@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2022 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -16,44 +16,52 @@
 │ TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR             │
 │ PERFORMANCE OF THIS SOFTWARE.                                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
-#include "libc/intrin/describeflags.internal.h"
+#include "libc/intrin/describeflags.h"
 
-// TODO(jart): Fork this function into ASAN and non-ASAN versions.
-const char *DescribeFlags(char *p, size_t n, struct DescribeFlags *d, size_t m,
-                          const char *prefix, unsigned x) {
+const char *_DescribeFlags(char *p, size_t n, const struct DescribeFlags *d,
+                           size_t m, const char *prefix, unsigned x) {
   bool t;
   char b[21];
   size_t i, j, k;
-  for (t = i = j = 0; j < m; ++j) {
+  for (t = false, i = j = 0; j < m; ++j) {
     if (d[j].flag && d[j].flag != -1 && (x & d[j].flag) == d[j].flag) {
       x &= ~d[j].flag;
       if (t) {
-        if (i + 1 < n) p[i++] = '|';
+        if (i + 1 < n)
+          p[i++] = '|';
       } else {
         t = true;
       }
       for (k = 0; prefix && prefix[k]; ++k) {
-        if (i + 1 < n) p[i++] = prefix[k];
+        if (i + 1 < n)
+          p[i++] = prefix[k];
       }
       for (k = 0; d[j].name[k]; ++k) {
-        if (i + 1 < n) p[i++] = d[j].name[k];
+        if (i + 1 < n)
+          p[i++] = d[j].name[k];
       }
     }
   }
   if (x || !t) {
-    if (t && i + 1 < n) p[i++] = '|';
-    if (i + 1 < n) p[i++] = '0';
+    if (t && i + 1 < n)
+      p[i++] = '|';
+    if (i + 1 < n)
+      p[i++] = '0';
     if (x) {
-      if (i + 1 < n) p[i++] = 'x';
+      if (i + 1 < n)
+        p[i++] = 'x';
       k = 0;
       do {
-        if (i + 1 < n) b[k++] = "0123456789abcdef"[x % 16];
+        if (i + 1 < n)
+          b[k++] = "0123456789abcdef"[x % 16];
       } while ((x /= 16));
       while (k--) {
-        if (i + 1 < n) p[i++] = b[k];
+        if (i + 1 < n)
+          p[i++] = b[k];
       }
     }
   }
-  if (i < n) p[i] = 0;
+  if (i < n)
+    p[i] = 0;
   return p;
 }

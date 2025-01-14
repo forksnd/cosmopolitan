@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2022 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -23,7 +23,7 @@
 #include "tool/plinko/lib/tree.h"
 
 static void PrettyPrintList(int fd, int x, int n) {
-  int i, y, once, func, mode, argwidth, funcwidth, forcedot;
+  int y, once, func, mode, argwidth, funcwidth, forcedot;
   DCHECK_GE(n, 0);
   DCHECK_LE(x, 0);
   if (x < cx) {
@@ -85,15 +85,18 @@ static void PrettyPrintList(int fd, int x, int n) {
         if (y >= 0) {
           argwidth += PrintSpace(fd);
           argwidth += PrintAtom(fd, y);
-          if (!once) n += argwidth;
+          if (!once)
+            n += argwidth;
         } else {
           if (once && (y < 0 || mode)) {
             mode = 1;
             PrintNewline(fd);
-            if (depth >= 0) PrintDepth(fd, depth);
+            if (depth >= 0)
+              PrintDepth(fd, depth);
             PrintIndent(fd, n);
           } else {
-            if (y < 0) mode = 1;
+            if (y < 0)
+              mode = 1;
             PrintSpace(fd);
           }
           once = 1;

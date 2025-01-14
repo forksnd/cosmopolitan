@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2020 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -24,6 +24,7 @@
 #include "libc/nt/runtime.h"
 #include "libc/sock/internal.h"
 #include "libc/sysv/errfuns.h"
+#include "libc/thread/tls.h"
 
 /**
  * Return path for failed Win32 API calls.
@@ -31,14 +32,17 @@
  * @return -1 w/ few exceptions
  * @note this is a code-size saving device
  */
-privileged int64_t __winerr(void) {
+privileged optimizesize int64_t __winerr(void) {
   errno_t e;
   if (IsWindows()) {
     e = __dos2errno(__imp_GetLastError());
-    _npassert(e > 0);
   } else {
     e = ENOSYS;
   }
-  errno = e;
+  if (__tls_enabled) {
+    __get_tls_privileged()->tib_errno = e;
+  } else {
+    __errno = e;
+  }
   return -1;
 }

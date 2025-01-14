@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2022 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -17,23 +17,34 @@
 │ PERFORMANCE OF THIS SOFTWARE.                                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
 #include "libc/atomic.h"
-#include "libc/calls/blocksigs.internal.h"
 #include "libc/calls/calls.h"
+#include "libc/calls/struct/sigaction.h"
+#include "libc/calls/struct/sigaltstack.h"
 #include "libc/dce.h"
 #include "libc/errno.h"
+#include "libc/intrin/kprintf.h"
 #include "libc/mem/gc.h"
 #include "libc/mem/mem.h"
 #include "libc/nexgen32e/nexgen32e.h"
+#include "libc/runtime/internal.h"
 #include "libc/runtime/runtime.h"
+#include "libc/runtime/sysconf.h"
+#include "libc/sysv/consts/sig.h"
 #include "libc/testlib/testlib.h"
 #include "libc/thread/thread.h"
 #include "libc/thread/thread2.h"
 
 int pfds[2];
+atomic_bool ready;
 pthread_cond_t cv;
 pthread_mutex_t mu;
 atomic_int gotcleanup;
-char testlib_enable_tmp_setup_teardown;
+
+void SetUpOnce(void) {
+  testlib_enable_tmp_setup_teardown();
+  pthread_mutex_init(&mu, 0);
+  pthread_cond_init(&cv, 0);
+}
 
 void SetUp(void) {
   gotcleanup = false;
@@ -53,7 +64,7 @@ void *CancelSelfWorkerDeferred(void *arg) {
   return 0;
 }
 
-TEST(pthread_cancel, self_deferred_waitsForCancellationPoint) {
+TEST(pthread_cancel, self_deferred_waitsForCancelationPoint) {
   void *rc;
   pthread_t th;
   ASSERT_SYS(0, 0, pipe(pfds));
@@ -66,8 +77,8 @@ TEST(pthread_cancel, self_deferred_waitsForCancellationPoint) {
 }
 
 void *Worker(void *arg) {
-  int n;
   char buf[8];
+  ready = true;
   pthread_cleanup_push(OnCleanup, 0);
   read(pfds[0], buf, sizeof(buf));
   pthread_cleanup_pop(0);
@@ -87,15 +98,17 @@ TEST(pthread_cancel, synchronous) {
   ASSERT_SYS(0, 0, close(pfds[0]));
 }
 
-TEST(pthread_cancel, synchronous_delayed) {
+TEST(pthread_cancel, synchronous_deferred) {
   void *rc;
   pthread_t th;
   ASSERT_SYS(0, 0, pipe(pfds));
   ASSERT_EQ(0, pthread_create(&th, 0, Worker, 0));
-  usleep(10);
-  ASSERT_EQ(0, pthread_cancel(th));
-  ASSERT_EQ(0, pthread_join(th, &rc));
-  ASSERT_EQ(PTHREAD_CANCELED, rc);
+  while (!ready)
+    pthread_yield();
+  ASSERT_SYS(0, 0, usleep(10));
+  EXPECT_EQ(0, pthread_cancel(th));
+  EXPECT_EQ(0, pthread_join(th, &rc));
+  EXPECT_EQ(PTHREAD_CANCELED, rc);
   ASSERT_TRUE(gotcleanup);
   ASSERT_SYS(0, 0, close(pfds[1]));
   ASSERT_SYS(0, 0, close(pfds[0]));
@@ -128,7 +141,7 @@ TEST(pthread_cancel, masked_delayed) {
   pthread_t th;
   ASSERT_SYS(0, 0, pipe(pfds));
   ASSERT_EQ(0, pthread_create(&th, 0, DisabledWorker, 0));
-  usleep(10);
+  ASSERT_SYS(0, 0, usleep(10));
   ASSERT_EQ(0, pthread_cancel(th));
   ASSERT_EQ(0, pthread_join(th, &rc));
   ASSERT_EQ(0, rc);
@@ -158,28 +171,28 @@ TEST(pthread_cancel, condWaitMaskedDelayed) {
   void *rc;
   pthread_t th;
   ASSERT_EQ(0, pthread_create(&th, 0, CondWaitMaskedWorker, 0));
-  usleep(10);
+  ASSERT_SYS(0, 0, usleep(10));
   ASSERT_EQ(0, pthread_cancel(th));
   ASSERT_EQ(0, pthread_join(th, &rc));
   ASSERT_EQ(0, rc);
 }
 
 void *CondWaitDeferredWorker(void *arg) {
-  pthread_setcancelstate(PTHREAD_CANCEL_DEFERRED, 0);
+  ASSERT_EQ(0, pthread_setcancelstate(PTHREAD_CANCEL_DEFERRED, 0));
   ASSERT_EQ(0, pthread_mutex_lock(&mu));
   ASSERT_EQ(ECANCELED, pthread_cond_timedwait(&cv, &mu, 0));
-  ASSERT_EQ(0, pthread_mutex_unlock(&mu));
-  return 0;
+  abort();
 }
 
-TEST(pthread_cancel, condDeferredWait) {
+TEST(pthread_cancel, condDeferredWait_reacquiresMutex) {
   void *rc;
   pthread_t th;
   ASSERT_EQ(0, pthread_create(&th, 0, CondWaitDeferredWorker, 0));
   ASSERT_EQ(0, pthread_cancel(th));
   ASSERT_EQ(0, pthread_join(th, &rc));
   ASSERT_EQ(PTHREAD_CANCELED, rc);
-  ASSERT_EQ(0, pthread_mutex_trylock(&mu));
+  ASSERT_EQ(EBUSY, pthread_mutex_trylock(&mu));
+  ASSERT_EQ(0, pthread_mutex_consistent(&mu));
   ASSERT_EQ(0, pthread_mutex_unlock(&mu));
 }
 
@@ -187,11 +200,12 @@ TEST(pthread_cancel, condDeferredWaitDelayed) {
   void *rc;
   pthread_t th;
   ASSERT_EQ(0, pthread_create(&th, 0, CondWaitDeferredWorker, 0));
-  usleep(10);
+  ASSERT_SYS(0, 0, usleep(10));
   ASSERT_EQ(0, pthread_cancel(th));
   ASSERT_EQ(0, pthread_join(th, &rc));
   ASSERT_EQ(PTHREAD_CANCELED, rc);
-  ASSERT_EQ(0, pthread_mutex_trylock(&mu));
+  ASSERT_EQ(EBUSY, pthread_mutex_trylock(&mu));
+  ASSERT_EQ(0, pthread_mutex_consistent(&mu));
   ASSERT_EQ(0, pthread_mutex_unlock(&mu));
 }
 
@@ -206,6 +220,7 @@ void KeyDestructor(void *arg) {
   key_destructor_was_run = true;
 }
 
+#ifdef __x86_64__
 void TortureStack(void) {
   asm("sub\t$4,%rsp\n\t"
       "pause\n\t"
@@ -213,6 +228,7 @@ void TortureStack(void) {
       "pause\n\t"
       "add\t$6,%rsp");
 }
+#endif
 
 void *CpuBoundWorker(void *arg) {
   char *volatile wontleak1;
@@ -220,32 +236,35 @@ void *CpuBoundWorker(void *arg) {
   CheckStackIsAligned();
   wouldleak = malloc(123);
   wontleak1 = malloc(123);
+  (void)wontleak1;
   pthread_cleanup_push(free, wontleak1);
-  wontleak2 = _gc(malloc(123));
+  wontleak2 = gc(malloc(123));
+  (void)wontleak2;
   ASSERT_EQ(0, pthread_setspecific(key, (void *)31337));
   ASSERT_EQ(0, pthread_setcanceltype(PTHREAD_CANCEL_ASYNCHRONOUS, 0));
   for (;;) {
+#ifdef __x86_64__
     TortureStack();
+#else
+    CheckStackIsAligned();
+#endif
     is_in_infinite_loop = true;
   }
   pthread_cleanup_pop(1);
   free(wouldleak);
+  return 0;
 }
 
 TEST(pthread_cancel, async) {
   void *rc;
   pthread_t th;
   ASSERT_EQ(0, pthread_key_create(&key, KeyDestructor));
-  if (IsWindows()) {
-    // asynchronous cancellations aren't possible on windows yet
-    ASSERT_EQ(ENOTSUP, pthread_setcanceltype(PTHREAD_CANCEL_ASYNCHRONOUS, 0));
-    return;
-  }
   wouldleak = NULL;
   is_in_infinite_loop = false;
   key_destructor_was_run = false;
   ASSERT_EQ(0, pthread_create(&th, 0, CpuBoundWorker, 0));
-  while (!is_in_infinite_loop) pthread_yield();
+  while (!is_in_infinite_loop)
+    pthread_yield();
   ASSERT_EQ(0, pthread_cancel(th));
   ASSERT_EQ(0, pthread_join(th, &rc));
   ASSERT_EQ(PTHREAD_CANCELED, rc);
@@ -255,10 +274,9 @@ TEST(pthread_cancel, async) {
 }
 
 void *CancelSelfWorkerAsync(void *arg) {
-  char buf[8];
-  pthread_setcanceltype(PTHREAD_CANCEL_ASYNCHRONOUS, 0);
+  ASSERT_EQ(0, pthread_setcanceltype(PTHREAD_CANCEL_ASYNCHRONOUS, 0));
   pthread_cleanup_push(OnCleanup, 0);
-  pthread_cancel(pthread_self());
+  ASSERT_EQ(0, pthread_cancel(pthread_self()));
   pthread_cleanup_pop(0);
   return 0;
 }
@@ -266,7 +284,6 @@ void *CancelSelfWorkerAsync(void *arg) {
 TEST(pthread_cancel, self_asynchronous_takesImmediateEffect) {
   void *rc;
   pthread_t th;
-  if (IsWindows()) return;
   ASSERT_SYS(0, 0, pipe(pfds));
   ASSERT_EQ(0, pthread_create(&th, 0, CancelSelfWorkerAsync, 0));
   ASSERT_EQ(0, pthread_join(th, &rc));
@@ -274,4 +291,30 @@ TEST(pthread_cancel, self_asynchronous_takesImmediateEffect) {
   ASSERT_TRUE(gotcleanup);
   ASSERT_SYS(0, 0, close(pfds[1]));
   ASSERT_SYS(0, 0, close(pfds[0]));
+}
+
+atomic_bool was_completed;
+
+void WaitUntilReady(void) {
+  while (!ready)
+    pthread_yield();
+  ASSERT_EQ(0, errno);
+  ASSERT_SYS(0, 0, usleep(1000));
+}
+
+void *SleepWorker(void *arg) {
+  pthread_setcancelstate(PTHREAD_CANCEL_MASKED, 0);
+  ready = true;
+  ASSERT_SYS(ECANCELED, -1, usleep(30 * 1e6));
+  was_completed = true;
+  return 0;
+}
+
+TEST(pthread_cancel, canInterruptSleepOperation) {
+  pthread_t th;
+  ASSERT_EQ(0, pthread_create(&th, 0, SleepWorker, 0));
+  WaitUntilReady();
+  ASSERT_EQ(0, pthread_cancel(th));
+  ASSERT_EQ(0, pthread_join(th, 0));
+  ASSERT_TRUE(was_completed);
 }

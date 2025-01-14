@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2020 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -25,12 +25,10 @@
 #include "libc/dce.h"
 #include "libc/errno.h"
 #include "libc/fmt/itoa.h"
-#include "libc/intrin/asan.internal.h"
-#include "libc/intrin/strace.internal.h"
+#include "libc/intrin/strace.h"
 #include "libc/log/log.h"
-#include "libc/macros.internal.h"
+#include "libc/macros.h"
 #include "libc/nt/enum/computernameformat.h"
-#include "libc/nt/struct/teb.h"
 #include "libc/nt/systeminfo.h"
 #include "libc/runtime/runtime.h"
 #include "libc/str/str.h"
@@ -47,6 +45,12 @@
 #define CTL_HW     6
 #define HW_MACHINE 1
 
+#define COSMOPOLITAN_VERSION_STR__(x, y, z) #x "." #y "." #z
+#define COSMOPOLITAN_VERSION_STR_(x, y, z)  COSMOPOLITAN_VERSION_STR__(x, y, z)
+#define COSMOPOLITAN_VERSION_STR                                            \
+  COSMOPOLITAN_VERSION_STR_(__COSMOPOLITAN_MAJOR__, __COSMOPOLITAN_MINOR__, \
+                            __COSMOPOLITAN_PATCH__)
+
 // Gets BSD sysctl() string, guaranteeing NUL-terminator.
 // We ignore errors since this syscall mutates on ENOMEM.
 // In that case, sysctl() doesn't guarantee the nul term.
@@ -56,7 +60,7 @@ static void GetBsdStr(int c0, int c1, char *s) {
   size_t n = SYS_NMLN;
   int cmd[2] = {c0, c1};
   bzero(s, n), --n;
-  sys_sysctl(cmd, 2, s, &n, NULL, 0);
+  sysctl(cmd, 2, s, &n, NULL, 0);
   errno = e;
   // sysctl kern.version is too verbose for uname
   if ((p = strchr(s, '\n'))) {
@@ -66,7 +70,6 @@ static void GetBsdStr(int c0, int c1, char *s) {
 
 // Gets NT name ignoring errors with guaranteed NUL-terminator.
 static textwindows void GetNtName(char *name, int kind) {
-  uint32_t n = SYS_NMLN;
   char16_t name16[256];
   uint32_t size = ARRAYLEN(name16);
   if (GetComputerNameEx(kind, name16, &size)) {
@@ -76,22 +79,13 @@ static textwindows void GetNtName(char *name, int kind) {
   }
 }
 
-static inline textwindows noasan int GetNtMajorVersion(void) {
-  return NtGetPeb()->OSMajorVersion;
-}
-
-static inline textwindows noasan int GetNtMinorVersion(void) {
-  return NtGetPeb()->OSMinorVersion;
-}
-
-static inline textwindows noasan int GetNtBuildNumber(void) {
-  return NtGetPeb()->OSBuildNumber;
-}
-
 static textwindows void GetNtVersion(char *p) {
-  p = FormatUint32(p, GetNtMajorVersion()), *p++ = '.';
-  p = FormatUint32(p, GetNtMinorVersion()), *p++ = '-';
-  p = FormatUint32(p, GetNtBuildNumber());
+  // We could ask GetVersionExW() for this information, but it'll simply
+  // report what we put in the MajorOperatingSystemVersion of the PE ape
+  // header fields. Windows doesn't want us detecting versions it seems.
+  // Chances are they bake all old versions of Windows into Windows, and
+  // run us on the intended one, like some kind of Docker container. Heh
+  strcpy(p, "10.0");
 }
 
 static const char *Str(int rc, const char *s) {
@@ -141,17 +135,17 @@ static const char *Str(int rc, const char *s) {
  */
 int uname(struct utsname *uts) {
   int rc;
-  if (!uts || (IsAsan() && !__asan_is_valid(uts, sizeof(*uts)))) {
+  if (!uts) {
     rc = efault();
   } else if (IsLinux()) {
     struct utsname_linux linux;
     if (!(rc = sys_uname_linux(&linux))) {
-      stpcpy(uts->sysname, linux.sysname);
-      stpcpy(uts->nodename, linux.nodename);
-      stpcpy(uts->release, linux.release);
-      stpcpy(uts->version, linux.version);
-      stpcpy(uts->machine, linux.machine);
-      stpcpy(uts->domainname, linux.domainname);
+      strlcpy(uts->sysname, linux.sysname, SYS_NMLN);
+      strlcpy(uts->nodename, linux.nodename, SYS_NMLN);
+      strlcpy(uts->release, linux.release, SYS_NMLN);
+      strlcpy(uts->version, linux.version, SYS_NMLN);
+      strlcpy(uts->machine, linux.machine, SYS_NMLN);
+      strlcpy(uts->domainname, linux.domainname, SYS_NMLN);
       if (!strcmp(uts->domainname, "(none)")) {
         uts->domainname[0] = 0;
       }
@@ -167,13 +161,24 @@ int uname(struct utsname *uts) {
   } else if (IsWindows()) {
     stpcpy(uts->sysname, "Windows");
     stpcpy(uts->machine, "x86_64");
-    GetNtVersion(stpcpy(uts->version, "Windows "));
     GetNtVersion(uts->release);
     GetNtName(uts->nodename, kNtComputerNamePhysicalDnsHostname);
     GetNtName(uts->domainname, kNtComputerNamePhysicalDnsDomain);
     rc = 0;
   } else {
     rc = enosys();
+  }
+  if (!rc) {
+    char buf[SYS_NMLN];
+    stpcpy(buf, "Cosmopolitan " COSMOPOLITAN_VERSION_STR);
+    if (*MODE) {
+      strlcat(buf, " MODE=" MODE, SYS_NMLN);
+    }
+    if (*uts->version) {
+      strlcat(buf, "; ", SYS_NMLN);
+      strlcat(buf, uts->version, SYS_NMLN);
+    }
+    strlcpy(uts->version, buf, SYS_NMLN);
   }
   STRACE("uname([{%#s, %#s, %#s, %#s, %#s, %#s}]) → %d% m",
          Str(rc, uts->sysname), Str(rc, uts->nodename), Str(rc, uts->release),

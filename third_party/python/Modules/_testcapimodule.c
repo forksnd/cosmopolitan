@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:4;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=4 sts=4 sw=4 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=4 sts=4 sw=4 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Python 3                                                                     │
 │ https://docs.python.org/3/license.html                                       │
@@ -9,12 +9,11 @@
 #include "libc/calls/calls.h"
 #include "libc/calls/weirdtypes.h"
 #include "libc/errno.h"
-#include "libc/fmt/fmt.h"
 #include "libc/limits.h"
 #include "libc/math.h"
 #include "libc/mem/mem.h"
 #include "libc/sysv/consts/sig.h"
-#include "libc/time/time.h"
+#include "libc/time.h"
 #include "third_party/python/Include/abstract.h"
 #include "third_party/python/Include/boolobject.h"
 #include "third_party/python/Include/bytearrayobject.h"
@@ -45,7 +44,6 @@
 #include "third_party/python/Include/traceback.h"
 #include "third_party/python/Include/yoink.h"
 #include "third_party/python/pyconfig.h"
-/* clang-format off */
 
 PYTHON_PROVIDE("_testcapi");
 PYTHON_PROVIDE("_testcapi.CHAR_MAX");
@@ -4305,6 +4303,7 @@ tracemalloc_track(PyObject *self, PyObject *args)
     Py_ssize_t size;
     int release_gil = 0;
     int res;
+    (void)ptr;
 
     if (!PyArg_ParseTuple(args, "IOn|i", &domain, &ptr_obj, &size, &release_gil))
         return NULL;
@@ -4336,6 +4335,7 @@ tracemalloc_untrack(PyObject *self, PyObject *args)
     PyObject *ptr_obj;
     void *ptr;
     int res;
+    (void)ptr;
 
     if (!PyArg_ParseTuple(args, "IO", &domain, &ptr_obj))
         return NULL;
@@ -4358,6 +4358,7 @@ tracemalloc_get_traceback(PyObject *self, PyObject *args)
     unsigned int domain;
     PyObject *ptr_obj;
     void *ptr;
+    (void)ptr;
 
     if (!PyArg_ParseTuple(args, "IO", &domain, &ptr_obj))
         return NULL;
@@ -5218,7 +5219,12 @@ PyInit__testcapi(void)
     return m;
 }
 
-_Section(".rodata.pytab.1") const struct _inittab _PyImport_Inittab__testcapi = {
+#ifdef __aarch64__
+_Section(".rodata.pytab.1 //")
+#else
+_Section(".rodata.pytab.1")
+#endif
+ const struct _inittab _PyImport_Inittab__testcapi = {
     "_testcapi",
     PyInit__testcapi,
 };

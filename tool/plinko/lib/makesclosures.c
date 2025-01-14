@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2022 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -21,14 +21,18 @@
 bool MakesClosures(int x) {
   int h;
   if (x < 0 && (h = Car(x)) != kQuote && h != kClosure) {
-    if (h == kMacro) return true;
-    if (h == kLambda) return true;
+    if (h == kMacro)
+      return true;
+    if (h == kLambda)
+      return true;
     if (h == kCond) {
       while ((x = Cdr(x)) < 0) {
         if ((h = Car(x)) < 0) {
-          if (MakesClosures(Car(h))) return true;
+          if (MakesClosures(Car(h)))
+            return true;
           if ((h = Cdr(h)) < 0) {
-            if (MakesClosures(Car(h))) return true;
+            if (MakesClosures(Car(h)))
+              return true;
           }
         }
       }

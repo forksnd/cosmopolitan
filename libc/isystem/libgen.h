@@ -1,4 +1,4 @@
-#ifndef COSMOPOLITAN_LIBC_ISYSTEM_LIBGEN_H_
-#define COSMOPOLITAN_LIBC_ISYSTEM_LIBGEN_H_
-#include "libc/fmt/conv.h"
-#endif /* COSMOPOLITAN_LIBC_ISYSTEM_LIBGEN_H_ */
+#ifndef _LIBGEN_H
+#define _LIBGEN_H
+#include "libc/fmt/libgen.h"
+#endif /* _LIBGEN_H */

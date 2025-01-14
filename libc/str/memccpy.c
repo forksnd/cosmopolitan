@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2020 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -16,7 +16,6 @@
 │ TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR             │
 │ PERFORMANCE OF THIS SOFTWARE.                                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
-#include "libc/intrin/bits.h"
 #include "libc/str/str.h"
 
 /**
@@ -46,13 +45,14 @@
  * @asyncsignalsafe
  */
 void *memccpy(void *dst, const void *src, int c, size_t n) {
-  size_t i;
-  unsigned char *d;
-  const unsigned char *s;
-  for (d = dst, s = src, i = 0; i < n; ++i) {
-    if ((d[i] = s[i]) == (c & 255)) {
-      return d + i + 1;
-    }
+  const char *p;
+  // this memchr() call is only correct if your memchr() implementation
+  // offers the same readahead safety guarantees as cosmopolitan's does
+  if ((p = memchr(src, c, n))) {
+    size_t m = p + 1 - (const char *)src;
+    memmove(dst, src, m);
+    return (char *)dst + m;
   }
+  memmove(dst, src, n);
   return 0;
 }

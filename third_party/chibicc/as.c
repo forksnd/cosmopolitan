@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2020 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -20,24 +20,25 @@
 #include "libc/calls/struct/stat.h"
 #include "libc/elf/def.h"
 #include "libc/fmt/conv.h"
-#include "libc/intrin/bits.h"
 #include "libc/intrin/bsr.h"
 #include "libc/intrin/popcnt.h"
 #include "libc/log/check.h"
 #include "libc/log/log.h"
-#include "libc/macros.internal.h"
+#include "libc/macros.h"
 #include "libc/mem/mem.h"
 #include "libc/nexgen32e/crc32.h"
 #include "libc/runtime/runtime.h"
 #include "libc/stdio/stdio.h"
 #include "libc/str/str.h"
-#include "libc/str/tab.internal.h"
+#include "libc/str/tab.h"
 #include "libc/sysv/consts/o.h"
 #include "libc/sysv/consts/s.h"
 #include "libc/x/x.h"
 #include "libc/x/xasprintf.h"
 #include "third_party/chibicc/file.h"
 #include "third_party/gdtoa/gdtoa.h"
+#include "libc/serialize.h"
+#include "libc/ctype.h"
 #include "tool/build/lib/elfwriter.h"
 
 #define OSZ  0x66
@@ -481,11 +482,11 @@ static void ReadFlags(struct As *a, int argc, char *argv[]) {
   for (i = 1; i < argc; ++i) {
     if (!strcmp(argv[i], "-o")) {
       a->outpath = StrDup(a, argv[++i]);
-    } else if (_startswith(argv[i], "-o")) {
+    } else if (startswith(argv[i], "-o")) {
       a->outpath = StrDup(a, argv[i] + 2);
     } else if (!strcmp(argv[i], "-I")) {
       SaveString(&a->incpaths, strdup(argv[++i]));
-    } else if (_startswith(argv[i], "-I")) {
+    } else if (startswith(argv[i], "-I")) {
       SaveString(&a->incpaths, strdup(argv[i] + 2));
     } else if (!strcmp(argv[i], "-Z")) {
       a->inhibiterr = true;
@@ -775,7 +776,7 @@ static void Tokenize(struct As *a, int path) {
 
 static int GetSymbol(struct As *a, int name) {
   struct HashEntry *p;
-  unsigned i, j, k, n, m, h, n2;
+  unsigned i, j, k, n, m, h;
   if (!(h = crc32c(0, a->slices.p[name].p, a->slices.p[name].n))) h = 1;
   n = a->symbolindex.n;
   i = 0;
@@ -932,7 +933,6 @@ static int NewBinary(struct As *a, enum ExprKind k, int lhs, int rhs) {
 //         | symbol
 //         | reference
 static int ParsePrimary(struct As *a, int *rest, int i) {
-  int e;
   if (IsInt(a, i)) {
     *rest = i + 1;
     return NewPrimary(a, EX_INT, a->ints.p[a->things.p[i].i]);
@@ -1669,13 +1669,13 @@ static int GrabSection(struct As *a, int name, int flags, int type, int group,
 static void OnSection(struct As *a, struct Slice s) {
   int name, flags, type, group = -1, comdat = -1;
   name = SliceDup(a, GetSlice(a));
-  if (_startswith(a->strings.p[name], ".text")) {
+  if (startswith(a->strings.p[name], ".text")) {
     flags = SHF_ALLOC | SHF_EXECINSTR;
     type = SHT_PROGBITS;
-  } else if (_startswith(a->strings.p[name], ".data")) {
+  } else if (startswith(a->strings.p[name], ".data")) {
     flags = SHF_ALLOC | SHF_WRITE;
     type = SHT_PROGBITS;
-  } else if (_startswith(a->strings.p[name], ".bss")) {
+  } else if (startswith(a->strings.p[name], ".bss")) {
     flags = SHF_ALLOC | SHF_WRITE;
     type = SHT_NOBITS;
   } else {
@@ -1765,7 +1765,7 @@ static void OnSize(struct As *a, struct Slice s) {
 }
 
 static void OnEqu(struct As *a, struct Slice s) {
-  int i, j;
+  int i;
   i = GetSymbol(a, a->things.p[a->i++].i);
   ConsumeComma(a);
   a->symbols.p[i].offset = GetInt(a);
@@ -1894,7 +1894,7 @@ static bool Prefix(struct As *a, const char *p, int n) {
     l = 0;
     r = ARRAYLEN(kPrefix) - 1;
     while (l <= r) {
-      m = (l + r) >> 1;
+      m = (l & r) + ((l ^ r) >> 1);  // floor((a+b)/2)
       y = READ64BE(kPrefix[m]);
       if (x < y) {
         r = m - 1;
@@ -1919,7 +1919,7 @@ static bool FindReg(const char *p, int n, struct Reg *out_reg) {
     l = 0;
     r = ARRAYLEN(kRegs) - 1;
     while (l <= r) {
-      m = (l + r) >> 1;
+      m = (l & r) + ((l ^ r) >> 1);  // floor((a+b)/2)
       y = READ64BE(kRegs[m].s);
       if (x < y) {
         r = m - 1;
@@ -1967,15 +1967,17 @@ static int RemoveRexw(int x) {
 
 static int GetRegisterReg(struct As *a) {
   int reg;
-  struct Slice wut;
-  if ((reg = FindRegReg(GetSlice(a))) == -1) InvalidRegister(a);
+  if ((reg = FindRegReg(GetSlice(a))) == -1) {
+    InvalidRegister(a);
+  }
   return reg;
 }
 
 static int GetRegisterRm(struct As *a) {
   int reg;
-  struct Slice wut;
-  if ((reg = FindRegRm(GetSlice(a))) == -1) InvalidRegister(a);
+  if ((reg = FindRegRm(GetSlice(a))) == -1) {
+    InvalidRegister(a);
+  }
   return reg;
 }
 
@@ -1992,7 +1994,7 @@ static int ParseModrm(struct As *a, int *disp) {
                │││││├──────┐├┐├─┐├─┐
   0b00000000000000000000000000000000*/
   struct Slice str;
-  int reg, scale, modrm = 0;
+  int reg, modrm = 0;
   if (!ConsumeSegment(a) && IsRegister(a, a->i)) {
     *disp = 0;
     modrm = GetRegisterRm(a) | ISREG;
@@ -2027,7 +2029,7 @@ static int ParseModrm(struct As *a, int *disp) {
         if (((reg & 070) >> 3) == 2) modrm |= HASASZ;  // asz
         if (IsComma(a)) {
           ++a->i;
-          modrm |= (_bsr(GetInt(a)) & 3) << 6;
+          modrm |= (bsr(GetInt(a)) & 3) << 6;
         }
       }
       ConsumePunct(a, ')');
@@ -2057,12 +2059,12 @@ static void EmitImm(struct As *a, int reg, int imm) {
 }
 
 static void EmitModrm(struct As *a, int reg, int modrm, int disp) {
-  int relo, mod, rm;
+  int relo, mod;
   void (*emitter)(struct As *, uint128_t);
   reg &= 7;
   reg <<= 3;
   if (modrm & ISREG) {
-    EmitByte(a, 0300 | reg | modrm & 7);
+    EmitByte(a, 0300 | reg | (modrm & 7));
   } else {
     if (modrm & ISRIP) {
       EmitByte(a, 005 | reg);
@@ -2348,7 +2350,7 @@ static dontinline void OpXadd(struct As *a) {
 }
 
 static dontinline int OpF6Impl(struct As *a, struct Slice s, int reg) {
-  int modrm, imm, disp;
+  int modrm, disp;
   modrm = ParseModrm(a, &disp);
   reg |= GetOpSize(a, s, modrm, 1) << 3;
   EmitRexOpModrm(a, 0xF6, reg, modrm, disp, 1);
@@ -2609,8 +2611,8 @@ static bool HasXmmOnLine(struct As *a) {
   int i;
   for (i = 0; !IsPunct(a, a->i + i, ';'); ++i) {
     if (IsSlice(a, a->i + i) && a->slices.p[a->things.p[a->i + i].i].n >= 4 &&
-        (_startswith(a->slices.p[a->things.p[a->i + i].i].p, "xmm") ||
-         _startswith(a->slices.p[a->things.p[a->i + i].i].p, "%xmm"))) {
+        (startswith(a->slices.p[a->things.p[a->i + i].i].p, "xmm") ||
+         startswith(a->slices.p[a->things.p[a->i + i].i].p, "%xmm"))) {
       return true;
     }
   }
@@ -2642,7 +2644,6 @@ static void OnPush(struct As *a, struct Slice s) {
 }
 
 static void OnRdpid(struct As *a, struct Slice s) {
-  int modrm, disp;
   EmitVarword(a, 0xf30fc7);
   EmitByte(a, 0370 | GetRegisterReg(a));
 }
@@ -2700,6 +2701,8 @@ static void OnFile(struct As *a, struct Slice s) {
   struct Slice path;
   fileno = GetInt(a);
   path = GetSlice(a);
+  (void)fileno;
+  (void)path;
   // TODO: DWARF
 }
 
@@ -2707,6 +2710,8 @@ static void OnLoc(struct As *a, struct Slice s) {
   int fileno, lineno;
   fileno = GetInt(a);
   lineno = GetInt(a);
+  (void)fileno;
+  (void)lineno;
   // TODO: DWARF
 }
 
@@ -2762,7 +2767,7 @@ static void OnFxch(struct As *a, struct Slice s) {
   int rm;
   rm = !IsSemicolon(a) ? GetRegisterRm(a) : 1;
   EmitByte(a, 0xD9);
-  EmitByte(a, 0310 | rm & 7);
+  EmitByte(a, 0310 | (rm & 7));
 }
 
 static void OnBswap(struct As *a, struct Slice s) {
@@ -2770,7 +2775,7 @@ static void OnBswap(struct As *a, struct Slice s) {
   srm = GetRegisterRm(a);
   EmitRex(a, srm);
   EmitByte(a, 0x0F);
-  EmitByte(a, 0310 | srm & 7);
+  EmitByte(a, 0310 | (srm & 7));
 }
 
 static dontinline void OpFcomImpl(struct As *a, int op) {
@@ -2786,7 +2791,7 @@ static dontinline void OpFcomImpl(struct As *a, int op) {
       }
     }
   }
-  EmitVarword(a, op | rm & 7);
+  EmitVarword(a, op | (rm & 7));
 }
 
 static dontinline void OpFcom(struct As *a, int op) {
@@ -3740,7 +3745,7 @@ static bool OnDirective8(struct As *a, struct Slice s) {
     l = 0;
     r = ARRAYLEN(kDirective8) - 1;
     while (l <= r) {
-      m = (l + r) >> 1;
+      m = (l & r) + ((l ^ r) >> 1);  // floor((a+b)/2)
       y = READ64BE(kDirective8[m].s);
       if (x < y) {
         r = m - 1;
@@ -3763,7 +3768,7 @@ static bool OnDirective16(struct As *a, struct Slice s) {
     l = 0;
     r = ARRAYLEN(kDirective16) - 1;
     while (l <= r) {
-      m = (l + r) >> 1;
+      m = (l & r) + ((l ^ r) >> 1);  // floor((a+b)/2)
       y = READ128BE(kDirective16[m].s);
       if (x < y) {
         r = m - 1;
@@ -3940,7 +3945,7 @@ static void Objectify(struct As *a, int path) {
   char *p;
   int i, j, s, e;
   struct ElfWriter *elf;
-  elf = elfwriter_open(a->strings.p[path], 0644);
+  elf = elfwriter_open(a->strings.p[path], 0644, EM_NEXGEN32E);
   for (i = 0; i < a->symbols.n; ++i) {
     if (!IsLiveSymbol(a, i)) continue;
     p = strndup(a->slices.p[a->symbols.p[i].name].p,

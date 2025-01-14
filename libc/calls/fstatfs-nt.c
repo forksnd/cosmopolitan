@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2022 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -22,9 +22,8 @@
 #include "libc/calls/struct/statfs.h"
 #include "libc/calls/struct/statfs.internal.h"
 #include "libc/calls/syscall_support-nt.internal.h"
-#include "libc/intrin/tpenc.h"
 #include "libc/limits.h"
-#include "libc/macros.internal.h"
+#include "libc/macros.h"
 #include "libc/nt/enum/fsinformationclass.h"
 #include "libc/nt/enum/status.h"
 #include "libc/nt/files.h"
@@ -38,7 +37,6 @@
 textwindows int sys_fstatfs_nt(int64_t handle, struct statfs *f) {
   uint64_t w;
   NtStatus st;
-  uint32_t type;
   uint32_t h, i, j;
   struct NtIoStatusBlock io;
   struct NtFileFsFullSizeInformation fs;
@@ -56,11 +54,12 @@ textwindows int sys_fstatfs_nt(int64_t handle, struct statfs *f) {
   st = NtQueryVolumeInformationFile(handle, &io, &fs, sizeof(fs),
                                     kNtFileFsFullSizeInformation);
   if (!NtSuccess(st)) {
-    if (st == kNtStatusDllNotFound) return enosys();
+    if (st == kNtStatusDllNotFound)
+      return enosys();
     return eio();
   }
   for (h = j = i = 0; FileSystemNameBuffer[i]; i++) {
-    w = _tpenc(FileSystemNameBuffer[i]);
+    w = tpenc(FileSystemNameBuffer[i]);
     do {
       if (j + 1 < sizeof(f->f_fstypename)) {
         h = ((unsigned)(w & 255) + h) * 0x9e3779b1u;

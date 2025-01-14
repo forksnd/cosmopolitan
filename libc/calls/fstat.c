@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2020 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -20,15 +20,18 @@
 #include "libc/calls/internal.h"
 #include "libc/calls/struct/stat.internal.h"
 #include "libc/dce.h"
-#include "libc/intrin/asan.internal.h"
-#include "libc/intrin/describeflags.internal.h"
-#include "libc/intrin/strace.internal.h"
+#include "libc/intrin/describeflags.h"
+#include "libc/intrin/strace.h"
 #include "libc/intrin/weaken.h"
+#include "libc/runtime/zipos.internal.h"
 #include "libc/sysv/errfuns.h"
-#include "libc/zipos/zipos.internal.h"
 
 /**
  * Returns information about file, via open()'d descriptor.
+ *
+ * On Windows, this implementation always sets `st_uid` and `st_gid` to
+ * `getuid()` and `getgid()`. The `st_mode` field is generated based on
+ * the current umask().
  *
  * @return 0 on success or -1 w/ errno
  * @raise EBADF if `fd` isn't a valid file descriptor
@@ -41,15 +44,17 @@ int fstat(int fd, struct stat *st) {
   if (__isfdkind(fd, kFdZip)) {
     rc = _weaken(__zipos_fstat)(
         (struct ZiposHandle *)(intptr_t)g_fds.p[fd].handle, st);
-  } else if (!IsWindows() && !IsMetal()) {
+  } else if (IsLinux() || IsXnu() || IsFreebsd() || IsOpenbsd() || IsNetbsd()) {
     rc = sys_fstat(fd, st);
   } else if (IsMetal()) {
     rc = sys_fstat_metal(fd, st);
-  } else if (!__isfdkind(fd, kFdFile)) {
-    rc = ebadf();
+  } else if (IsWindows()) {
+    rc = sys_fstat_nt(fd, st);
   } else {
-    rc = sys_fstat_nt(__getfdhandleactual(fd), st);
+    rc = enosys();
   }
   STRACE("fstat(%d, [%s]) → %d% m", fd, DescribeStat(rc, st), rc);
   return rc;
 }
+
+__weak_reference(fstat, fstat64);

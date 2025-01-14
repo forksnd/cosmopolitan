@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2022 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -17,28 +17,29 @@
 │ PERFORMANCE OF THIS SOFTWARE.                                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
 #include "libc/calls/syscall_support-nt.internal.h"
-#include "libc/intrin/describeflags.internal.h"
-#include "libc/intrin/strace.internal.h"
+#include "libc/intrin/describeflags.h"
+#include "libc/intrin/strace.h"
 #include "libc/nt/files.h"
+#include "libc/nt/runtime.h"
 #include "libc/nt/thunk/msabi.h"
 
 __msabi extern typeof(ReOpenFile) *const __imp_ReOpenFile;
+__msabi extern typeof(GetLastError) *const __imp_GetLastError;
 
 /**
  * Reopens file on the New Technology.
  *
  * @return handle, or -1 on failure
- * @note this wrapper takes care of ABI, STRACE(), and __winerr()
  */
 int64_t ReOpenFile(int64_t hOriginalFile, uint32_t dwDesiredAccess,
                    uint32_t dwShareMode, uint32_t dwFlagsAndAttributes) {
   int64_t hHandle;
   hHandle = __imp_ReOpenFile(hOriginalFile, dwDesiredAccess, dwShareMode,
                              dwFlagsAndAttributes);
-  if (hHandle == -1) __winerr();
-  NTTRACE("ReOpenFile(%ld, %s, %s, %s) → %ld% m", hOriginalFile,
+  NTTRACE("ReOpenFile(%ld, %s, %s, %s) → {%ld, %d}", hOriginalFile,
           DescribeNtFileAccessFlags(dwDesiredAccess),
           DescribeNtFileShareFlags(dwShareMode),
-          DescribeNtFileFlagAttr(dwFlagsAndAttributes), hHandle);
+          DescribeNtFileFlagAttr(dwFlagsAndAttributes), hHandle,
+          __imp_GetLastError());
   return hHandle;
 }

@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2020 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -19,6 +19,7 @@
 #include "libc/errno.h"
 #include "libc/fmt/conv.h"
 #include "libc/mem/mem.h"
+#include "libc/stdckdint.h"
 
 /**
  * Manages array memory, the BSD way.
@@ -26,11 +27,10 @@
  * @param ptr may be NULL for malloc() behavior
  * @param nmemb may be 0 for free() behavior; shrinking is promised too
  * @return new address or NULL w/ errno and ptr is NOT free()'d
- * @threadsafe
  */
 void *reallocarray(void *ptr, size_t nmemb, size_t itemsize) {
   size_t n;
-  if (!__builtin_mul_overflow(nmemb, itemsize, &n)) {
+  if (!ckd_mul(&n, nmemb, itemsize)) {
     return realloc(ptr, n);
   } else {
     errno = ENOMEM;

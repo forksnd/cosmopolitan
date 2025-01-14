@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2020 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -18,8 +18,10 @@
 ╚─────────────────────────────────────────────────────────────────────────────*/
 #include "libc/calls/internal.h"
 #include "libc/calls/syscall_support-nt.internal.h"
-#include "libc/mem/gc.internal.h"
+#include "libc/dce.h"
+#include "libc/mem/gc.h"
 #include "libc/testlib/testlib.h"
+#if SupportsWindows()
 
 char16_t p[PATH_MAX];
 
@@ -35,8 +37,8 @@ TEST(mkntpath, testSlashes) {
    * all it takes to make the feature entirely useless to us, similar to
    * the law of noncontradiction. We address the issue as follows:
    */
-  EXPECT_EQ(9, __mkntpath("o/foo.com", p));
-  EXPECT_STREQ(u"o\\foo.com", p);
+  EXPECT_EQ(5, __mkntpath("o/foo", p));
+  EXPECT_STREQ(u"o\\foo", p);
 }
 
 TEST(mkntpath, testUnicode) {
@@ -48,3 +50,35 @@ TEST(mkntpath, testRemoveDoubleSlash) {
   EXPECT_EQ(21, __mkntpath("C:\\Users\\jart\\\\.config", p));
   EXPECT_STREQ(u"C:\\Users\\jart\\.config", p);
 }
+
+TEST(mkntpath, testRelativeCurrentParent) {
+  EXPECT_EQ(3, __mkntpath("./../", p));
+  EXPECT_STREQ(u"..\\", p);
+}
+
+TEST(mkntpath, testRelativeParentParent) {
+  EXPECT_EQ(6, __mkntpath("../../", p));
+  EXPECT_STREQ(u"..\\..\\", p);
+}
+
+TEST(mkntpath, testRelativeParentParentParent) {
+  EXPECT_EQ(9, __mkntpath("../../../", p));
+  EXPECT_STREQ(u"..\\..\\..\\", p);
+}
+
+TEST(mkntpath, testRelativeDirParent) {
+  EXPECT_EQ(2, __mkntpath("abc/../", p));
+  EXPECT_STREQ(u".\\", p);
+}
+
+TEST(mkntpath, testRelativeDirCurrent) {
+  EXPECT_EQ(4, __mkntpath("abc/./", p));
+  EXPECT_STREQ(u"abc\\", p);
+}
+
+TEST(mkntpath, testRelativeDirDirParent) {
+  EXPECT_EQ(4, __mkntpath("abc/def/../", p));
+  EXPECT_STREQ(u"abc\\", p);
+}
+
+#endif /* SupportsWindows() */

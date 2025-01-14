@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=8 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=8 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2020 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -16,20 +16,50 @@
 │ TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR             │
 │ PERFORMANCE OF THIS SOFTWARE.                                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
-#include "libc/assert.h"
 #include "libc/calls/calls.h"
-#include "libc/calls/internal.h"
-#include "libc/calls/struct/iovec.h"
 #include "libc/calls/struct/iovec.internal.h"
 #include "libc/errno.h"
 #include "libc/fmt/conv.h"
-#include "libc/macros.internal.h"
-#include "libc/runtime/runtime.h"
-#include "libc/sock/sock.h"
+#include "libc/macros.h"
+#include "libc/stdckdint.h"
 #include "libc/stdio/internal.h"
 #include "libc/stdio/stdio.h"
 #include "libc/str/str.h"
 #include "libc/sysv/consts/o.h"
+
+static ssize_t writevall(int fd, struct iovec *iov, int iovlen) {
+  int olde;
+  ssize_t rc;
+  size_t got, toto;
+  toto = 0;
+  olde = errno;
+  do {
+    if ((rc = writev(fd, iov, iovlen)) == -1) {
+      if (toto && errno == EINTR) {
+        errno = olde;
+        continue;
+      }
+      return -1;
+    }
+    got = rc;
+    toto += got;
+    for (;;) {
+      if (!iov->iov_len) {
+        --iovlen;
+        ++iov;
+      } else if (got >= iov->iov_len) {
+        got -= iov->iov_len;
+        --iovlen;
+        ++iov;
+      } else {
+        iov->iov_base += got;
+        iov->iov_len -= got;
+        break;
+      }
+    }
+  } while (got && iovlen);
+  return toto;
+}
 
 /**
  * Writes data to stream.
@@ -44,20 +74,19 @@ size_t fwrite_unlocked(const void *data, size_t stride, size_t count, FILE *f) {
   size_t n, m;
   const char *p;
   struct iovec iov[2];
-  if (f->state) {
+  if (!stride || !count)
     return 0;
-  }
-  if ((f->iomode & O_ACCMODE) == O_RDONLY) {
+  if ((f->oflags & O_ACCMODE) == O_RDONLY) {
     f->state = errno = EBADF;
     return 0;
   }
-  if (__builtin_mul_overflow(stride, count, &n)) {
+  if (ckd_mul(&n, stride, count)) {
     f->state = errno = EOVERFLOW;
     return 0;
   }
   m = f->size - f->beg;
   if (n <= m && f->bufmode != _IONBF) {
-    // this isn't a fully buffered stream, and
+    // this isn't an unbuffered stream, and
     // there's enough room in the buffer for the request
     memcpy(f->buf + f->beg, data, n);
     f->beg += n;
@@ -105,10 +134,10 @@ size_t fwrite_unlocked(const void *data, size_t stride, size_t count, FILE *f) {
   // (2) we avoid need for malloc() when it's out of room
   iov[0].iov_base = f->buf;
   iov[0].iov_len = f->beg;
-  iov[1].iov_base = data;
+  iov[1].iov_base = (void *)data;
   iov[1].iov_len = n;
   n += f->beg;
-  if (WritevUninterruptible(f->fd, iov, 2) == -1) {
+  if ((rc = writevall(f->fd, iov, 2)) == -1) {
     f->state = errno;
     return 0;
   }

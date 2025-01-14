@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2021 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -17,49 +17,50 @@
 │ PERFORMANCE OF THIS SOFTWARE.                                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
 #include "libc/math.h"
-#include "libc/mem/gc.internal.h"
+#include "libc/mem/gc.h"
 #include "libc/testlib/ezbench.h"
 #include "libc/testlib/testlib.h"
 #include "libc/x/x.h"
 
+double _trunc(double) asm("trunc");
+float _truncf(float) asm("truncf");
+long double _truncl(long double) asm("truncl");
+
 TEST(trunc, test) {
-  EXPECT_STREQ("3", gc(xdtoa(trunc(3))));
-  EXPECT_STREQ("3", gc(xdtoa(trunc(3.14))));
-  EXPECT_STREQ("-3", gc(xdtoa(trunc(-3.14))));
-  EXPECT_STREQ("-0", gc(xdtoa(trunc(-0.))));
-  EXPECT_STREQ("NAN", gc(xdtoa(trunc(NAN))));
-  EXPECT_STREQ("-NAN", gc(xdtoa(trunc(-NAN))));
-  EXPECT_STREQ("INFINITY", gc(xdtoa(trunc(INFINITY))));
-  EXPECT_STREQ("-INFINITY", gc(xdtoa(trunc(-INFINITY))));
+  EXPECT_STREQ("3", gc(xdtoa(_trunc(3))));
+  EXPECT_STREQ("3", gc(xdtoa(_trunc(3.14))));
+  EXPECT_STREQ("-3", gc(xdtoa(_trunc(-3.14))));
+  EXPECT_STREQ("-0", gc(xdtoa(_trunc(-0.))));
+  EXPECT_STREQ("NAN", gc(xdtoa(_trunc(NAN))));
+  EXPECT_STREQ("-NAN", gc(xdtoa(_trunc(-NAN))));
+  EXPECT_STREQ("INFINITY", gc(xdtoa(_trunc(INFINITY))));
+  EXPECT_STREQ("-INFINITY", gc(xdtoa(_trunc(-INFINITY))));
 }
 
 TEST(truncf, test) {
-  EXPECT_STREQ("3", gc(xdtoaf(truncf(3))));
-  EXPECT_STREQ("3", gc(xdtoaf(truncf(3.14))));
-  EXPECT_STREQ("-3", gc(xdtoaf(truncf(-3.14))));
-  EXPECT_STREQ("-0", gc(xdtoaf(truncf(-0.))));
-  EXPECT_STREQ("NAN", gc(xdtoaf(truncf(NAN))));
-  EXPECT_STREQ("-NAN", gc(xdtoaf(truncf(-NAN))));
-  EXPECT_STREQ("INFINITY", gc(xdtoaf(truncf(INFINITY))));
-  EXPECT_STREQ("-INFINITY", gc(xdtoaf(truncf(-INFINITY))));
+  EXPECT_STREQ("3", gc(xdtoaf(_truncf(3))));
+  EXPECT_STREQ("3", gc(xdtoaf(_truncf(3.14))));
+  EXPECT_STREQ("-3", gc(xdtoaf(_truncf(-3.14))));
+  EXPECT_STREQ("-0", gc(xdtoaf(_truncf(-0.))));
+  EXPECT_STREQ("NAN", gc(xdtoaf(_truncf(NAN))));
+  EXPECT_STREQ("-NAN", gc(xdtoaf(_truncf(-NAN))));
+  EXPECT_STREQ("INFINITY", gc(xdtoaf(_truncf(INFINITY))));
+  EXPECT_STREQ("-INFINITY", gc(xdtoaf(_truncf(-INFINITY))));
 }
 
 TEST(truncl, test) {
-  EXPECT_STREQ("3", gc(xdtoal(truncl(3))));
-  EXPECT_STREQ("3", gc(xdtoal(truncl(3.14))));
-  EXPECT_STREQ("-3", gc(xdtoal(truncl(-3.14))));
-  EXPECT_STREQ("-0", gc(xdtoal(truncl(-0.))));
-  EXPECT_STREQ("NAN", gc(xdtoal(truncl(NAN))));
-  EXPECT_STREQ("-NAN", gc(xdtoal(truncl(-NAN))));
-  EXPECT_STREQ("INFINITY", gc(xdtoal(truncl(INFINITY))));
-  EXPECT_STREQ("-INFINITY", gc(xdtoal(truncl(-INFINITY))));
+  EXPECT_STREQ("3", gc(xdtoal(_truncl(3))));
+  EXPECT_STREQ("3", gc(xdtoal(_truncl(3.14))));
+  EXPECT_STREQ("-3", gc(xdtoal(_truncl(-3.14))));
+  EXPECT_STREQ("-0", gc(xdtoal(_truncl(-0.))));
+  EXPECT_STREQ("NAN", gc(xdtoal(_truncl(NAN))));
+  EXPECT_STREQ("-NAN", gc(xdtoal(_truncl(-NAN))));
+  EXPECT_STREQ("INFINITY", gc(xdtoal(_truncl(INFINITY))));
+  EXPECT_STREQ("-INFINITY", gc(xdtoal(_truncl(-INFINITY))));
 }
 
 BENCH(truncl, bench) {
-  double _trunc(double) asm("trunc");
-  float _truncf(float) asm("truncf");
-  long double _truncl(long double) asm("truncl");
-  EZBENCH2("trunc", donothing, _trunc(.7));   /* ~2ns */
-  EZBENCH2("truncf", donothing, _truncf(.7)); /* ~2ns */
-  EZBENCH2("truncl", donothing, _truncl(.7)); /* ~9ns */
+  EZBENCH2("trunc", donothing, _trunc(.7));    // ~1ns
+  EZBENCH2("truncf", donothing, _truncf(.7));  // ~1ns
+  EZBENCH2("truncl", donothing, _truncl(.7));  // ~7ns
 }

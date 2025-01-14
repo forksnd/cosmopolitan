@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2022 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -22,22 +22,33 @@
 #include "libc/dce.h"
 #include "libc/errno.h"
 #include "libc/fmt/itoa.h"
-#include "libc/intrin/asan.internal.h"
-#include "libc/intrin/asmflag.h"
 #include "libc/intrin/atomic.h"
+#include "libc/intrin/describeflags.h"
+#include "libc/intrin/strace.h"
+#include "libc/runtime/syslib.internal.h"
 #include "libc/str/str.h"
+#include "libc/sysv/consts/at.h"
 #include "libc/sysv/consts/o.h"
 #include "libc/sysv/consts/pr.h"
 #include "libc/thread/posixthread.internal.h"
+#include "libc/thread/thread.h"
+#include "libc/thread/tls.h"
 
-static errno_t pthread_setname_impl(pthread_t thread, const char *name) {
+static errno_t pthread_setname_impl(struct PosixThread *pt, const char *name) {
   char path[128], *p;
   int e, fd, rc, tid, len;
 
-  if ((rc = pthread_getunique_np(thread, &tid))) return rc;
   len = strlen(name);
+  tid = _pthread_tid(pt);
 
-  if (IsLinux()) {
+  if (IsXnuSilicon()) {
+    if (pt == _pthread_self()) {
+      __syslib->__pthread_setname_np(name);
+      return 0;
+    } else {
+      return EPERM;
+    }
+  } else if (IsLinux()) {
     e = errno;
     if (tid == gettid()) {
       if (prctl(PR_SET_NAME, name) == -1) {
@@ -50,7 +61,7 @@ static errno_t pthread_setname_impl(pthread_t thread, const char *name) {
       p = stpcpy(p, "/proc/self/task/");
       p = FormatUint32(p, tid);
       p = stpcpy(p, "/comm");
-      if ((fd = sys_open(path, O_WRONLY | O_CLOEXEC, 0)) == -1) {
+      if ((fd = sys_openat(AT_FDCWD, path, O_WRONLY | O_CLOEXEC, 0)) == -1) {
         rc = errno;
         errno = e;
         return rc;
@@ -71,23 +82,31 @@ static errno_t pthread_setname_impl(pthread_t thread, const char *name) {
     }
     return 0;
 
-  } else if (IsFreebsd()) {
-    char cf;
-    int ax, dx;
-    asm volatile(CFLAG_ASM("syscall")
-                 : CFLAG_CONSTRAINT(cf), "=a"(ax), "=d"(dx)
-                 : "1"(323 /* thr_set_name */), "D"(tid), "S"(name)
-                 : "rcx", "r8", "r9", "r10", "r11", "memory");
-    return !cf ? 0 : ax;
+#ifdef __x86_64__
+  } else if (IsFreebsd() || IsNetbsd() || IsOpenbsd()) {
+    int ax;
+    if (IsFreebsd()) {
+      ax = 464;  // thr_set_name
+    } else if (IsNetbsd()) {
+      ax = 323;  // _lwp_setname
+    } else {
+      ax = 143;  // sys_setthrname
+    }
+    asm volatile("syscall"
+                 : "+a"(ax), "+D"(tid), "+S"(name)
+                 : /* no inputs */
+                 : "rcx", "rdx", "r8", "r9", "r10", "r11", "memory");
+    return ax;
+#endif
 
-  } else if (IsNetbsd()) {
-    char cf;
-    int ax, dx;
-    asm volatile(CFLAG_ASM("syscall")
-                 : CFLAG_CONSTRAINT(cf), "=a"(ax), "=d"(dx)
-                 : "1"(323 /* _lwp_setname */), "D"(tid), "S"(name)
-                 : "rcx", "r8", "r9", "r10", "r11", "memory");
-    return !cf ? 0 : ax;
+#ifdef __aarch64__
+  } else if (IsFreebsd()) {
+    register int x0 asm("x0") = tid;
+    register long x1 asm("x1") = (long)name;
+    register int x8 asm("x8") = 464;  // thr_set_name
+    asm volatile("svc\t0" : "+r"(x0) : "r"(x1), "r"(x8) : "memory");
+    return x0;
+#endif
 
   } else {
     return ENOSYS;
@@ -114,13 +133,17 @@ static errno_t pthread_setname_impl(pthread_t thread, const char *name) {
  * @return 0 on success, or errno on error
  * @raise ERANGE if length of `name` exceeded system limit, in which
  *    case the name may have still been set with os using truncation
- * @raise ENOSYS on MacOS, Windows, and OpenBSD
+ * @raise ENOSYS on Windows and AMD64-XNU
  * @see pthread_getname_np()
  */
 errno_t pthread_setname_np(pthread_t thread, const char *name) {
-  errno_t rc;
-  BLOCK_CANCELLATIONS;
-  rc = pthread_setname_impl(thread, name);
-  ALLOW_CANCELLATIONS;
-  return rc;
+  errno_t err;
+  struct PosixThread *pt;
+  pt = (struct PosixThread *)thread;
+  BLOCK_CANCELATION;
+  err = pthread_setname_impl(pt, name);
+  ALLOW_CANCELATION;
+  STRACE("pthread_setname_np(%d, %#s) → %s", _pthread_tid(pt), name,
+         DescribeErrno(err));
+  return err;
 }

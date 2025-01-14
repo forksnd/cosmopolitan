@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2021 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -20,9 +20,13 @@
 
 pureconst bool IsConstant(int e) {
   unsigned f = LO(GetShadow(e));
-  if (f == EncodeDispatchFn(DispatchNil)) return true;
-  if (f == EncodeDispatchFn(DispatchTrue)) return true;
-  if (f == EncodeDispatchFn(DispatchPrecious)) return true;
-  if (f == EncodeDispatchFn(DispatchQuote)) return true;
+  if (f == EncodeDispatchFn(DispatchNil))
+    return true;
+  if (f == EncodeDispatchFn(DispatchTrue))
+    return true;
+  if (f == EncodeDispatchFn(DispatchPrecious))
+    return true;
+  if (f == EncodeDispatchFn(DispatchQuote))
+    return true;
   return false;
 }

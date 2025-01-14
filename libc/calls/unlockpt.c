@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2020 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -17,15 +17,18 @@
 │ PERFORMANCE OF THIS SOFTWARE.                                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
 #include "libc/calls/calls.h"
+#include "libc/calls/internal.h"
+#include "libc/intrin/fds.h"
 #include "libc/calls/syscall-sysv.internal.h"
 #include "libc/calls/syscall_support-sysv.internal.h"
 #include "libc/calls/termios.h"
 #include "libc/dce.h"
-#include "libc/intrin/strace.internal.h"
+#include "libc/intrin/strace.h"
 #include "libc/sysv/consts/pty.h"
 #include "libc/sysv/errfuns.h"
 
-extern const uint32_t TIOCPTYUNLK;
+#define TIOCSPTLCK  0x40045431  // linux
+#define TIOCPTYUNLK 0x20007452  // xnu
 
 /**
  * Unlocks pseudoteletypewriter pair.
@@ -36,7 +39,9 @@ extern const uint32_t TIOCPTYUNLK;
  */
 int unlockpt(int fd) {
   int rc, unlock = 0;
-  if (IsFreebsd() || IsOpenbsd() || IsNetbsd()) {
+  if (fd < g_fds.n && g_fds.p[fd].kind == kFdZip) {
+    rc = enotty();
+  } else if (IsFreebsd() || IsOpenbsd() || IsNetbsd()) {
     rc = _isptmaster(fd);
   } else if (IsXnu()) {
     rc = sys_ioctl(fd, TIOCPTYUNLK);

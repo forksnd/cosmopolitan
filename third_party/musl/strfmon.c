@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:t;c-basic-offset:8;tab-width:8;coding:utf-8   -*-│
-│vi: set et ft=c ts=8 tw=8 fenc=utf-8                                       :vi│
+│ vi: set noet ft=c ts=8 sw=8 fenc=utf-8                                   :vi │
 ╚──────────────────────────────────────────────────────────────────────────────╝
 │                                                                              │
 │  Musl Libc                                                                   │
@@ -26,16 +26,12 @@
 │                                                                              │
 ╚─────────────────────────────────────────────────────────────────────────────*/
 #include "libc/errno.h"
-#include "libc/fmt/fmt.h"
-#include "libc/str/locale.h"
+#include "libc/stdio/stdio.h"
+#include "libc/str/locale.internal.h"
 #include "libc/str/str.h"
+#include "libc/ctype.h"
 #include "libc/thread/tls.h"
-
-asm(".ident\t\"\\n\\n\
-Musl libc (MIT License)\\n\
-Copyright 2005-2014 Rich Felker, et. al.\"");
-asm(".include \"libc/disclaimer.inc\"");
-// clang-format off
+__static_yoink("musl_libc_notice");
 
 static ssize_t vstrfmon_l(char *s, size_t n, locale_t loc, const char *fmt, va_list ap)
 {
@@ -63,16 +59,20 @@ static ssize_t vstrfmon_l(char *s, size_t n, locale_t loc, const char *fmt, va_l
 			switch (*fmt) {
 			case '=':
 				fill = *++fmt;
+				(void)fill;
 				continue;
 			case '^':
 				nogrp = 1;
+				(void)nogrp;
 				continue;
 			case '(':
 				negpar = 1;
+				(void)negpar;
 			case '+':
 				continue;
 			case '!':
 				nosym = 1;
+				(void)nosym;
 				continue;
 			case '-':
 				left = 1;
@@ -91,6 +91,7 @@ static ssize_t vstrfmon_l(char *s, size_t n, locale_t loc, const char *fmt, va_l
 			rp = 10*rp + (*fmt-'0');
 
 		intl = *fmt++ == 'i';
+		(void)intl;
 
 		w = lp + 1 + rp;
 		if (!left && fw>w) w = fw;
@@ -126,7 +127,7 @@ ssize_t strfmon(char *restrict s, size_t n, const char *restrict fmt, ...)
 	ssize_t ret;
 
 	va_start(ap, fmt);
-	ret = vstrfmon_l(s, n, (locale_t)__get_tls()->tib_locale, fmt, ap);
+	ret = vstrfmon_l(s, n, CURRENT_LOCALE, fmt, ap);
 	va_end(ap);
 
 	return ret;

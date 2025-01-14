@@ -1,4 +1,3 @@
-// clang-format off
 /*
 *   $Id: lisp.c 717 2009-07-07 03:40:50Z dhiebert $
 *
@@ -13,6 +12,7 @@
 /*
 *   INCLUDE FILES
 */
+#include "libc/ctype.h"
 #include "third_party/ctags/general.h"  /* must always come first */
 
 #include "third_party/ctags/parse.h"

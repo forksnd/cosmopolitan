@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2021 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -17,7 +17,8 @@
 │ PERFORMANCE OF THIS SOFTWARE.                                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
 #include "libc/math.h"
-#include "libc/mem/gc.internal.h"
+#include "libc/mem/gc.h"
+#include "libc/testlib/ezbench.h"
 #include "libc/testlib/testlib.h"
 #include "libc/x/x.h"
 
@@ -59,4 +60,10 @@ TEST(sinhf, test) {
   EXPECT_STREQ("NAN", gc(xdtoaf(_sinhf(NAN))));
   EXPECT_STREQ("INFINITY", gc(xdtoaf(_sinhf(INFINITY))));
   EXPECT_STREQ("-INFINITY", gc(xdtoaf(_sinhf(-INFINITY))));
+}
+
+BENCH(sinh, bench) {
+  EZBENCH2("sinh", donothing, _sinh(.7));    // ~24ns
+  EZBENCH2("sinhf", donothing, _sinhf(.7));  // ~19ns
+  EZBENCH2("sinhl", donothing, _sinhl(.7));  // ~15ns
 }

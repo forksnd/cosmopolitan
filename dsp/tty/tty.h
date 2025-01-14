@@ -3,10 +3,8 @@
 
 #define kTtyIdScreen 83
 
-#if !(__ASSEMBLER__ + __LINKER__ + 0)
 COSMOPOLITAN_C_START_
 
-struct FILE;
 struct termios;
 
 struct TtyIdent {
@@ -55,5 +53,4 @@ void ttyhisto(uint32_t[hasatleast 256], uint8_t[hasatleast 256],
               const uint8_t *, const uint8_t *, size_t);
 
 COSMOPOLITAN_C_END_
-#endif /* !(__ASSEMBLER__ + __LINKER__ + 0) */
 #endif /* COSMOPOLITAN_DSP_TTY_TTY_H_ */

@@ -1,11 +1,12 @@
 #include "libc/calls/calls.h"
 #include "libc/calls/struct/sigaction.h"
 #include "libc/calls/struct/termios.h"
-#include "libc/intrin/safemacros.internal.h"
+#include "libc/intrin/safemacros.h"
+#include "libc/math.h"
 #include "libc/runtime/runtime.h"
+#include "libc/stdio/stdio.h"
 #include "libc/str/str.h"
 #include "libc/sysv/consts/sig.h"
-#include "third_party/libcxx/math.h"
 
 /**
  * @fileoverview demo code borrowed from Rosetta Code.
@@ -13,6 +14,11 @@
 
 #define FRAMERATE 23.976
 #define WRITE(s)  write(1, s, strlen(s))
+
+#ifdef __x86_64__
+__static_yoink("vga_console");
+__static_yoink("EfiMain");
+#endif
 
 struct Sphere {
   double cx, cy, cz, r;
@@ -120,7 +126,6 @@ static void DrawSphere(double k, double ambient) {
 
 int main() {
   double ang;
-  struct termios old;
   WRITE("\e[?25l");
   if (!setjmp(jb_)) {
     signal(SIGINT, OnCtrlC);

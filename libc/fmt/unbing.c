@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2020 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -17,7 +17,7 @@
 │ PERFORMANCE OF THIS SOFTWARE.                                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
 #include "libc/fmt/bing.internal.h"
-#include "libc/macros.internal.h"
+#include "libc/macros.h"
 
 static const int kCp437i[] = {
     0x000a << 8 | 10,   // \n NEWLINE
@@ -216,11 +216,12 @@ static const int kCp437i[] = {
  */
 int unbing(int c) {
   int m, l, r;
-  if (32 <= c && c < 127) return c;
+  if (32 <= c && c < 127)
+    return c;
   l = 0;
   r = ARRAYLEN(kCp437i) - 1;
   while (l <= r) {
-    m = (l + r) >> 1;
+    m = (l & r) + ((l ^ r) >> 1);  // floor((a+b)/2)
     if ((kCp437i[m] >> 8) < c) {
       l = m + 1;
     } else if ((kCp437i[m] >> 8) > c) {

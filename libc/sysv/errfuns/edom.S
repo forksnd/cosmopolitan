@@ -1,15 +1,16 @@
-#include "libc/macros.internal.h"
+#include "libc/macros.h"
 .text.unlikely
 
+	.ftrace1
 edom:
+	.ftrace2
 #ifdef __x86_64__
 	.leafprologue
-	.profilable
 	mov	EDOM(%rip),%ecx
 	jmp	__errfun
 #elif defined(__aarch64__)
 	adrp	x1,EDOM
-	ldr	w0,[x1,#:lo12:EDOM]
+	ldrsw	x0,[x1,#:lo12:EDOM]
 	b	__errfun
 #else
 #error "unsupported architecture"

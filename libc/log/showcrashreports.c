@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2020 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -17,71 +17,45 @@
 │ PERFORMANCE OF THIS SOFTWARE.                                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
 #include "libc/assert.h"
-#include "libc/calls/calls.h"
 #include "libc/calls/struct/sigaction.h"
 #include "libc/calls/struct/sigaltstack.h"
-#include "libc/dce.h"
-#include "libc/errno.h"
+#include "libc/calls/struct/sigset.h"
 #include "libc/log/internal.h"
-#include "libc/log/log.h"
-#include "libc/macros.internal.h"
-#include "libc/runtime/stack.h"
+#include "libc/mem/mem.h"
+#include "libc/runtime/runtime.h"
 #include "libc/runtime/symbols.internal.h"
-#include "libc/str/str.h"
-#include "libc/sysv/consts/map.h"
-#include "libc/sysv/consts/prot.h"
 #include "libc/sysv/consts/sa.h"
 #include "libc/sysv/consts/sig.h"
-#include "libc/sysv/consts/ss.h"
 
-#ifdef __x86_64__
+#ifndef TINY
+__static_yoink("zipos");                       // for symtab
+__static_yoink("__die");                       // for backtracing
+__static_yoink("ShowBacktrace");               // for backtracing
+__static_yoink("GetSymbolTable");              // for backtracing
+__static_yoink("PrintBacktraceUsingSymbols");  // for backtracing
+__static_yoink("__demangle");                  // for pretty c++ symbols
+__static_yoink("malloc_inspect_all");          // for asan memory origin
+__static_yoink("GetSymbolByAddr");             // for asan memory origin
+#endif
 
-STATIC_YOINK("zipos");                       // for symtab
-STATIC_YOINK("__die");                       // for backtracing
-STATIC_YOINK("ShowBacktrace");               // for backtracing
-STATIC_YOINK("GetSymbolTable");              // for backtracing
-STATIC_YOINK("PrintBacktraceUsingSymbols");  // for backtracing
-STATIC_YOINK("malloc_inspect_all");          // for asan memory origin
-STATIC_YOINK("GetSymbolByAddr");             // for asan memory origin
-
-static struct sigaction g_oldcrashacts[8];
-extern const unsigned char __oncrash_thunks[8][11];
-
-static void InstallCrashHandlers(int extraflags) {
-  int e;
-  size_t i;
+static void InstallCrashHandler(int sig, int flags) {
   struct sigaction sa;
-  bzero(&sa, sizeof(sa));
-  sigfillset(&sa.sa_mask);
-  sa.sa_flags = SA_SIGINFO | SA_NODEFER | extraflags;
-  for (i = 0; i < ARRAYLEN(kCrashSigs); ++i) {
-    sigdelset(&sa.sa_mask, kCrashSigs[i]);
-  }
-  for (i = 0; i < ARRAYLEN(kCrashSigs); ++i) {
-    if (kCrashSigs[i]) {
-      sa.sa_sigaction = (sigaction_f)__oncrash_thunks[i];
-      e = errno;
-      sigaction(kCrashSigs[i], &sa, &g_oldcrashacts[i]);
-      errno = e;
-    }
-  }
-}
-
-relegated void RestoreDefaultCrashSignalHandlers(void) {
-  int e;
-  size_t i;
-  sigset_t ss;
-  strace_enabled(-1);
-  sigemptyset(&ss);
-  sigprocmask(SIG_SETMASK, &ss, NULL);
-  for (i = 0; i < ARRAYLEN(kCrashSigs); ++i) {
-    if (kCrashSigs[i]) {
-      e = errno;
-      sigaction(kCrashSigs[i], &g_oldcrashacts[i], NULL);
-      errno = e;
-    }
-  }
-  strace_enabled(+1);
+  sigemptyset(&sa.sa_mask);
+  sigaddset(&sa.sa_mask, SIGQUIT);
+  sigaddset(&sa.sa_mask, SIGFPE);
+  sigaddset(&sa.sa_mask, SIGILL);
+  sigaddset(&sa.sa_mask, SIGSEGV);
+  sigaddset(&sa.sa_mask, SIGTRAP);
+  sigaddset(&sa.sa_mask, SIGBUS);
+  sigaddset(&sa.sa_mask, SIGABRT);
+  sa.sa_flags = SA_SIGINFO | flags;
+#ifdef TINY
+  sa.sa_sigaction = __minicrash;
+#else
+  GetSymbolTable();
+  sa.sa_sigaction = __oncrash;
+#endif
+  unassert(!sigaction(sig, &sa, 0));
 }
 
 /**
@@ -101,32 +75,17 @@ relegated void RestoreDefaultCrashSignalHandlers(void) {
  */
 void ShowCrashReports(void) {
   struct sigaltstack ss;
-  _wantcrashreports = true;
-  /* <SYNC-LIST>: showcrashreports.c, oncrashthunks.S, oncrash.c */
-  kCrashSigs[0] = SIGQUIT; /* ctrl+\ aka ctrl+break */
-  kCrashSigs[1] = SIGFPE;  /* 1 / 0 */
-  kCrashSigs[2] = SIGILL;  /* illegal instruction */
-  kCrashSigs[3] = SIGSEGV; /* bad memory access */
-  kCrashSigs[4] = SIGTRAP; /* bad system call */
-  kCrashSigs[5] = SIGABRT; /* abort() called */
-  kCrashSigs[6] = SIGBUS;  /* misaligned, noncanonical ptr, etc. */
-  kCrashSigs[7] = SIGURG;  /* placeholder */
-  /* </SYNC-LIST>: showcrashreports.c, oncrashthunks.S, oncrash.c */
-  if (!IsWindows()) {
-    ss.ss_flags = 0;
-    ss.ss_size = GetStackSize();
-    // FreeBSD sigaltstack() will EFAULT if we use MAP_STACK here
-    // OpenBSD sigaltstack() auto-applies MAP_STACK to the memory
-    _npassert((ss.ss_sp = _mapanon(GetStackSize())));
-    _npassert(!sigaltstack(&ss, 0));
-    InstallCrashHandlers(SA_ONSTACK);
-  } else {
-    InstallCrashHandlers(0);
-  }
-  GetSymbolTable();
+  static char crashstack[65536];
+  FindDebugBinary();
+  ss.ss_flags = 0;
+  ss.ss_size = sizeof(crashstack);
+  ss.ss_sp = crashstack;
+  unassert(!sigaltstack(&ss, 0));
+  InstallCrashHandler(SIGQUIT, 0);
+  InstallCrashHandler(SIGTRAP, 0);
+  InstallCrashHandler(SIGFPE, 0);
+  InstallCrashHandler(SIGILL, 0);
+  InstallCrashHandler(SIGBUS, 0);
+  InstallCrashHandler(SIGABRT, 0);
+  InstallCrashHandler(SIGSEGV, SA_ONSTACK);
 }
-
-#else
-void ShowCrashReports(void) {
-}
-#endif /* __x86_64__ */

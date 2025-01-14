@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2022 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -17,7 +17,7 @@
 │ PERFORMANCE OF THIS SOFTWARE.                                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
 #include "libc/intrin/bsr.h"
-#include "libc/macros.internal.h"
+#include "libc/macros.h"
 
 /**
  * Fingers IP+TCP SYN packet.
@@ -27,7 +27,7 @@
  */
 uint32_t FingerSyn(const char *p, size_t n) {
   uint32_t h = 0;
-  int i, j, k, q, r, iplen, tcplen, ttl;
+  int i, j, k, iplen, tcplen, ttl;
   if (n >= 20 + 20 && n >= (iplen = (p[0] & 0x0F) * 4) + 20 &&
       n >= iplen + (tcplen = ((p[iplen + 12] & 0xF0) >> 4) * 4)) {
     n = iplen + tcplen;
@@ -36,7 +36,7 @@ uint32_t FingerSyn(const char *p, size_t n) {
     // ttl<=128 Windows, OpenVMS 8+
     // ttl<=64  Mac, Linux, BSD, Solaris 8+, Tru64, HP-UX
     ttl = p[8] & 255;
-    h += _bsr(MAX(1, ttl - 1));
+    h += bsr(MAX(1, ttl - 1));
     h *= 0x9e3779b1;
     // TCP Options
     // We care about the order and presence of leading common options.

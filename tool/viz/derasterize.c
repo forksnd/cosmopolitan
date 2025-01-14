@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2020 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -19,18 +19,15 @@
 #include "dsp/tty/itoa8.h"
 #include "libc/assert.h"
 #include "libc/calls/calls.h"
-#include "libc/calls/ioctl.h"
 #include "libc/calls/struct/stat.h"
 #include "libc/calls/termios.h"
 #include "libc/fmt/conv.h"
-#include "libc/fmt/fmt.h"
-#include "libc/intrin/tpenc.h"
 #include "libc/limits.h"
 #include "libc/log/check.h"
 #include "libc/log/log.h"
-#include "libc/macros.internal.h"
+#include "libc/macros.h"
 #include "libc/math.h"
-#include "libc/mem/gc.internal.h"
+#include "libc/mem/gc.h"
 #include "libc/mem/mem.h"
 #include "libc/nexgen32e/x86feature.h"
 #include "libc/runtime/runtime.h"
@@ -44,9 +41,10 @@
 #include "libc/sysv/consts/o.h"
 #include "libc/sysv/consts/prot.h"
 #include "libc/x/x.h"
-#include "third_party/getopt/getopt.h"
+#include "third_party/getopt/getopt.internal.h"
 #include "third_party/stb/stb_image.h"
 #include "third_party/stb/stb_image_resize.h"
+#ifdef __x86_64__
 
 #define HELPTEXT \
   "\n\
@@ -84,7 +82,7 @@ DESCRIPTION\n\
 \n\
 EXAMPLES\n\
 \n\
-  $ ./derasterize.com samples/wave.png > wave.uaart\n\
+  $ ./derasterize samples/wave.png > wave.uaart\n\
   $ cat wave.uaart\n\
 \n\
 AUTHORS\n\
@@ -138,7 +136,8 @@ extern const char16_t kRunes[];
  */
 static char *tptoa(char *p, wchar_t x) {
   unsigned long w;
-  for (w = _tpenc(x); w; w >>= 010) *p++ = w & 0xff;
+  for (w = tpenc(x); w; w >>= 010)
+    *p++ = w & 0xff;
   return p;
 }
 
@@ -165,8 +164,10 @@ static float frgb2std(float x) {
  */
 static void rgb2float(unsigned n, float *f, const unsigned char *u) {
   unsigned i;
-  for (i = 0; i < n; ++i) f[i] = u[i];
-  for (i = 0; i < n; ++i) f[i] /= 255;
+  for (i = 0; i < n; ++i)
+    f[i] = u[i];
+  for (i = 0; i < n; ++i)
+    f[i] /= 255;
 }
 
 /**
@@ -174,9 +175,12 @@ static void rgb2float(unsigned n, float *f, const unsigned char *u) {
  */
 static void float2rgb(unsigned n, unsigned char *u, float *f) {
   unsigned i;
-  for (i = 0; i < n; ++i) f[i] *= 256;
-  for (i = 0; i < n; ++i) f[i] = roundf(f[i]);
-  for (i = 0; i < n; ++i) u[i] = MAX(0, MIN(255, f[i]));
+  for (i = 0; i < n; ++i)
+    f[i] *= 256;
+  for (i = 0; i < n; ++i)
+    f[i] = roundf(f[i]);
+  for (i = 0; i < n; ++i)
+    u[i] = MAX(0, MIN(255, f[i]));
 }
 
 /**
@@ -188,7 +192,8 @@ static void float2rgb(unsigned n, unsigned char *u, float *f) {
 static dontinline void rgb2lin(unsigned n, float *f, const unsigned char *u) {
   unsigned i;
   rgb2float(n, f, u);
-  for (i = 0; i < n; ++i) f[i] = frgb2lin(f[i]);
+  for (i = 0; i < n; ++i)
+    f[i] = frgb2lin(f[i]);
 }
 
 /**
@@ -196,7 +201,8 @@ static dontinline void rgb2lin(unsigned n, float *f, const unsigned char *u) {
  */
 static dontinline void rgb2std(unsigned n, unsigned char *u, float *f) {
   unsigned i;
-  for (i = 0; i < n; ++i) f[i] = frgb2std(f[i]);
+  for (i = 0; i < n; ++i)
+    f[i] = frgb2std(f[i]);
   float2rgb(n, u, f);
 }
 
@@ -290,29 +296,35 @@ static unsigned combinecolors(unsigned char bf[1u << MC][2],
 /**
  * Computes distance between synthetic block and actual.
  */
-#define ADJUDICATE(SYMBOL, ARCH)                                  \
-  ARCH static float SYMBOL(unsigned b, unsigned f, unsigned g,    \
-                           const float lb[CN][YS * XS]) {         \
-    unsigned i, k, gu;                                            \
-    float p[BN], q[BN], fu, bu, r;                                \
-    bzero(q, sizeof(q));                                          \
-    for (k = 0; k < CN; ++k) {                                    \
-      gu = kGlyphs[g];                                            \
-      bu = lb[k][b];                                              \
-      fu = lb[k][f];                                              \
-      for (i = 0; i < BN; ++i) p[i] = (gu & (1u << i)) ? fu : bu; \
-      for (i = 0; i < BN; ++i) p[i] -= lb[k][i];                  \
-      for (i = 0; i < BN; ++i) p[i] *= p[i];                      \
-      for (i = 0; i < BN; ++i) q[i] += p[i];                      \
-    }                                                             \
-    r = 0;                                                        \
-    for (i = 0; i < BN; ++i) q[i] = sqrtf(q[i]);                  \
-    for (i = 0; i < BN; ++i) r += q[i];                           \
-    return r;                                                     \
+#define ADJUDICATE(SYMBOL, ARCH)                               \
+  ARCH static float SYMBOL(unsigned b, unsigned f, unsigned g, \
+                           const float lb[CN][YS * XS]) {      \
+    unsigned i, k, gu;                                         \
+    float p[BN], q[BN], fu, bu, r;                             \
+    bzero(q, sizeof(q));                                       \
+    for (k = 0; k < CN; ++k) {                                 \
+      gu = kGlyphs[g];                                         \
+      bu = lb[k][b];                                           \
+      fu = lb[k][f];                                           \
+      for (i = 0; i < BN; ++i)                                 \
+        p[i] = (gu & (1u << i)) ? fu : bu;                     \
+      for (i = 0; i < BN; ++i)                                 \
+        p[i] -= lb[k][i];                                      \
+      for (i = 0; i < BN; ++i)                                 \
+        p[i] *= p[i];                                          \
+      for (i = 0; i < BN; ++i)                                 \
+        q[i] += p[i];                                          \
+    }                                                          \
+    r = 0;                                                     \
+    for (i = 0; i < BN; ++i)                                   \
+      q[i] = sqrtf(q[i]);                                      \
+    for (i = 0; i < BN; ++i)                                   \
+      r += q[i];                                               \
+    return r;                                                  \
   }
 
-ADJUDICATE(adjudicate_avx2, microarchitecture("avx2,fma"))
-ADJUDICATE(adjudicate_avx, microarchitecture("avx"))
+ADJUDICATE(adjudicate_avx2, _Microarchitecture("avx2,fma"))
+ADJUDICATE(adjudicate_avx, _Microarchitecture("avx"))
 ADJUDICATE(adjudicate_default, )
 
 static float (*adjudicate_hook)(unsigned, unsigned, unsigned,
@@ -341,14 +353,20 @@ static float adjudicate(unsigned b, unsigned f, unsigned g,
     gu = kGlyphs[g];
     bu = lb[k][b];
     fu = lb[k][f];
-    for (i = 0; i < BN; ++i) p[i] = (gu & (1u << i)) ? fu : bu;
-    for (i = 0; i < BN; ++i) p[i] -= lb[k][i];
-    for (i = 0; i < BN; ++i) p[i] *= p[i];
-    for (i = 0; i < BN; ++i) q[i] += p[i];
+    for (i = 0; i < BN; ++i)
+      p[i] = (gu & (1u << i)) ? fu : bu;
+    for (i = 0; i < BN; ++i)
+      p[i] -= lb[k][i];
+    for (i = 0; i < BN; ++i)
+      p[i] *= p[i];
+    for (i = 0; i < BN; ++i)
+      q[i] += p[i];
   }
   r = 0;
-  for (i = 0; i < BN; ++i) q[i] = sqrtf(q[i]);
-  for (i = 0; i < BN; ++i) r += q[i];
+  for (i = 0; i < BN; ++i)
+    q[i] = sqrtf(q[i]);
+  for (i = 0; i < BN; ++i)
+    r += q[i];
   return r;
 }
 
@@ -378,7 +396,8 @@ static struct Cell derasterize(unsigned char block[CN][YS * XS]) {
         cell.fg[0] = block[0][f];
         cell.fg[1] = block[1][f];
         cell.fg[2] = block[2][f];
-        if (!r) return cell;
+        if (!r)
+          return cell;
       }
     }
   }
@@ -433,7 +452,6 @@ static void PrintImage(unsigned yn, unsigned xn,
   size_t size;
   char *v, *vt;
   size = yn * (xn * (32 + (2 + (1 + 3) * 3) * 2 + 1 + 3)) * 1 + 5 + 1;
-  size = ROUNDUP(size, FRAMESIZE);
   CHECK_NOTNULL((vt = _mapanon(size)));
   v = RenderImage(vt, yn, xn, rgb);
   *v++ = '\r';
@@ -452,8 +470,8 @@ static void GetTermSize(unsigned out_rows[1], unsigned out_cols[1]) {
   struct winsize ws;
   ws.ws_row = 24;
   ws.ws_col = 80;
-  if (ioctl(STDIN_FILENO, TIOCGWINSZ, &ws) == -1) {
-    ioctl(STDOUT_FILENO, TIOCGWINSZ, &ws);
+  if (tcgetwinsize(STDIN_FILENO, &ws) == -1) {
+    tcgetwinsize(STDOUT_FILENO, &ws);
   }
   out_rows[0] = ws.ws_row;
   out_cols[0] = ws.ws_col;
@@ -466,7 +484,8 @@ static int ReadAll(int fd, void *data, size_t size) {
   p = data;
   n = size;
   do {
-    if ((rc = read(fd, p, n)) == -1) return -1;
+    if ((rc = read(fd, p, n)) == -1)
+      return -1;
     got = rc;
     assert(got || !n);
     p += got;
@@ -498,8 +517,9 @@ static void LoadFileViaImageMagick(const char *path, unsigned yn, unsigned xn,
   CHECK_NE(-1, pipe2(pipefds, O_CLOEXEC));
   if (!(pid = vfork())) {
     dup2(pipefds[1], 1);
-    execv(convert, (char *const[]){"convert", path, "-resize", dim, "-depth",
-                                   "8", "-colorspace", "sRGB", "rgb:-", NULL});
+    execv(convert,
+          (char *const[]){"convert", (char *)path, "-resize", dim, "-depth",
+                          "8", "-colorspace", "sRGB", "rgb:-", NULL});
     abort();
   }
   CHECK_NE(-1, close(pipefds[1]));
@@ -511,8 +531,7 @@ static void LoadFileViaImageMagick(const char *path, unsigned yn, unsigned xn,
 
 static void LoadFile(const char *path, size_t yn, size_t xn, void *rgb) {
   struct stat st;
-  size_t data2size, data3size;
-  void *map, *data, *data2, *data3;
+  void *map, *data;
   int fd, gotx, goty, channels_in_file;
   CHECK_NE(-1, (fd = open(path, O_RDONLY)), "%s", path);
   CHECK_NE(-1, fstat(fd, &st));
@@ -530,8 +549,8 @@ static void LoadFile(const char *path, size_t yn, size_t xn, void *rgb) {
   stbir_resize_uint8(data, gotx, goty, 0, rgb, xn * XS, yn * YS, 0, CN);
 #else
   CHECK_EQ(CN, 3);
-  data2size = ROUNDUP(sizeof(float) * goty * gotx * CN, FRAMESIZE);
-  data3size = ROUNDUP(sizeof(float) * yn * YS * xn * XS * CN, FRAMESIZE);
+  data2size = sizeof(float) * goty * gotx * CN;
+  data3size = sizeof(float) * yn * YS * xn * XS * CN;
   CHECK_NOTNULL((data2 = _mapanon(data2size)));
   CHECK_NOTNULL((data3 = _mapanon(data3size)));
   rgb2lin(goty * gotx * CN, data2, data);
@@ -553,8 +572,8 @@ static int ParseNumberOption(const char *arg) {
   return x;
 }
 
-static void PrintUsage(int rc, FILE *f) {
-  fputs(HELPTEXT, f);
+static void PrintUsage(int rc, int fd) {
+  tinyprint(fd, HELPTEXT, NULL);
   exit(rc);
 }
 
@@ -575,9 +594,12 @@ static void GetOpts(int argc, char *argv[]) {
         break;
       case '?':
       case 'H':
-        PrintUsage(EXIT_SUCCESS, stdout);
       default:
-        PrintUsage(EX_USAGE, stderr);
+        if (opt == optopt) {
+          PrintUsage(EXIT_SUCCESS, STDOUT_FILENO);
+        } else {
+          PrintUsage(EX_USAGE, STDERR_FILENO);
+        }
     }
   }
 }
@@ -586,7 +608,6 @@ int main(int argc, char *argv[]) {
   int i;
   void *rgb;
   size_t size;
-  char *option;
   unsigned yd, xd;
   ShowCrashReports();
   GetOpts(argc, argv);
@@ -603,9 +624,10 @@ int main(int argc, char *argv[]) {
   // FIXME: on the conversion stage should do 2Y because of halfblocks
   // printf( "filename >%s<\tx >%d<\ty >%d<\n\n", filename, x_, y_);
   size = y_ * YS * x_ * XS * CN;
-  CHECK_NOTNULL((rgb = _mapanon(ROUNDUP(size, FRAMESIZE))));
+  CHECK_NOTNULL((rgb = _mapanon(size)));
   for (i = optind; i < argc; ++i) {
-    if (!argv[i]) continue;
+    if (!argv[i])
+      continue;
     if (m_) {
       LoadFileViaImageMagick(argv[i], y_, x_, rgb);
     } else {
@@ -613,6 +635,13 @@ int main(int argc, char *argv[]) {
     }
     PrintImage(y_, x_, rgb);
   }
-  munmap(rgb, ROUNDUP(size, FRAMESIZE));
+  munmap(rgb, size);
   return 0;
 }
+
+#else
+
+int main(int argc, char *argv[]) {
+}
+
+#endif /* __x86_64__ */

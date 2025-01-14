@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2021 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -58,10 +58,12 @@ int main(int argc, char *argv[]) {
     return 1;
   }
   for (b = o = 0;;) {
-    if (!(n = fread(R, 1, 16, f))) break;
+    if (!(n = fread(R, 1, 16, f)))
+      break;
     p = A, q = B;
     for (c = i = 0; i < n; ++i) {
-      if (i == 8) *p++ = ' ';
+      if (i == 8)
+        *p++ = ' ';
       *p++ = "0123456789abcdef"[(R[i] & 0xF0) >> 4];
       *p++ = "0123456789abcdef"[(R[i] & 0x0F) >> 0];
       *p++ = ' ';
@@ -77,6 +79,7 @@ int main(int argc, char *argv[]) {
     }
     o += n;
   }
-  if (o) printf("%08x\n", o);
+  if (o)
+    printf("%08x\n", o);
   return !feof(f);
 }

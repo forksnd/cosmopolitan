@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2020 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -18,6 +18,7 @@
 ╚─────────────────────────────────────────────────────────────────────────────*/
 #include "libc/calls/calls.h"
 #include "libc/calls/syscall_support-nt.internal.h"
+#include "libc/cosmo.h"
 #include "libc/errno.h"
 #include "libc/nt/enum/accessmask.h"
 #include "libc/nt/enum/fileflagandattributes.h"
@@ -30,40 +31,52 @@
 #include "libc/nt/struct/luid.h"
 #include "libc/nt/struct/tokenprivileges.h"
 #include "libc/nt/thunk/msabi.h"
+#include "libc/runtime/stack.h"
+#include "libc/str/str.h"
 #include "libc/sysv/errfuns.h"
-#include "libc/thread/thread.h"
 
-__msabi extern typeof(GetFileAttributes) *const __imp_GetFileAttributesW;
-
-static _Bool g_winlink_allowed;
-static pthread_once_t g_winlink_once;
+static struct {
+  _Atomic(uint32_t) once;
+  _Bool allowed;
+} g_winlink;
 
 static textwindows void InitializeWinlink(void) {
   int64_t tok;
   struct NtLuid id;
   struct NtTokenPrivileges tp;
-  if (!OpenProcessToken(GetCurrentProcess(), kNtTokenAllAccess, &tok)) return;
-  if (!LookupPrivilegeValue(0, u"SeCreateSymbolicLinkPrivilege", &id)) return;
+  if (!OpenProcessToken(GetCurrentProcess(), kNtTokenAllAccess, &tok))
+    return;
+  if (!LookupPrivilegeValue(0, u"SeCreateSymbolicLinkPrivilege", &id))
+    return;
   tp.PrivilegeCount = 1;
   tp.Privileges[0].Luid = id;
   tp.Privileges[0].Attributes = kNtSePrivilegeEnabled;
-  if (!AdjustTokenPrivileges(tok, 0, &tp, sizeof(tp), 0, 0)) return;
-  g_winlink_allowed = GetLastError() != kNtErrorNotAllAssigned;
+  if (!AdjustTokenPrivileges(tok, 0, &tp, sizeof(tp), 0, 0))
+    return;
+  g_winlink.allowed = GetLastError() != kNtErrorNotAllAssigned;
 }
 
 textwindows int sys_symlinkat_nt(const char *target, int newdirfd,
                                  const char *linkpath) {
+#pragma GCC push_options
+#pragma GCC diagnostic ignored "-Wframe-larger-than="
+  struct {
+    char16_t target16[PATH_MAX];
+    char16_t linkpath16[PATH_MAX];
+  } M;
+  CheckLargeStackAllocation(&M, sizeof(M));
+#pragma GCC pop_options
   int targetlen;
   uint32_t attrs, flags;
-  char16_t target16[PATH_MAX];
-  char16_t linkpath16[PATH_MAX];
 
   // convert the paths
-  if (__mkntpathat(newdirfd, linkpath, 0, linkpath16) == -1) return -1;
-  if ((targetlen = __mkntpath(target, target16)) == -1) return -1;
+  if (__mkntpathat(newdirfd, linkpath, 0, M.linkpath16) == -1)
+    return -1;
+  if ((targetlen = __mkntpath(target, M.target16)) == -1)
+    return -1;
 
   // determine if we need directory flag
-  if ((attrs = __imp_GetFileAttributesW(target16)) != -1u) {
+  if ((attrs = GetFileAttributes(M.target16)) != -1u) {
     if (attrs & kNtFileAttributeDirectory) {
       flags = kNtSymbolicLinkFlagDirectory;
     } else {
@@ -73,7 +86,7 @@ textwindows int sys_symlinkat_nt(const char *target, int newdirfd,
     // win32 needs to know if it's a directory of a file symlink, but
     // that's hard to determine if we're creating a broken symlink so
     // we'll fall back to checking for trailing slash
-    if (targetlen && target16[targetlen - 1] == '\\') {
+    if (targetlen && M.target16[targetlen - 1] == '\\') {
       flags = kNtSymbolicLinkFlagDirectory;
     } else {
       flags = 0;
@@ -82,15 +95,15 @@ textwindows int sys_symlinkat_nt(const char *target, int newdirfd,
 
   // windows only lets administrators do this
   // even then we're required to ask for permission
-  pthread_once(&g_winlink_once, InitializeWinlink);
-  if (!g_winlink_allowed) {
+  cosmo_once(&g_winlink.once, InitializeWinlink);
+  if (!g_winlink.allowed) {
     return eperm();
   }
 
   // we can now proceed
-  if (CreateSymbolicLink(linkpath16, target16, flags)) {
+  if (CreateSymbolicLink(M.linkpath16, M.target16, flags)) {
     return 0;
   } else {
-    return __fix_enotdir(-1, linkpath16);
+    return __fix_enotdir(-1, M.linkpath16);
   }
 }

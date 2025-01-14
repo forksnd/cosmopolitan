@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:t;c-basic-offset:8;tab-width:8;coding:utf-8   -*-│
-│vi: set et ft=c ts=8 tw=8 fenc=utf-8                                       :vi│
+│ vi: set noet ft=c ts=8 sw=8 fenc=utf-8                                   :vi │
 ╚──────────────────────────────────────────────────────────────────────────────╝
 │                                                                              │
 │  The author of this software is David M. Gay.                                │
@@ -30,7 +30,6 @@
 │                                                                              │
 ╚─────────────────────────────────────────────────────────────────────────────*/
 #include "third_party/gdtoa/gdtoa.internal.h"
-/* clang-format off */
 
 extern UShort __gdtoa_NanDflt_ldus[5];
 
@@ -74,7 +73,8 @@ int
 strtorx(const char *s, char **sp, int rounding, void *L)
 {
 	static const FPI fpi0 = { 64, 1-16383-64+1, 32766 - 16383 - 64 + 1, 1, SI, 0 /*unused*/ };
-	FPI *fpi, fpi1;
+	FPI fpi1;
+	const FPI *fpi;
 	ULong bits[2];
 	Long exp;
 	int k;

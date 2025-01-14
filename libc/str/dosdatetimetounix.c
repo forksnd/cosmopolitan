@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2020 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -17,8 +17,8 @@
 │ PERFORMANCE OF THIS SOFTWARE.                                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
 #include "libc/fmt/conv.h"
-#include "libc/macros.internal.h"
-#include "libc/time/time.h"
+#include "libc/macros.h"
+#include "libc/time.h"
 
 /**
  * Converts MS-DOS timestamp to UNIX.
@@ -26,8 +26,8 @@
  * @note type signature supports dates greater than 2100
  * @see PKZIP, FAT
  */
-int64_t DosDateTimeToUnix(unsigned date, unsigned time) {
-  unsigned weekday, year, month, day, hour, minute, second, yday, leap;
+int64_t DosDateTimeToUnix(uint32_t date, uint32_t time) {
+  unsigned year, month, day, hour, minute, second, yday, leap;
   year = ((date & 0xfffffe00) >> 9) + 1980 - 1900;
   month = MAX(1, MIN(12, (date & 0x01e0) >> 5));
   day = (date & 0x001f) ? (date & 0x001f) - 1 : 0;

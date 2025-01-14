@@ -32,10 +32,10 @@
 #define kNtPe32bit 0x010b
 #define kNtPe64bit 0x020b
 
-#define kNtPeSectionCntCode              0x000000020
-#define kNtPeSectionCntInitializedData   0x000000040
-#define kNtPeSectionCntUninitializedData 0x000000080
-#define kNtPeSectionGprel                0x000008000
+#define kNtPeSectionCntCode              0x00000020
+#define kNtPeSectionCntInitializedData   0x00000040
+#define kNtPeSectionCntUninitializedData 0x00000080
+#define kNtPeSectionGprel                0x00008000
 #define kNtPeSectionMemDiscardable       0x02000000
 #define kNtPeSectionMemNotCached         0x04000000
 #define kNtPeSectionMemNotPaged          0x08000000
@@ -198,8 +198,8 @@
 #define kNtImageScnScaleIndex     0x00000001
 
 #define kNtImageSymUndefined            ((uint16_t)0)
-#define kNtImageSymAbsolute             ((uint16_t)-1)
-#define kNtImageSymDebug                ((uint16_t)-2)
+#define kNtImageSymAbsolute             ((uint16_t) - 1)
+#define kNtImageSymDebug                ((uint16_t) - 2)
 #define kNtImageSymSectionMax           0xFEFF
 #define kNtImageSymSectionMaxEx         __LONG_MAX__
 #define kNtImageSymTypeNull             0x0000

@@ -3,7 +3,6 @@
 #include "third_party/mbedtls/ctr_drbg.h"
 #include "third_party/mbedtls/ssl.h"
 #include "third_party/mbedtls/x509_crt.h"
-#if !(__ASSEMBLER__ + __LINKER__ + 0)
 COSMOPOLITAN_C_START_
 
 struct EzTlsBio {
@@ -13,16 +12,19 @@ struct EzTlsBio {
   unsigned char u[1430];
 };
 
-extern struct EzTlsBio ezbio;
-extern mbedtls_ssl_config ezconf;
-extern mbedtls_ssl_context ezssl;
-extern mbedtls_ctr_drbg_context ezrng;
+extern _Thread_local struct EzTlsBio ezbio;
+extern _Thread_local mbedtls_ssl_config ezconf;
+extern _Thread_local mbedtls_ssl_context ezssl;
+extern _Thread_local mbedtls_ctr_drbg_context ezrng;
 
 void EzFd(int);
+void EzSanity(void);
+void EzDestroy(void);
 void EzHandshake(void);
 int EzHandshake2(void);
 void EzSetup(char[32]);
 void EzInitialize(void);
+void EzTlsDie(const char *, int);
 int EzTlsFlush(struct EzTlsBio *, const unsigned char *, size_t);
 
 /*
@@ -38,5 +40,4 @@ forceinline void SetupPresharedKeySsl(int endpoint, char psk[32]) {
 }
 
 COSMOPOLITAN_C_END_
-#endif /* !(__ASSEMBLER__ + __LINKER__ + 0) */
 #endif /* COSMOPOLITAN_TOOL_BUILD_LIB_EZTLS_H_ */

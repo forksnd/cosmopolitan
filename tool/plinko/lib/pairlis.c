@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2022 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -21,8 +21,10 @@
 #include "tool/plinko/lib/plinko.h"
 
 int Pairlis(int x, int y, int a) {
-  if (!x) return a;
-  if (x > 0) return Alist(x, y, a);
+  if (!x)
+    return a;
+  if (x > 0)
+    return Alist(x, y, a);
   if (y <= 0) {
     a = pairlis(Cdr(x), Cdr(y), a);
     return Car(x) ? pairlis(Car(x), Car(y), a) : a;

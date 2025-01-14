@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=8 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=8 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2020 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -16,7 +16,6 @@
 │ TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR             │
 │ PERFORMANCE OF THIS SOFTWARE.                                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
-#include "libc/stdio/lock.internal.h"
 #include "libc/stdio/stdio.h"
 
 /**
@@ -24,7 +23,6 @@
  *
  * @param c is byte to buffer or write, which is masked
  * @return c as unsigned char if written or -1 w/ errno
- * @threadsafe
  */
 int fputc(int c, FILE *f) {
   int rc;
@@ -33,3 +31,5 @@ int fputc(int c, FILE *f) {
   funlockfile(f);
   return rc;
 }
+
+__strong_reference(fputc, putc);

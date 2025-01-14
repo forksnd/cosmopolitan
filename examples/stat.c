@@ -7,18 +7,12 @@
 │   • http://creativecommons.org/publicdomain/zero/1.0/            │
 ╚─────────────────────────────────────────────────────────────────*/
 #endif
-#include "libc/calls/calls.h"
-#include "libc/calls/struct/stat.h"
-#include "libc/errno.h"
-#include "libc/fmt/conv.h"
-#include "libc/fmt/fmt.h"
-#include "libc/log/check.h"
-#include "libc/log/log.h"
-#include "libc/mem/gc.h"
-#include "libc/stdio/stdio.h"
-#include "libc/str/str.h"
-#include "libc/sysv/consts/s.h"
-#include "libc/x/xiso8601.h"
+#include <assert.h>
+#include <cosmo.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <sys/stat.h>
+#include <time.h>
 
 /**
  * @fileoverview File metadata viewer.
@@ -27,6 +21,23 @@
  */
 
 bool numeric;
+
+char *xiso8601(struct timespec ts) {
+  struct tm tm;
+  if (!localtime_r(&ts.tv_sec, &tm))
+    return 0;
+  int len = 128;
+  char *res = malloc(len);
+  char *ptr = res;
+  char *end = res + len;
+  if (!res)
+    return 0;
+  ptr += strftime(ptr, end - ptr, "%Y-%m-%d %H:%M:%S", &tm);
+  ptr += snprintf(ptr, end - ptr, ".%09ld", ts.tv_nsec);
+  ptr += strftime(ptr, end - ptr, "%z %Z", &tm);
+  unassert(ptr + 1 <= end);
+  return res;
+}
 
 const char *DescribeFileType(unsigned mode) {
   switch (mode & S_IFMT) {
@@ -54,9 +65,15 @@ void PrintFileMetadata(const char *pathname, struct stat *st) {
   printf("\n%s:", pathname);
   if (numeric) {
     fd = atoi(pathname);
-    CHECK_NE(-1, fstat(fd, st), "fd=%d", fd);
+    if (fstat(fd, st)) {
+      perror(pathname);
+      exit(1);
+    }
   } else {
-    CHECK_NE(-1, stat(pathname, st), "pathname=%s", pathname);
+    if (stat(pathname, st)) {
+      perror(pathname);
+      exit(1);
+    }
   }
   printf("\n"
          "%-32s%,ld\n"
@@ -75,21 +92,25 @@ void PrintFileMetadata(const char *pathname, struct stat *st) {
          "%-32s%s\n"
          "%-32s%s\n"
          "%-32s%s\n",
-         "bytes in file", st->st_size, "physical bytes", st->st_blocks * 512,
-         "device id w/ file", st->st_dev, "inode", st->st_ino,
-         "hard link count", st->st_nlink, "mode / permissions", st->st_mode,
-         DescribeFileType(st->st_mode), "owner id", st->st_uid, "group id",
-         st->st_gid, "flags", st->st_flags, "gen", st->st_gen,
-         "device id (if special)", st->st_rdev, "block size", st->st_blksize,
-         "access time", _gc(xiso8601(&st->st_atim)), "modified time",
-         _gc(xiso8601(&st->st_mtim)), "c[omplicated]time",
-         _gc(xiso8601(&st->st_ctim)), "birthtime",
-         _gc(xiso8601(&st->st_birthtim)));
+         "bytes in file:", st->st_size, "physical bytes:", st->st_blocks * 512,
+         "device id w/ file:", st->st_dev, "inode:", st->st_ino,
+         "hard link count:", st->st_nlink, "mode / permissions:", st->st_mode,
+         DescribeFileType(st->st_mode), "owner id:", st->st_uid,
+         "group id:", st->st_gid, "flags:", st->st_flags, "gen:", st->st_gen,
+         "device id (if special):", st->st_rdev, "block size:", st->st_blksize,
+         "access time:", gc(xiso8601(st->st_atim)),
+         "modified time:", gc(xiso8601(st->st_mtim)),
+         "c[omplicated]time:", gc(xiso8601(st->st_ctim)),
+         "[birthtime]:", gc(xiso8601(st->st_birthtim)));
 }
 
 int main(int argc, char *argv[]) {
   size_t i;
   struct stat st;
+  if (argc <= 1) {
+    PrintFileMetadata(".", &st);
+    return 0;
+  }
   for (i = 1; i < argc; ++i) {
     if (!strcmp(argv[i], "-n")) {
       numeric = true;

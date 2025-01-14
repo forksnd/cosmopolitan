@@ -1,7 +1,7 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
-│ Copyright 2022 Justine Alexandra Roberts Tunney                              │
+│ Copyright 2024 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
 │ Permission to use, copy, modify, and/or distribute this software for         │
 │ any purpose with or without fee is hereby granted, provided that the         │
@@ -16,34 +16,32 @@
 │ TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR             │
 │ PERFORMANCE OF THIS SOFTWARE.                                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
-#include "libc/intrin/atomic.h"
-#include "libc/runtime/runtime.h"
+#include "libc/cosmo.h"
+#include "libc/intrin/stack.h"
 #include "libc/thread/posixthread.internal.h"
 #include "libc/thread/thread.h"
-#include "libc/thread/tls.h"
-#include "third_party/nsync/dll.h"
 
 /**
- * Releases memory of detached threads that have terminated.
+ * Garbage collects POSIX threads runtime.
+ *
+ * This function frees unreferenced zombie threads and empties cache
+ * memory associated with the Cosmopolitan POSIX threads runtime.
+ *
+ * Here's an example use case for this function. Let's say you want to
+ * create a malloc() memory leak detector. If your program was running
+ * threads earlier, then there might still be allocations lingering
+ * around, that'll give you false positives. To fix this, what you would
+ * do is call the following, right before running your leak detector:
+ *
+ *     while (!pthread_orphan_np())
+ *       pthread_decimate_np();
+ *
+ * Which will wait until all threads have exited and their memory freed.
+ *
+ * @return 0 on success, or errno on error
  */
-void pthread_decimate_np(void) {
-  nsync_dll_element_ *e;
-  struct PosixThread *pt;
-  enum PosixThreadStatus status;
-StartOver:
-  pthread_spin_lock(&_pthread_lock);
-  for (e = nsync_dll_first_(_pthread_list); e;
-       e = nsync_dll_next_(_pthread_list, e)) {
-    pt = (struct PosixThread *)e->container;
-    if (pt->tib == __get_tls()) continue;
-    status = atomic_load_explicit(&pt->status, memory_order_acquire);
-    if (status != kPosixThreadZombie) break;
-    if (!atomic_load_explicit(&pt->tib->tib_tid, memory_order_acquire)) {
-      _pthread_list = nsync_dll_remove_(_pthread_list, e);
-      pthread_spin_unlock(&_pthread_lock);
-      _pthread_free(pt);
-      goto StartOver;
-    }
-  }
-  pthread_spin_unlock(&_pthread_lock);
+int pthread_decimate_np(void) {
+  _pthread_decimate(kPosixThreadZombie);
+  cosmo_stack_clear();
+  return 0;
 }

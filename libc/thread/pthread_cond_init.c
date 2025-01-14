@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2022 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -16,10 +16,12 @@
 │ TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR             │
 │ PERFORMANCE OF THIS SOFTWARE.                                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
+#include "libc/dce.h"
+#include "libc/sysv/consts/clock.h"
 #include "libc/thread/thread.h"
 
 /**
- * Initializes condition.
+ * Initializes condition variable.
  *
  * @param attr may be null
  * @return 0 on success, or error number on failure
@@ -27,5 +29,9 @@
 errno_t pthread_cond_init(pthread_cond_t *cond,
                           const pthread_condattr_t *attr) {
   *cond = (pthread_cond_t){0};
+  if (attr) {
+    cond->_pshared = attr->_pshared;
+    cond->_clock = attr->_clock;
+  }
   return 0;
 }

@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=8 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2020 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -16,39 +16,37 @@
 │ TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR             │
 │ PERFORMANCE OF THIS SOFTWARE.                                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
-#include "libc/calls/calls.h"
-#include "libc/dce.h"
+#include "libc/intrin/dll.h"
 #include "libc/stdio/internal.h"
-#include "libc/stdio/stdio.h"
 #include "libc/sysv/consts/fileno.h"
 #include "libc/sysv/consts/o.h"
-#include "libc/thread/thread.h"
+
+__static_yoink("fflush");
+
+static char __stdout_buf[BUFSIZ];
+
+static FILE __stdout = {
+    .fd = STDOUT_FILENO,
+    .oflags = O_WRONLY,
+    .buf = __stdout_buf,
+    .size = sizeof(__stdout_buf),
+    .lock = PTHREAD_RECURSIVE_MUTEX_INITIALIZER_NP,
+    .elem = {&__stdout.elem, &__stdout.elem},
+
+    // Unlike other C libraries we don't bother calling fstat() to check
+    // if stdio is a character device and we instead choose to always
+    // line buffer it. We need it because there's no way to use the
+    // unbuffer command on a statically linked binary. This still goes
+    // fast. We value latency more than throughput, and stdio isn't the
+    // best api when the goal is throughput.
+    .bufmode = _IOLBF,
+};
 
 /**
  * Pointer to standard output stream.
  */
-FILE *stdout;
+FILE *stdout = &__stdout;
 
-static FILE __stdout;
-
-__attribute__((__constructor__)) static void __stdout_init(void) {
-  stdout = &__stdout;
-
-  stdout->fd = STDOUT_FILENO;
-  stdout->iomode = O_WRONLY;
-  stdout->buf = stdout->mem;
-  stdout->size = sizeof(stdout->mem);
-  ((pthread_mutex_t *)stdout->lock)->_type = PTHREAD_MUTEX_RECURSIVE;
-
-  /*
-   * Unlike other C libraries we don't bother calling fstat() to check
-   * if stdio is a character device and we instead choose to always line
-   * buffer it. We need it because there's no way to use the unbuffer
-   * command on a statically linked binary. This still goes fast. We
-   * value latency more than throughput, and stdio isn't the best api
-   * when the goal is throughput.
-   */
-  stdout->bufmode = _IOLBF;
-
-  __fflush_register(stdout);
+__attribute__((__constructor__(60))) static textstartup void stdout_init(void) {
+  dll_make_last(&__stdio.files, &__stdout.elem);
 }

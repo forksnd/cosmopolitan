@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:4;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=4 sts=4 sw=4 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=4 sts=4 sw=4 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright (c) 2008-2016 Stefan Krah. All rights reserved.                    │
 │                                                                              │
@@ -27,21 +27,16 @@
 │ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,            │
 │ EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.                           │
 ╚─────────────────────────────────────────────────────────────────────────────*/
+#include "third_party/python/Modules/_decimal/libmpdec/mpdecimal.h"
 #include "libc/math.h"
 #include "third_party/python/Modules/_decimal/libmpdec/basearith.h"
 #include "third_party/python/Modules/_decimal/libmpdec/bits.h"
 #include "third_party/python/Modules/_decimal/libmpdec/convolute.h"
 #include "third_party/python/Modules/_decimal/libmpdec/crt.h"
 #include "third_party/python/Modules/_decimal/libmpdec/mpalloc.h"
-#include "third_party/python/Modules/_decimal/libmpdec/mpdecimal.h"
 #include "third_party/python/Modules/_decimal/libmpdec/typearith.h"
 #include "third_party/python/Modules/_decimal/libmpdec/umodarith.h"
-/* clang-format off */
-
-asm(".ident\t\"\\n\\n\
-libmpdec (BSD-2)\\n\
-Copyright 2008-2016 Stefan Krah\"");
-asm(".include \"libc/disclaimer.inc\"");
+__static_yoink("libmpdec_notice");
 
 #define MPD_NEWTONDIV_CUTOFF 1024L
 
@@ -3450,7 +3445,7 @@ mpd_qdivint(mpd_t *q, const mpd_t *a, const mpd_t *b,
             _settriple(q, sign, 0, 0);
             return;
         }
-        unreachable;
+        __builtin_unreachable();
     }
     if (mpd_iszerocoeff(b)) {
         if (mpd_iszerocoeff(a)) {

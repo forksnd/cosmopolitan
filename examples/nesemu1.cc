@@ -3,6 +3,7 @@
 /* PORTED TO TELETYPEWRITERS IN YEAR 2020 BY JUSTINE ALEXANDRA ROBERTS TUNNEY */
 /* TRADEMARKS ARE OWNED BY THEIR RESPECTIVE OWNERS LAWYERCATS LUV TAUTOLOGIES */
 /* https://bisqwit.iki.fi/jutut/kuvat/programming_examples/nesemu1/nesemu1.cc */
+#include "dsp/audio/cosmoaudio/cosmoaudio.h"
 #include "dsp/core/core.h"
 #include "dsp/core/half.h"
 #include "dsp/core/illumination.h"
@@ -12,21 +13,22 @@
 #include "dsp/tty/tty.h"
 #include "libc/assert.h"
 #include "libc/calls/calls.h"
-#include "libc/calls/struct/itimerval.h"
+#include "libc/calls/struct/sigset.h"
 #include "libc/calls/struct/winsize.h"
+#include "libc/calls/termios.h"
+#include "libc/dce.h"
 #include "libc/errno.h"
 #include "libc/fmt/conv.h"
-#include "libc/fmt/fmt.h"
-#include "libc/intrin/bits.h"
-#include "libc/intrin/safemacros.internal.h"
+#include "libc/intrin/safemacros.h"
 #include "libc/inttypes.h"
 #include "libc/log/check.h"
 #include "libc/log/log.h"
-#include "libc/macros.internal.h"
+#include "libc/macros.h"
 #include "libc/math.h"
 #include "libc/mem/arraylist2.internal.h"
 #include "libc/mem/mem.h"
 #include "libc/runtime/runtime.h"
+#include "libc/runtime/zipos.internal.h"
 #include "libc/sock/sock.h"
 #include "libc/sock/struct/pollfd.h"
 #include "libc/stdio/stdio.h"
@@ -34,20 +36,20 @@
 #include "libc/sysv/consts/ex.h"
 #include "libc/sysv/consts/exit.h"
 #include "libc/sysv/consts/fileno.h"
-#include "libc/sysv/consts/itimer.h"
-#include "libc/sysv/consts/o.h"
 #include "libc/sysv/consts/poll.h"
+#include "libc/sysv/consts/prio.h"
 #include "libc/sysv/consts/sig.h"
-#include "libc/time/time.h"
+#include "libc/thread/thread.h"
+#include "libc/time.h"
 #include "libc/x/xasprintf.h"
 #include "libc/x/xsigaction.h"
 #include "libc/zip.h"
-#include "libc/zipos/zipos.internal.h"
-#include "third_party/getopt/getopt.h"
+#include "third_party/getopt/getopt.internal.h"
+#include "third_party/libcxx/__atomic/atomic.h"
 #include "third_party/libcxx/vector"
 #include "tool/viz/lib/knobs.h"
 
-STATIC_YOINK("zipos");
+__static_yoink("zipos");
 
 #define USAGE \
   " [ROM] [FMV]\n\
@@ -106,7 +108,9 @@ AUTHORS\n\
 #define DYN     240
 #define DXN     256
 #define FPS     60.0988
-#define HZ      1789773
+#define CPUHZ   1789773
+#define SRATE   44100
+#define ABUFZ   ((int)(SRATE / FPS) + 1)
 #define GAMMA   2.2
 #define CTRL(C) ((C) ^ 0100)
 #define ALT(C)  ((033 << 010) | (C))
@@ -116,23 +120,9 @@ typedef uint8_t u8;
 typedef uint16_t u16;
 typedef uint32_t u32;
 
-static const struct itimerval kNesFps = {
-    {0, 1. / FPS * 1e6},
-    {0, 1. / FPS * 1e6},
-};
-
-struct Frame {
-  char *p, *w, *mem;
-};
-
 struct Action {
   int code;
   int wait;
-};
-
-struct Audio {
-  size_t i;
-  int16_t p[FRAMESIZE];
 };
 
 struct Status {
@@ -145,34 +135,33 @@ struct ZipGames {
   char** p;
 };
 
-static int frame_;
-static int drain_;
-static int playfd_;
-static int playpid_;
-static bool exited_;
-static bool timeout_;
-static bool resized_;
-static size_t vtsize_;
+static const struct timespec kNesFps = {0, 1. / FPS * 1e9};
+
 static bool artifacts_;
 static long tyn_, txn_;
-static struct Frame vf_[2];
-static struct Audio audio_;
 static const char* inputfn_;
 static struct Status status_;
+static volatile bool exited_;
+static volatile bool resized_;
+static struct CosmoAudio* ca_;
 static struct TtyRgb* ttyrgb_;
 static unsigned char *R, *G, *B;
 static struct ZipGames zipgames_;
 static struct Action arrow_, button_;
-static struct SamplingSolution* asx_;
 static struct SamplingSolution* ssy_;
 static struct SamplingSolution* ssx_;
-static unsigned char pixels_[3][DYN][DXN];
+static unsigned char (*pixels_)[3][DYN][DXN];
 static unsigned char palette_[3][64][512][3];
 static int joy_current_[2], joy_next_[2], joypos_[2];
 
 static int keyframes_ = 10;
 static enum TtyBlocksSelection blocks_ = kTtyBlocksUnicode;
-static enum TtyQuantizationAlgorithm quant_ = kTtyQuantTrue;
+static enum TtyQuantizationAlgorithm quant_ = kTtyQuantXterm256;
+
+static struct timespec deadline_;
+static std::atomic<void*> pixels_ready_;
+static pthread_cond_t cond = PTHREAD_COND_INITIALIZER;
+static pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
 
 static int Clamp(int v) {
   return MAX(0, MIN(255, v));
@@ -226,54 +215,37 @@ void InitPalette(void) {
           rgbc[u] = FixGamma(y / 1980. + i * A[u] / 9e6 + q * B[u] / 9e6);
         }
         matvmul3(rgbd65, lightbulb, rgbc);
-        for (u = 0; u < 3; ++u) {
+        for (u = 0; u < 3; ++u)
           palette_[o][p1][p0][u] = Clamp(rgbd65[u] * 255);
-        }
       }
     }
   }
 }
 
-static void WriteStringNow(const char* s) {
-  ttywrite(STDOUT_FILENO, s, strlen(s));
+static void WriteString(const char* s) {
+  write(STDOUT_FILENO, s, strlen(s));
 }
 
 void Exit(int rc) {
-  WriteStringNow("\r\n\e[0m\e[J");
-  if (rc && errno) {
+  WriteString("\r\n\e[0m\e[J");
+  if (rc && errno)
     fprintf(stderr, "%s%s\r\n", "error: ", strerror(errno));
-  }
   exit(rc);
 }
 
 void Cleanup(void) {
   ttyraw((enum TtyRawFlags)(-1u));
   ttyshowcursor(STDOUT_FILENO);
-  if (playpid_) kill(playpid_, SIGTERM), sched_yield();
+  cosmoaudio_close(ca_);
+  ca_ = 0;
 }
 
-void OnTimer(void) {
-  timeout_ = true;  // also sends EINTR to poll()
+void OnCtrlC(void) {
+  exited_ = true;
 }
 
 void OnResize(void) {
   resized_ = true;
-}
-
-void OnPiped(void) {
-  exited_ = true;
-}
-
-void OnCtrlC(void) {
-  drain_ = exited_ = true;
-}
-
-void OnSigChld(void) {
-  exited_ = true, playpid_ = 0;
-}
-
-void InitFrame(struct Frame* f) {
-  f->p = f->w = f->mem = (char*)realloc(f->mem, vtsize_);
 }
 
 long ChopAxis(long dn, long sn) {
@@ -287,33 +259,25 @@ void GetTermSize(void) {
   struct winsize wsize_;
   wsize_.ws_row = 25;
   wsize_.ws_col = 80;
-  _getttysize(0, &wsize_);
+  tcgetwinsize(0, &wsize_);
   FreeSamplingSolution(ssy_);
   FreeSamplingSolution(ssx_);
   tyn_ = wsize_.ws_row * 2;
   txn_ = wsize_.ws_col * 2;
   ssy_ = ComputeSamplingSolution(tyn_, ChopAxis(tyn_, DYN), 0, 0, 2);
-  ssx_ = ComputeSamplingSolution(txn_, ChopAxis(txn_, DXN), 0, 0, 0);
+  ssx_ = ComputeSamplingSolution(txn_, ChopAxis(txn_, DXN), 0, 0, 2);
   R = (unsigned char*)realloc(R, tyn_ * txn_);
   G = (unsigned char*)realloc(G, tyn_ * txn_);
   B = (unsigned char*)realloc(B, tyn_ * txn_);
   ttyrgb_ = (struct TtyRgb*)realloc(ttyrgb_, tyn_ * txn_ * 4);
-  vtsize_ = ((tyn_ * txn_ * strlen("\e[48;2;255;48;2;255m▄")) +
-             (tyn_ * strlen("\e[0m\r\n")) + 128);
-  frame_ = 0;
-  InitFrame(&vf_[0]);
-  InitFrame(&vf_[1]);
-  WriteStringNow("\e[0m\e[H\e[J");
+  WriteString("\e[0m\e[H\e[J");
+  resized_ = false;
 }
 
 void IoInit(void) {
   GetTermSize();
   xsigaction(SIGINT, (void*)OnCtrlC, 0, 0, NULL);
-  xsigaction(SIGPIPE, (void*)OnPiped, 0, 0, NULL);
   xsigaction(SIGWINCH, (void*)OnResize, 0, 0, NULL);
-  xsigaction(SIGALRM, (void*)OnTimer, 0, 0, NULL);
-  xsigaction(SIGCHLD, (void*)OnSigChld, 0, 0, NULL);
-  setitimer(ITIMER_REAL, &kNesFps, NULL);
   ttyhidecursor(STDOUT_FILENO);
   ttyraw(kTtySigs);
   ttyquantsetup(quant_, kTtyQuantRgb, blocks_);
@@ -328,13 +292,14 @@ void SetStatus(const char* fmt, ...) {
   status_.wait = FPS / 2;
 }
 
-void ReadKeyboard(void) {
+ssize_t ReadKeyboard(void) {
   int ch;
-  char b[20];
   ssize_t i, rc;
-  memset(b, -1, sizeof(b));
+  char b[20] = {0};
   if ((rc = read(STDIN_FILENO, b, 16)) != -1) {
-    if (!rc) exited_ = true;
+    if (!rc) {
+      Exit(0);
+    }
     for (i = 0; i < rc; ++i) {
       ch = b[i];
       if (b[i] == '\e') {
@@ -446,76 +411,32 @@ void ReadKeyboard(void) {
       }
     }
   }
+  return rc;
 }
 
-bool HasVideo(struct Frame* f) {
-  return f->w < f->p;
-}
-
-bool HasPendingVideo(void) {
-  return HasVideo(&vf_[0]) || HasVideo(&vf_[1]);
-}
-
-bool HasPendingAudio(void) {
-  return playpid_ && audio_.i;
-}
-
-struct Frame* FlipFrameBuffer(void) {
-  frame_ = !frame_;
-  return &vf_[frame_];
-}
-
-void TransmitVideo(void) {
-  ssize_t rc;
-  struct Frame* f;
-  f = &vf_[frame_];
-  if (!HasVideo(f)) f = FlipFrameBuffer();
-  if ((rc = write(STDOUT_FILENO, f->w, f->p - f->w)) != -1) {
-    f->w += rc;
-  } else if (errno == EPIPE) {
-    Exit(0);
-  } else if (errno != EINTR) {
-    Exit(1);
-  }
-}
-
-void TransmitAudio(void) {
-  ssize_t rc;
-  if (!audio_.i) return;
-  if ((rc = write(playfd_, audio_.p, audio_.i * sizeof(short))) != -1) {
-    rc /= sizeof(short);
-    memmove(audio_.p, audio_.p + rc, (audio_.i - rc) * sizeof(short));
-    audio_.i -= rc;
-  } else if (errno == EPIPE) {
-    Exit(0);
-  } else if (errno != EINTR) {
-    Exit(1);
-  }
-}
-
-void ScaleVideoFrameToTeletypewriter(void) {
+void ScaleVideoFrameToTeletypewriter(unsigned char (*pixels)[3][DYN][DXN]) {
   long y, x, yn, xn;
   yn = DYN, xn = DXN;
   while (HALF(yn) > tyn_ || HALF(xn) > txn_) {
     if (HALF(xn) > txn_) {
-      Magikarp2xX(DYN, DXN, pixels_[0], yn, xn);
-      Magikarp2xX(DYN, DXN, pixels_[1], yn, xn);
-      Magikarp2xX(DYN, DXN, pixels_[2], yn, xn);
+      Magikarp2xX(DYN, DXN, (*pixels)[0], yn, xn);
+      Magikarp2xX(DYN, DXN, (*pixels)[1], yn, xn);
+      Magikarp2xX(DYN, DXN, (*pixels)[2], yn, xn);
       xn = HALF(xn);
     }
     if (HALF(yn) > tyn_) {
-      Magikarp2xY(DYN, DXN, pixels_[0], yn, xn);
-      Magikarp2xY(DYN, DXN, pixels_[1], yn, xn);
-      Magikarp2xY(DYN, DXN, pixels_[2], yn, xn);
+      Magikarp2xY(DYN, DXN, (*pixels)[0], yn, xn);
+      Magikarp2xY(DYN, DXN, (*pixels)[1], yn, xn);
+      Magikarp2xY(DYN, DXN, (*pixels)[2], yn, xn);
       yn = HALF(yn);
     }
   }
-  GyaradosUint8(tyn_, txn_, R, DYN, DXN, pixels_[0], tyn_, txn_, yn, xn, 0, 255,
-                ssy_, ssx_, true);
-  GyaradosUint8(tyn_, txn_, G, DYN, DXN, pixels_[1], tyn_, txn_, yn, xn, 0, 255,
-                ssy_, ssx_, true);
-  GyaradosUint8(tyn_, txn_, B, DYN, DXN, pixels_[2], tyn_, txn_, yn, xn, 0, 255,
-                ssy_, ssx_, true);
+  GyaradosUint8(tyn_, txn_, R, DYN, DXN, (*pixels)[0], tyn_, txn_, yn, xn, 0,
+                255, ssy_, ssx_, true);
+  GyaradosUint8(tyn_, txn_, G, DYN, DXN, (*pixels)[1], tyn_, txn_, yn, xn, 0,
+                255, ssy_, ssx_, true);
+  GyaradosUint8(tyn_, txn_, B, DYN, DXN, (*pixels)[2], tyn_, txn_, yn, xn, 0,
+                255, ssy_, ssx_, true);
   for (y = 0; y < tyn_; ++y) {
     for (x = 0; x < txn_; ++x) {
       ttyrgb_[y * txn_ + x] =
@@ -532,77 +453,104 @@ void KeyCountdown(struct Action* a) {
   }
 }
 
-void PollAndSynchronize(void) {
-  struct pollfd fds[3];
-  do {
-    errno = 0;
-    fds[0].fd = STDIN_FILENO;
-    fds[0].events = POLLIN;
-    fds[1].fd = HasPendingVideo() ? STDOUT_FILENO : -1;
-    fds[1].events = POLLOUT;
-    fds[2].fd = HasPendingAudio() ? playfd_ : -1;
-    fds[2].events = POLLOUT;
-    if (poll(fds, ARRAYLEN(fds), 1. / FPS * 1e3) != -1) {
-      if (fds[0].revents & (POLLIN | POLLERR)) ReadKeyboard();
-      if (fds[1].revents & (POLLOUT | POLLERR)) TransmitVideo();
-      if (fds[2].revents & (POLLOUT | POLLERR)) TransmitAudio();
-    } else if (errno != EINTR) {
-      Exit(1);
-    }
-    if (exited_) {
-      if (drain_) {
-        while (HasPendingVideo()) {
-          TransmitVideo();
-        }
-      }
-      Exit(0);
-    }
-    if (resized_) {
-      resized_ = false;
-      GetTermSize();
-      break;
-    }
-  } while (!timeout_);
-  timeout_ = false;
-  KeyCountdown(&arrow_);
-  KeyCountdown(&button_);
-  joy_next_[0] = arrow_.code | button_.code;
-  joy_next_[1] = arrow_.code | button_.code;
-}
-
-void Raster(void) {
-  struct Frame* f;
+void Raster(unsigned char (*pixels)[3][DYN][DXN]) {
   struct TtyRgb bg = {0x12, 0x34, 0x56, 0};
   struct TtyRgb fg = {0x12, 0x34, 0x56, 0};
-  ScaleVideoFrameToTeletypewriter();
-  f = &vf_[!frame_];
-  f->p = f->w = f->mem;
-  f->p = stpcpy(f->p, "\e[0m\e[H");
-  f->p = ttyraster(f->p, ttyrgb_, tyn_, txn_, bg, fg);
+  ScaleVideoFrameToTeletypewriter(pixels);
+  char* ansi = (char*)malloc((tyn_ * txn_ * strlen("\e[48;2;255;48;2;255m▄")) +
+                             (tyn_ * strlen("\e[0m\r\n")) + 128);
+  char* p = ansi;
+  p = stpcpy(p, "\e[0m\e[H");
+  p = ttyraster(p, ttyrgb_, tyn_, txn_, bg, fg);
+  free(pixels);
   if (status_.wait) {
     status_.wait--;
-    f->p = stpcpy(f->p, "\e[0m\e[H");
-    f->p = stpcpy(f->p, status_.text);
+    p = stpcpy(p, "\e[0m\e[H");
+    p = stpcpy(p, status_.text);
   }
-  CHECK_LT(f->p - f->mem, vtsize_);
-  PollAndSynchronize();
+  size_t n = p - ansi;
+  ssize_t wrote;
+  for (size_t i = 0; i < n; i += wrote) {
+    if ((wrote = write(STDOUT_FILENO, ansi + i, n - i)) == -1) {
+      exited_ = true;
+      break;
+    }
+  }
+  free(ansi);
+}
+
+void* RasterThread(void* arg) {
+  sigset_t ss;
+  sigemptyset(&ss);
+  sigaddset(&ss, SIGINT);
+  sigaddset(&ss, SIGHUP);
+  sigaddset(&ss, SIGQUIT);
+  sigaddset(&ss, SIGTERM);
+  sigaddset(&ss, SIGPIPE);
+  sigprocmask(SIG_SETMASK, &ss, 0);
+  for (;;) {
+    unsigned char(*pixels)[3][DYN][DXN];
+    pthread_mutex_lock(&lock);
+    while (!(pixels = (unsigned char(*)[3][DYN][DXN])pixels_ready_.load()))
+      pthread_cond_wait(&cond, &lock);
+    pixels_ready_.store(0);
+    pthread_mutex_unlock(&lock);
+    if (resized_)
+      GetTermSize();
+    Raster(pixels);
+  }
 }
 
 void FlushScanline(unsigned py) {
-  if (py == DYN - 1) {
-    if (!timeout_) {
-      Raster();
-    }
-    timeout_ = false;
+  if (py != DYN - 1)
+    return;
+  pthread_mutex_lock(&lock);
+  if (!pixels_ready_) {
+    pixels_ready_.store(pixels_);
+    pixels_ = 0;
+    pthread_cond_signal(&cond);
   }
+  pthread_mutex_unlock(&lock);
+  if (!pixels_)
+    pixels_ = (unsigned char(*)[3][DYN][DXN])malloc(3 * DYN * DXN);
+  if (exited_)
+    Exit(0);
+  do {
+    struct timespec now = timespec_mono();
+    struct timespec remain = timespec_subz(deadline_, now);
+    int remain_ms = timespec_tomillis(remain);
+    struct pollfd fds[] = {{STDIN_FILENO, POLLIN}};
+    int got = poll(fds, 1, remain_ms);
+    if (got == -1) {
+      if (errno == EINTR)
+        continue;
+      Exit(1);
+    }
+    if (got == 1) {
+      do {
+        if (ReadKeyboard() == -1) {
+          if (errno == EINTR)
+            continue;
+          Exit(1);
+        }
+      } while (0);
+    }
+    KeyCountdown(&arrow_);
+    KeyCountdown(&button_);
+    joy_next_[0] = arrow_.code | button_.code;
+    joy_next_[1] = arrow_.code | button_.code;
+    now = timespec_mono();
+    do
+      deadline_ = timespec_add(deadline_, kNesFps);
+    while (timespec_cmp(deadline_, now) <= 0);
+  } while (0);
 }
 
 static void PutPixel(unsigned px, unsigned py, unsigned pixel, int offset) {
-  unsigned rgb;
   static unsigned prev;
-  pixels_[0][py][px] = palette_[offset][prev % 64][pixel][2];
-  pixels_[1][py][px] = palette_[offset][prev % 64][pixel][1];
-  pixels_[2][py][px] = palette_[offset][prev % 64][pixel][0];
+  (*pixels_)[0][py][px] = palette_[offset][prev % 64][pixel][2];
+  (*pixels_)[1][py][px] = palette_[offset][prev % 64][pixel][1];
+  (*pixels_)[2][py][px] = palette_[offset][prev % 64][pixel][0];
   prev = pixel;
 }
 
@@ -731,7 +679,8 @@ u8 Access(unsigned addr, u8 value, bool write) {
       }
     }
   }
-  if ((addr >> 13) == 3) return PRAM[addr & 0x1FFF];
+  if ((addr >> 13) == 3)
+    return PRAM[addr & 0x1FFF];
   return banks[(addr / RomGranularity) % RomPages][addr % RomGranularity];
 }
 
@@ -825,7 +774,8 @@ bool offset_toggle = false;
 u8& NesMmap(int i) {
   i &= 0x3FFF;
   if (i >= 0x3F00) {
-    if (i % 4 == 0) i &= 0x0F;
+    if (i % 4 == 0)
+      i &= 0x0F;
     return palette[i & 0x1F];
   }
   if (i < 0x2000) {
@@ -841,7 +791,8 @@ u8 PpuAccess(u16 index, u8 v, bool write) {
     return open_bus_decay_timer = 77777, open_bus = v;
   };
   u8 res = open_bus;
-  if (write) RefreshOpenBus(v);
+  if (write)
+    RefreshOpenBus(v);
   switch (index) {  // Which port from $200x?
     case 0:
       if (write) {
@@ -855,7 +806,8 @@ u8 PpuAccess(u16 index, u8 v, bool write) {
       }
       break;
     case 2:
-      if (write) break;
+      if (write)
+        break;
       res = reg.status | (open_bus & 0x1F);
       reg.InVBlank = false;   // Reading $2002 clears the vblank flag.
       offset_toggle = false;  // Also resets the toggle for address updates.
@@ -864,7 +816,8 @@ u8 PpuAccess(u16 index, u8 v, bool write) {
       }
       break;
     case 3:
-      if (write) reg.OAMaddr = v;
+      if (write)
+        reg.OAMaddr = v;
       break;  // Index into Object Attribute Memory
     case 4:
       if (write) {
@@ -875,7 +828,8 @@ u8 PpuAccess(u16 index, u8 v, bool write) {
       }
       break;
     case 5:
-      if (!write) break;  // Set background scrolling offset
+      if (!write)
+        break;  // Set background scrolling offset
       if (offset_toggle) {
         scroll.yfine = v & 7;
         scroll.ycoarse = v >> 3;
@@ -885,7 +839,8 @@ u8 PpuAccess(u16 index, u8 v, bool write) {
       offset_toggle = !offset_toggle;
       break;
     case 6:
-      if (!write) break;  // Set video memory position for reads/writes
+      if (!write)
+        break;  // Set video memory position for reads/writes
       if (offset_toggle) {
         scroll.vaddrlo = v;
         vaddr.raw = (unsigned)scroll.raw;
@@ -923,17 +878,21 @@ void RenderingTick() {
     case 2:  // Point to attribute table
       ioaddr = 0x23C0 + 0x400 * vaddr.basenta + 8 * (vaddr.ycoarse / 4) +
                (vaddr.xcoarse / 4);
-      if (tile_decode_mode) break;  // Or nametable, with sprites.
-    case 0:                         // Point to nametable
+      if (tile_decode_mode)
+        break;  // Or nametable, with sprites.
+    case 0:     // Point to nametable
       ioaddr = 0x2000 + (vaddr.raw & 0xFFF);
       // Reset sprite data
       if (x_ == 0) {
         sprinpos = sproutpos = 0;
-        if (reg.ShowSP) reg.OAMaddr = 0;
+        if (reg.ShowSP)
+          reg.OAMaddr = 0;
       }
-      if (!reg.ShowBG) break;
+      if (!reg.ShowBG)
+        break;
       // Reset scrolling (vertical once, horizontal each scanline)
-      if (x_ == 304 && scanline == -1) vaddr.raw = (unsigned)scroll.raw;
+      if (x_ == 304 && scanline == -1)
+        vaddr.raw = (unsigned)scroll.raw;
       if (x_ == 256) {
         vaddr.xcoarse = (unsigned)scroll.xcoarse;
         vaddr.basenta_h = (unsigned)scroll.basenta_h;
@@ -946,7 +905,8 @@ void RenderingTick() {
       }
       // Name table access
       pat_addr = 0x1000 * reg.BGaddr + 16 * NesMmap(ioaddr) + vaddr.yfine;
-      if (!tile_decode_mode) break;
+      if (!tile_decode_mode)
+        break;
       // Push the current tile into shift registers.
       // The bitmap pattern is 16 bits, while the attribute is 2 bits, repeated
       // 8 times.
@@ -973,7 +933,8 @@ void RenderingTick() {
         auto& o = OAM3[sprrenpos];  // Sprite to render on next scanline
         memcpy(&o, &OAM2[sprrenpos], sizeof(o));
         unsigned y = (scanline)-o.y;
-        if (o.attr & 0x80) y ^= (reg.SPsize ? 15 : 7);
+        if (o.attr & 0x80)
+          y ^= (reg.SPsize ? 15 : 7);
         pat_addr = 0x1000 * (reg.SPsize ? (o.index & 0x01) : reg.SPaddr);
         pat_addr += 0x10 * (reg.SPsize ? (o.index & 0xFE) : (o.index & 0xFF));
         pat_addr += (y & 7) + (y & 8) * 2;
@@ -1008,8 +969,10 @@ void RenderingTick() {
         break;
       }
       ++sprinpos;  // next sprite
-      if (sproutpos < 8) OAM2[sproutpos].y = sprtmp;
-      if (sproutpos < 8) OAM2[sproutpos].sprindex = reg.OAMindex;
+      if (sproutpos < 8)
+        OAM2[sproutpos].y = sprtmp;
+      if (sproutpos < 8)
+        OAM2[sproutpos].sprindex = reg.OAMindex;
       y1 = sprtmp;
       y2 = sprtmp + (reg.SPsize ? 16 : 8);
       if (!(scanline >= y1 && scanline < y2)) {
@@ -1017,19 +980,23 @@ void RenderingTick() {
       }
       break;
     case 1:
-      if (sproutpos < 8) OAM2[sproutpos].index = sprtmp;
+      if (sproutpos < 8)
+        OAM2[sproutpos].index = sprtmp;
       break;
     case 2:
-      if (sproutpos < 8) OAM2[sproutpos].attr = sprtmp;
+      if (sproutpos < 8)
+        OAM2[sproutpos].attr = sprtmp;
       break;
     case 3:
-      if (sproutpos < 8) OAM2[sproutpos].x_ = sprtmp;
+      if (sproutpos < 8)
+        OAM2[sproutpos].x_ = sprtmp;
       if (sproutpos < 8) {
         ++sproutpos;
       } else {
         reg.SPoverflow = true;
       }
-      if (sprinpos == 2) reg.OAMaddr = 8;
+      if (sprinpos == 2)
+        reg.OAMaddr = 8;
       break;
   }
 }
@@ -1057,13 +1024,17 @@ void RenderPixel() {
       auto& s = OAM3[sno];
       // Check if this sprite is horizontally in range
       unsigned xdiff = x_ - s.x_;
-      if (xdiff >= 8) continue;  // Also matches negative values
+      if (xdiff >= 8)
+        continue;  // Also matches negative values
       // Determine which pixel to display; skip transparent pixels
-      if (!(s.attr & 0x40)) xdiff = 7 - xdiff;
+      if (!(s.attr & 0x40))
+        xdiff = 7 - xdiff;
       u8 spritepixel = (s.pattern >> (xdiff * 2)) & 3;
-      if (!spritepixel) continue;
+      if (!spritepixel)
+        continue;
       // Register sprite-0 hit if applicable
-      if (x_ < 255 && pixel && s.sprindex == 0) reg.SP0hit = true;
+      if (x_ < 255 && pixel && s.sprindex == 0)
+        reg.SP0hit = true;
       // Render the pixel unless behind-background placement wanted
       if (!(s.attr & 0x20) || !pixel) {
         attr = (s.attr & 3) + 4;
@@ -1092,11 +1063,13 @@ void ReadToolAssistedSpeedrunRobotKeys() {
     }
     if (ctrlmask & 0x80) {
       joy_next_[0] = fgetc(fp);
-      if (feof(fp)) joy_next_[0] = 0;
+      if (feof(fp))
+        joy_next_[0] = 0;
     }
     if (ctrlmask & 0x40) {
       joy_next_[1] = fgetc(fp);
-      if (feof(fp)) joy_next_[1] = 0;
+      if (feof(fp))
+        joy_next_[1] = 0;
     }
   }
 }
@@ -1141,18 +1114,23 @@ void Tick() {
       CPU::nmi = reg.InVBlank && reg.NMIenabled;
       break;
   }
-  if (VBlankState != 0) VBlankState += (VBlankState < 0 ? 1 : -1);
-  if (open_bus_decay_timer && !--open_bus_decay_timer) open_bus = 0;
+  if (VBlankState != 0)
+    VBlankState += (VBlankState < 0 ? 1 : -1);
+  if (open_bus_decay_timer && !--open_bus_decay_timer)
+    open_bus = 0;
 
   // Graphics processing scanline?
   if (scanline < DYN) {
     /* Process graphics for this cycle */
-    if (reg.ShowBGSP) RenderingTick();
-    if (scanline >= 0 && x_ < 256) RenderPixel();
+    if (reg.ShowBGSP)
+      RenderingTick();
+    if (scanline >= 0 && x_ < 256)
+      RenderPixel();
   }
 
   // Done with the cycle. Check for end of scanline.
-  if (++cycle_counter == 3) cycle_counter = 0;  // For NTSC pixel shifting
+  if (++cycle_counter == 3)
+    cycle_counter = 0;  // For NTSC pixel shifting
   if (++x_ >= scanline_end) {
     // Begin new scanline
     FlushScanline(scanline);
@@ -1239,30 +1217,36 @@ struct channel {
   template <unsigned c>
   int Tick() {
     channel& ch = *this;
-    if (!ChannelsEnabled[c]) return c == 4 ? 64 : 8;
+    if (!ChannelsEnabled[c])
+      return c == 4 ? 64 : 8;
     int wl = (ch.reg.WaveLength + 1) * (c >= 2 ? 1 : 2);
-    if (c == 3) wl = NoisePeriods[ch.reg.NoiseFreq];
+    if (c == 3)
+      wl = NoisePeriods[ch.reg.NoiseFreq];
     int volume = ch.length_counter
                      ? ch.reg.EnvDecayDisable ? ch.reg.FixedVolume : ch.envelope
                      : 0;
     // Sample may change at wavelen intervals.
     auto& S = ch.level;
-    if (!count(ch.wave_counter, wl)) return S;
+    if (!count(ch.wave_counter, wl))
+      return S;
     switch (c) {
       default:  // Square wave. With four different 8-step binary waveforms (32
                 // bits of data total).
-        if (wl < 8) return S = 8;
+        if (wl < 8)
+          return S = 8;
         return S = (0xF33C0C04u &
                     (1u << (++ch.phase % 8 + ch.reg.DutyCycle * 8)))
                        ? volume
                        : 0;
 
       case 2:  // Triangle wave
-        if (ch.length_counter && ch.linear_counter && wl >= 3) ++ch.phase;
+        if (ch.length_counter && ch.linear_counter && wl >= 3)
+          ++ch.phase;
         return S = (ch.phase & 15) ^ ((ch.phase & 16) ? 15 : 0);
 
       case 3:  // Noise: Linear feedback shift register
-        if (!ch.hold) ch.hold = 1;
+        if (!ch.hold)
+          ch.hold = 1;
         ch.hold =
             (ch.hold >> 1) |
             (((ch.hold ^ (ch.hold >> (ch.reg.NoiseType ? 6 : 1))) & 1) << 14);
@@ -1299,7 +1283,8 @@ struct channel {
           } else {
             v -= 2;
           }
-          if (v >= 0 && v <= 0x7F) ch.linear_counter = v;
+          if (v >= 0 && v <= 0x7F)
+            ch.linear_counter = v;
         }
         return S = ch.linear_counter;
     }
@@ -1335,7 +1320,8 @@ void Write(u8 index, u8 value) {
       ch.linear_counter = ch.reg.LinearCounterInit;
       ch.env_delay = ch.reg.EnvDecayRate;
       ch.envelope = 15;
-      if (index < 8) ch.phase = 0;
+      if (index < 8)
+        ch.phase = 0;
       break;
     case 0x10:
       ch.reg.reg3 = value;
@@ -1381,9 +1367,11 @@ u8 Read() {
   for (c = 0; c < 5; ++c) {
     res |= channels[c].length_counter ? 1 << c : 0;
   }
-  if (PeriodicIRQ) res |= 0x40;
+  if (PeriodicIRQ)
+    res |= 0x40;
   PeriodicIRQ = false;
-  if (DMC_IRQ) res |= 0x80;
+  if (DMC_IRQ)
+    res |= 0x80;
   DMC_IRQ = false;
   CPU::intr = false;
   return res;
@@ -1393,7 +1381,8 @@ void Tick() {  // Invoked at CPU's rate.
   // Divide CPU clock by 7457.5 to get a 240 Hz, which controls certain events.
   if ((hz240counter.lo += 2) >= 14915) {
     hz240counter.lo -= 14915;
-    if (++hz240counter.hi >= 4 + FiveCycleDivider) hz240counter.hi = 0;
+    if (++hz240counter.hi >= 4 + FiveCycleDivider)
+      hz240counter.hi = 0;
 
     // 60 Hz interval: IRQ. IRQ is not invoked in five-cycle mode (48 Hz).
     if (!IRQdisable && !FiveCycleDivider && hz240counter.hi == 0) {
@@ -1419,7 +1408,8 @@ void Tick() {  // Invoked at CPU's rate.
         if (wl >= 8 && ch.reg.SweepEnable && ch.reg.SweepShift) {
           int s = wl >> ch.reg.SweepShift, d[4] = {s, s, ~s, -s};
           wl += d[ch.reg.SweepDecrease * 2 + c];
-          if (wl < 0x800) ch.reg.WaveLength = wl;
+          if (wl < 0x800)
+            ch.reg.WaveLength = wl;
         }
 
       // Linear tick (triangle wave only)
@@ -1442,8 +1432,7 @@ void Tick() {  // Invoked at CPU's rate.
 // Mix the audio: Get the momentary sample from each channel and mix them.
 #define s(c) channels[c].Tick<c == 1 ? 0 : c>()
   auto v = [](float m, float n, float d) { return n != 0.f ? m / n : d; };
-  short sample =
-      30000 *
+  float sample =
       (v(95.88f, (100.f + v(8128.f, s(0) + s(1), -100.f)), 0.f) +
        v(159.79f,
          (100.f +
@@ -1452,7 +1441,19 @@ void Tick() {  // Invoked at CPU's rate.
        0.5f);
 #undef s
 
-  audio_.p[audio_.i = (audio_.i + 1) & (ARRAYLEN(audio_.p) - 1)] = sample;
+  // Relay audio to speaker.
+  static int buffer_position = 0;
+  static float audio_buffer[ABUFZ];
+  static double sample_counter = 0.0;
+  sample_counter += (double)SRATE / CPUHZ;
+  while (sample_counter >= 1.0) {
+    audio_buffer[buffer_position++] = sample;
+    sample_counter -= 1.0;
+    if (buffer_position == ABUFZ) {
+      cosmoaudio_write(ca_, audio_buffer, buffer_position);
+      buffer_position = 0;
+    }
+  }
 }
 
 }  // namespace APU
@@ -1461,20 +1462,24 @@ namespace CPU {
 
 void Tick() {
   // PPU clock: 3 times the CPU rate
-  for (unsigned n = 0; n < 3; ++n) PPU::Tick();
+  for (unsigned n = 0; n < 3; ++n)
+    PPU::Tick();
   // APU clock: 1 times the CPU rate
-  for (unsigned n = 0; n < 1; ++n) APU::Tick();
+  for (unsigned n = 0; n < 1; ++n)
+    APU::Tick();
 }
 
 template <bool write>
 u8 MemAccess(u16 addr, u8 v) {
   // Memory writes are turned into reads while reset is being signalled
-  if (reset && write) return MemAccess<0>(addr);
+  if (reset && write)
+    return MemAccess<0>(addr);
   Tick();
   // Map the memory from CPU's viewpoint.
   /**/ if (addr < 0x2000) {
     u8& r = RAM[addr & 0x7FF];
-    if (!write) return r;
+    if (!write)
+      return r;
     r = v;
   } else if (addr < 0x4000) {
     return PPU::PpuAccess(addr & 7, v, write);
@@ -1486,17 +1491,21 @@ u8 MemAccess(u16 addr, u8 v) {
             WB(0x2004, RB((v & 7) * 0x0100 + b));
         return 0;
       case 0x15:
-        if (!write) return APU::Read();
+        if (!write)
+          return APU::Read();
         APU::Write(0x15, v);
         break;
       case 0x16:
-        if (!write) return JoyRead(0);
+        if (!write)
+          return JoyRead(0);
         JoyStrobe(v);
         break;
       case 0x17:
-        if (!write) return JoyRead(1);  // write:passthru
+        if (!write)
+          return JoyRead(1);  // write:passthru
       default:
-        if (!write) break;
+        if (!write)
+          break;
         APU::Write(addr & 0x1F, v);
     }
   } else {
@@ -1524,7 +1533,8 @@ u16 wrap(u16 oldaddr, u16 newaddr) {
 }
 void Misfire(u16 old, u16 addr) {
   u16 q = wrap(old, addr);
-  if (q != addr) RB(q);
+  if (q != addr)
+    RB(q);
 }
 u8 Pop() {
   return RB(0x100 | u8(++S));
@@ -1652,10 +1662,11 @@ void Op() {
   } else if (intr && !P.I) {
     op = 0x102;
   }
-  if (!nmi_now) nmi_edge_detected = false;
+  if (!nmi_now)
+    nmi_edge_detected = false;
 
-    // Define function pointers for each opcode (00..FF) and each interrupt
-    // (100,101,102)
+  // Define function pointers for each opcode (00..FF) and each interrupt
+  // (100,101,102)
 #define c(n) Ins<0x##n>, Ins<0x##n + 1>,
 #define o(n) c(n) c(n + 2) c(n + 4) c(n + 6)
   static void (*const i[0x108])() = {
@@ -1675,7 +1686,7 @@ char* GetLine(void) {
   static char* line;
   static size_t linesize;
   if (getline(&line, &linesize, stdin) > 0) {
-    return _chomp(line);
+    return chomp(line);
   } else {
     return NULL;
   }
@@ -1683,9 +1694,6 @@ char* GetLine(void) {
 
 int PlayGame(const char* romfile, const char* opt_tasfile) {
   FILE* fp;
-  int devnull;
-  int pipefds[2];
-  const char* ffplay;
   inputfn_ = opt_tasfile;
 
   if (!(fp = fopen(romfile, "rb"))) {
@@ -1698,39 +1706,28 @@ int PlayGame(const char* romfile, const char* opt_tasfile) {
     return 3;
   }
 
+  // initialize screen
+  pixels_ = (unsigned char(*)[3][DYN][DXN])malloc(3 * DYN * DXN);
   InitPalette();
 
-  // open speaker
-  // todo: this needs plenty of work
-  if ((ffplay = commandvenv("FFPLAY", "ffplay"))) {
-    devnull = open("/dev/null", O_WRONLY | O_CLOEXEC);
-    pipe2(pipefds, O_CLOEXEC);
-    if (!(playpid_ = fork())) {
-      const char* const args[] = {
-          "ffplay",   "-nodisp", "-loglevel", "quiet", "-fflags",
-          "nobuffer", "-ac",     "1",         "-ar",   "1789773",
-          "-f",       "s16le",   "pipe:",     NULL,
-      };
-      dup2(pipefds[0], 0);
-      dup2(devnull, 1);
-      dup2(devnull, 2);
-      execv(ffplay, (char* const*)args);
-      abort();
-    }
-    close(pipefds[0]);
-    playfd_ = pipefds[1];
-  } else {
-    fputs("\nWARNING\n\
-\n\
-  Need `ffplay` command to play audio\n\
-  Try `sudo apt install ffmpeg` on Linux\n\
-  You can specify it on `PATH` or in `FFPLAY`\n\
-\n\
-Press enter to continue without sound: ",
-          stdout);
-    fflush(stdout);
-    GetLine();
+  // start raster thread
+  errno_t err;
+  pthread_t th;
+  if ((err = pthread_create(&th, 0, RasterThread, 0))) {
+    fprintf(stderr, "pthread_create: %s\n", strerror(err));
+    exit(1);
   }
+
+  // open speaker
+  struct CosmoAudioOpenOptions cao = {};
+  cao.sizeofThis = sizeof(struct CosmoAudioOpenOptions);
+  cao.deviceType = kCosmoAudioDeviceTypePlayback;
+  cao.sampleRate = SRATE;
+  cao.channels = 1;
+  cosmoaudio_open(&ca_, &cao);
+
+  // initialize time
+  deadline_ = timespec_add(timespec_mono(), kNesFps);
 
   // Read the ROM file header
   u8 rom16count = fgetc(fp);
@@ -1747,12 +1744,15 @@ Press enter to continue without sound: ",
   fgetc(fp);
   fgetc(fp);
 
-  if (mappernum >= 0x40) mappernum &= 15;
+  if (mappernum >= 0x40)
+    mappernum &= 15;
   GamePak::mappernum = mappernum;
 
   // Read the ROM data
-  if (rom16count) GamePak::ROM.resize(rom16count * 0x4000);
-  if (vrom8count) GamePak::VRAM.resize(vrom8count * 0x2000);
+  if (rom16count)
+    GamePak::ROM.resize(rom16count * 0x4000);
+  if (vrom8count)
+    GamePak::VRAM.resize(vrom8count * 0x2000);
   fread(&GamePak::ROM[0], rom16count, 0x4000, fp);
   fread(&GamePak::VRAM[0], vrom8count, 0x2000, fp);
 
@@ -1766,10 +1766,12 @@ Press enter to continue without sound: ",
   PPU::reg.value = 0;
 
   // Pre-initialize RAM the same way as FCEUX does, to improve TAS sync.
-  for (unsigned a = 0; a < 0x800; ++a) CPU::RAM[a] = (a & 4) ? 0xFF : 0x00;
+  for (unsigned a = 0; a < 0x800; ++a)
+    CPU::RAM[a] = (a & 4) ? 0xFF : 0x00;
 
   // Run the CPU until the program is killed.
-  for (;;) CPU::Op();
+  for (;;)
+    CPU::Op();
 }
 
 wontreturn void PrintUsage(int rc, FILE* f) {
@@ -1810,8 +1812,8 @@ void GetOpts(int argc, char* argv[]) {
 
 size_t FindZipGames(void) {
   char* name;
+  size_t i, cf;
   struct Zipos* zipos;
-  size_t i, cf, namesize;
   if ((zipos = __zipos_get())) {
     for (i = 0, cf = ZIP_CDIR_OFFSET(zipos->cdir);
          i < ZIP_CDIR_RECORDS(zipos->cdir);
@@ -1833,14 +1835,13 @@ int SelectGameFromZip(void) {
   int i, rc;
   char *line, *uri;
   fputs("\nCOSMOPOLITAN NESEMU1\n\n", stdout);
-  for (i = 0; i < zipgames_.i; ++i) {
+  for (i = 0; i < (int)zipgames_.i; ++i)
     printf("  [%d] %s\n", i, zipgames_.p[i]);
-  }
   fputs("\nPlease choose a game (or CTRL-C to quit) [default 0]: ", stdout);
   fflush(stdout);
   rc = 0;
   if ((line = GetLine())) {
-    i = MAX(0, MIN(zipgames_.i - 1, atoi(line)));
+    i = MAX(0, MIN((int)zipgames_.i - 1, atoi(line)));
     uri = zipgames_.p[i];
     rc = PlayGame(uri, NULL);
     free(uri);
@@ -1858,9 +1859,8 @@ int main(int argc, char** argv) {
   } else if (optind < argc) {
     rc = PlayGame(argv[optind], NULL);
   } else {
-    if (!FindZipGames()) {
+    if (!FindZipGames())
       PrintUsage(0, stderr);
-    }
     rc = SelectGameFromZip();
   }
   return rc;

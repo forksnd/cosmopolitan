@@ -1,4 +1,13 @@
-#define __COSMOPOLITAN__ 1
+#ifdef __COSMOPOLITAN__
+#undef __COSMOPOLITAN__
+#endif
+
+#define __COSMOPOLITAN_MAJOR__ 4
+#define __COSMOPOLITAN_MINOR__ 0
+#define __COSMOPOLITAN_PATCH__ 2
+#define __COSMOPOLITAN__                                                   \
+  (100000000 * __COSMOPOLITAN_MAJOR__ + 1000000 * __COSMOPOLITAN_MINOR__ + \
+   __COSMOPOLITAN_PATCH__)
 
 #ifndef __COUNTER__
 #define __COUNTER__ __LINE__
@@ -62,37 +71,51 @@
 #undef linux
 #endif
 
+#ifdef __linux
+#undef __linux
+#endif
+
+#ifdef __linux__
+#undef __linux__
+#endif
+
+#ifdef __gnu_linux__
+#undef __gnu_linux__
+#endif
+
 #ifndef __BIGGEST_ALIGNMENT__
 #define __BIGGEST_ALIGNMENT__ 16
 #endif
-
-/* TODO(jart): Remove this in favor of GetStackSize() */
-#ifdef COSMO
-#define STACKSIZE 262144 /* 256kb stack */
-#else
-#define STACKSIZE 8388608 /* 8mb stack */
-#endif
-
-#define BIGPAGESIZE 0x200000
-#define FRAMESIZE   0x10000 /* 8086 */
-#define GUARDSIZE   0x4000  /* b/c apple m1 */
-#define PAGESIZE    0x1000  /* i386+ */
-#define BUFSIZ      0x1000  /* best stdio default */
-#define CACHELINE   0x40    /* nexgen32e */
-#define CHAR_BIT    8       /* b/c von neumann */
-#define ARG_MAX     0xfffe  /* for argv and envp; see CreateProcess (32767*2) */
-#define PATH_MAX    1024    /* b/c _XOPEN_PATH_MAX */
-#define NAME_MAX    255     /* 511 on netbsd */
-#define CHILD_MAX   16      /* only if malloc isn't linked */
-#define OPEN_MAX    16      /* only if malloc isn't linked */
-#define ATEXIT_MAX  32      /* only if malloc isn't linked */
-#define NSIG        128     /* b/c freebsd */
 
 #if defined(__LP64__) && !defined(__INT64_TYPE__)
 #include "libc/integral/lp64.inc"
 #elif defined(_MSC_VER) && !defined(__INT64_TYPE__)
 #include "libc/integral/llp64.inc"
 #endif
+
+#undef __INT_FAST16_MAX__
+#undef __INT_FAST16_TYPE__
+#undef __UINT_FAST16_MAX__
+#undef __INT_FAST16_WIDTH__
+#undef __UINT_FAST16_TYPE__
+
+#define __INT_FAST16_MAX__   2147483647
+#define __INT_FAST16_TYPE__  int
+#define __UINT_FAST16_MAX__  4294967295U
+#define __INT_FAST16_WIDTH__ 32
+#define __UINT_FAST16_TYPE__ unsigned int
+
+#undef __INT_FAST32_MAX__
+#undef __INT_FAST32_TYPE__
+#undef __UINT_FAST32_MAX__
+#undef __INT_FAST32_WIDTH__
+#undef __UINT_FAST32_TYPE__
+
+#define __INT_FAST32_MAX__   2147483647
+#define __INT_FAST32_TYPE__  int
+#define __UINT_FAST32_MAX__  4294967295U
+#define __INT_FAST32_WIDTH__ 32
+#define __UINT_FAST32_TYPE__ unsigned int
 
 #if !(__ASSEMBLER__ + __LINKER__ + 0)
 #ifdef __STDC__

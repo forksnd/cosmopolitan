@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:t;c-basic-offset:8;tab-width:8;coding:utf-8   -*-│
-│vi: set et ft=c ts=8 tw=8 fenc=utf-8                                       :vi│
+│ vi: set noet ft=c ts=8 sw=8 fenc=utf-8                                   :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright (c) 1991, 1993                                                     │
 │      The Regents of the University of California.  All rights reserved.      │
@@ -31,6 +31,7 @@
 #include "libc/mem/alg.h"
 #include "libc/mem/mem.h"
 #include "libc/sysv/errfuns.h"
+__static_yoink("openbsd_sorting_notice");
 // clang-format off
 
 /*

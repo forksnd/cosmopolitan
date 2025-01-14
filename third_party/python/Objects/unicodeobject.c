@@ -1,13 +1,13 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:4;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=4 sts=4 sw=4 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=4 sts=4 sw=4 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Python 3                                                                     │
 │ https://docs.python.org/3/license.html                                       │
 ╚─────────────────────────────────────────────────────────────────────────────*/
 #define PY_SSIZE_T_CLEAN
+#include "third_party/python/Include/unicodeobject.h"
 #include "libc/assert.h"
 #include "libc/errno.h"
-#include "libc/fmt/fmt.h"
 #include "libc/intrin/likely.h"
 #include "libc/intrin/weaken.h"
 #include "libc/log/countbranch.h"
@@ -39,11 +39,9 @@
 #include "third_party/python/Include/sliceobject.h"
 #include "third_party/python/Include/tupleobject.h"
 #include "third_party/python/Include/ucnhash.h"
-#include "third_party/python/Include/unicodeobject.h"
 #include "third_party/python/Include/warnings.h"
 #include "third_party/python/Include/yoink.h"
 #include "third_party/python/Modules/unicodedata.h"
-/* clang-format off */
 
 PYTHON_PROVIDE("_string");
 PYTHON_PROVIDE("_string.__doc__");
@@ -3160,6 +3158,37 @@ PyUnicode_AsWideCharString(PyObject *unicode,
     return buffer;
 }
 
+wchar_t*
+_PyUnicode_AsWideCharString(PyObject *unicode)
+{
+    const wchar_t *wstr;
+    wchar_t *buffer;
+    Py_ssize_t buflen;
+
+    if (unicode == NULL) {
+        PyErr_BadInternalCall();
+        return NULL;
+    }
+
+    wstr = PyUnicode_AsUnicodeAndSize(unicode, &buflen);
+    if (wstr == NULL) {
+        return NULL;
+    }
+    if (wcslen(wstr) != (size_t)buflen) {
+        PyErr_SetString(PyExc_ValueError,
+                        "embedded null character");
+        return NULL;
+    }
+
+    buffer = PyMem_NEW(wchar_t, buflen + 1);
+    if (buffer == NULL) {
+        PyErr_NoMemory();
+        return NULL;
+    }
+    memcpy(buffer, wstr, (buflen + 1) * sizeof(wchar_t));
+    return buffer;
+}
+
 PyObject *
 PyUnicode_FromOrdinal(int ordinal)
 {
@@ -4902,7 +4931,7 @@ PyUnicode_DecodeUTF8(const char *s,
 # error C 'long' size should be either 4 or 8!
 #endif
 
-static optimizespeed Py_ssize_t
+static Py_ssize_t
 ascii_decode(const char *start, const char *end, Py_UCS1 *dest)
 {
     const char *p = start;

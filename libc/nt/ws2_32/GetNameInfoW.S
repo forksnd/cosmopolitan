@@ -1,12 +1,13 @@
 #include "libc/nt/codegen.h"
-.imp	ws2_32,__imp_GetNameInfoW,GetNameInfoW,34
+.imp	ws2_32,__imp_GetNameInfoW,GetNameInfoW
 
 	.text.windows
+	.ftrace1
 GetNameInfo:
+	.ftrace2
 #ifdef __x86_64__
 	push	%rbp
 	mov	%rsp,%rbp
-	.profilable
 	mov	__imp_GetNameInfoW(%rip),%rax
 	jmp	__sysv2nt8
 #elif defined(__aarch64__)

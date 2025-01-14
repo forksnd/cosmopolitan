@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2020 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -19,8 +19,7 @@
 #include "libc/calls/cp.internal.h"
 #include "libc/calls/internal.h"
 #include "libc/dce.h"
-#include "libc/intrin/asan.internal.h"
-#include "libc/intrin/strace.internal.h"
+#include "libc/intrin/strace.h"
 #include "libc/sock/internal.h"
 #include "libc/sock/sock.h"
 #include "libc/sock/struct/sockaddr.h"
@@ -31,35 +30,56 @@
 /**
  * Creates client socket file descriptor for incoming connection.
  *
+ * When `fd` is in `O_NONBLOCK` mode, this function will raise `EAGAIN`
+ * when no client is available to accept. To wait until a client exists
+ * the poll() function may be called using `POLLIN`.
+ *
+ * On Linux, your `SO_RCVTIMEO` will timeout accept4(). Other OSes (i.e.
+ * Windows, MacOS, and BSDs) do not support this and will block forever.
+ *
+ * On Windows, when this function blocks, there may be a 10 millisecond
+ * delay on the handling of signals or thread cancelation.
+ *
  * @param fd is the server socket file descriptor
- * @param out_addr will receive the remote address
- * @param inout_addrsize provides and receives out_addr's byte length
+ * @param opt_out_addr will receive the remote address
+ * @param opt_inout_addrsize provides and receives out_addr's byte length
  * @param flags can have SOCK_{CLOEXEC,NONBLOCK}, which may apply to
  *     both the newly created socket and the server one
  * @return client fd which needs close(), or -1 w/ errno
- * @cancellationpoint
+ * @raise EAGAIN if `O_NONBLOCK` and no clients pending
+ * @cancelationpoint
  * @asyncsignalsafe
  * @restartable (unless SO_RCVTIMEO)
  */
-int accept4(int fd, struct sockaddr *out_addr, uint32_t *inout_addrsize,
+int accept4(int fd, struct sockaddr *opt_out_addr, uint32_t *opt_inout_addrsize,
             int flags) {
   int rc;
-  char addrbuf[72];
-  BEGIN_CANCELLATION_POINT;
+  struct sockaddr_storage ss = {0};
+  BEGIN_CANCELATION_POINT;
 
-  if (!out_addr || !inout_addrsize ||
-      (IsAsan() && !__asan_is_valid(out_addr, *inout_addrsize))) {
-    rc = efault();
+  if (fd < g_fds.n && g_fds.p[fd].kind == kFdZip) {
+    rc = enotsock();
   } else if (!IsWindows()) {
-    rc = sys_accept4(fd, out_addr, inout_addrsize, flags);
-  } else if (__isfdkind(fd, kFdSocket)) {
-    rc = sys_accept_nt(&g_fds.p[fd], out_addr, inout_addrsize, flags);
-  } else {
+    rc = sys_accept4(fd, &ss, flags);
+  } else if (!__isfdopen(fd)) {
     rc = ebadf();
+  } else if (__isfdkind(fd, kFdSocket)) {
+    rc = sys_accept_nt(g_fds.p + fd, &ss, flags);
+  } else {
+    rc = enotsock();
   }
 
-  END_CANCELLATION_POINT;
+  if (rc != -1) {
+    if (IsBsd()) {
+      __convert_bsd_to_sockaddr(&ss);
+    }
+    __write_sockaddr(&ss, opt_out_addr, opt_inout_addrsize);
+  }
+
+  END_CANCELATION_POINT;
   STRACE("accept4(%d, [%s]) -> %d% lm", fd,
-         DescribeSockaddr(out_addr, inout_addrsize ? *inout_addrsize : 0), rc);
+         DescribeSockaddr(opt_out_addr,
+                          opt_inout_addrsize ? *opt_inout_addrsize : 0),
+         rc);
   return rc;
 }

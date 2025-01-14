@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2021 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -26,8 +26,9 @@
  * @see ITU G.711
  */
 int alaw(int x) {
-  int a, b, e, i;
-  if ((a = x) < 0) a = ~a;
+  int a, b, i;
+  if ((a = x) < 0)
+    a = ~a;
   a >>= 4;
   if (a > 15) {
     if ((i = a >> 5)) {
@@ -36,11 +37,11 @@ int alaw(int x) {
       a -= 16;
       a += (b + 1) << 4;
     } else {
-      e = 1;
       a -= 16;
       a += 16;
     }
   }
-  if (x >= 0) a |= 128;
+  if (x >= 0)
+    a |= 128;
   return a ^ 85;
 }

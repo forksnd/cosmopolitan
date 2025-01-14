@@ -5,7 +5,6 @@
 #include "libc/nt/struct/iostatusblock.h"
 #include "libc/nt/thunk/msabi.h"
 #include "libc/nt/typedef/ioapcroutine.h"
-#if !(__ASSEMBLER__ + __LINKER__ + 0)
 COSMOPOLITAN_C_START_
 /*                            ░░░░
                        ▒▒▒░░░▒▒▒▒▒▒▒▓▓▓░
@@ -42,7 +41,7 @@ struct NtObjectAttributes;
 NtStatus NtClose(int64_t handle);
 
 NtStatus NtCreateFile(int64_t *out_FileHandle, uint32_t DesiredAccess,
-                      struct NtObjectAttributes *ObjectAttributes,
+                      const struct NtObjectAttributes *ObjectAttributes,
                       struct NtIoStatusBlock *out_IoStatusBlock,
                       int64_t *opt_AllocationSize, uint32_t FileAttributes,
                       uint32_t ShareAccess, uint32_t CreateDisposition,
@@ -94,5 +93,4 @@ NtStatus RtlNtStatusToDosError(NtStatus Status);
 #include "libc/nt/thunk/ntfile.inc"
 #endif /* ShouldUseMsabiAttribute() */
 COSMOPOLITAN_C_END_
-#endif /* !(__ASSEMBLER__ + __LINKER__ + 0) */
 #endif /* COSMOPOLITAN_LIBC_NT_NT_FILE_H_ */

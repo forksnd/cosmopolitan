@@ -1,6 +1,51 @@
 #ifndef COSMOPOLITAN_THIRD_PARTY_DLMALLOC_DLMALLOC_H_
 #define COSMOPOLITAN_THIRD_PARTY_DLMALLOC_DLMALLOC_H_
-#if !(__ASSEMBLER__ + __LINKER__ + 0)
+
+#define dlbulk_free                  __dlbulk_free
+#define dlcalloc                     __dlcalloc
+#define dlfree                       __dlfree
+#define dlindependent_calloc         __dlindependent_calloc
+#define dlindependent_comalloc       __dlindependent_comalloc
+#define dlmallinfo                   __dlmallinfo
+#define dlmalloc                     __dlmalloc
+#define dlmalloc_abort               __dlmalloc_abort
+#define dlmalloc_footprint           __dlmalloc_footprint
+#define dlmalloc_footprint_limit     __dlmalloc_footprint_limit
+#define dlmalloc_inspect_all         __dlmalloc_inspect_all
+#define dlmalloc_max_footprint       __dlmalloc_max_footprint
+#define dlmalloc_set_footprint_limit __dlmalloc_set_footprint_limit
+#define dlmalloc_stats               __dlmalloc_stats
+#define dlmalloc_trim                __dlmalloc_trim
+#define dlmalloc_usable_size         __dlmalloc_usable_size
+#define dlmallopt                    __dlmallopt
+#define dlmallopt                    __dlmallopt
+#define dlmemalign                   __dlmemalign
+#define dlrealloc                    __dlrealloc
+#define dlrealloc_in_place           __dlrealloc_in_place
+#define dlrealloc_in_place           __dlrealloc_in_place
+
+#define create_mspace_with_base      __create_mspace_with_base
+#define mspace_bulk_free             __mspace_bulk_free
+#define mspace_calloc                __mspace_calloc
+#define mspace_footprint             __mspace_footprint
+#define mspace_footprint_limit       __mspace_footprint_limit
+#define mspace_free                  __mspace_free
+#define mspace_independent_calloc    __mspace_independent_calloc
+#define mspace_independent_comalloc  __mspace_independent_comalloc
+#define mspace_inspect_all           __mspace_inspect_all
+#define mspace_mallinfo              __mspace_mallinfo
+#define mspace_malloc                __mspace_malloc
+#define mspace_malloc_stats          __mspace_malloc_stats
+#define mspace_mallopt               __mspace_mallopt
+#define mspace_max_footprint         __mspace_max_footprint
+#define mspace_memalign              __mspace_memalign
+#define mspace_realloc               __mspace_realloc
+#define mspace_realloc_in_place      __mspace_realloc_in_place
+#define mspace_set_footprint_limit   __mspace_set_footprint_limit
+#define mspace_track_large_chunks    __mspace_track_large_chunks
+#define mspace_trim                  __mspace_trim
+#define mspace_usable_size           __mspace_usable_size
+
 COSMOPOLITAN_C_START_
 
 /*
@@ -17,7 +62,7 @@ COSMOPOLITAN_C_START_
   maximum supported value of n differs across systems, but is in all
   cases less than the maximum representable value of a size_t.
 */
-void* dlmalloc(size_t);
+extern void* (*dlmalloc)(size_t);
 
 /*
   free(void* p)
@@ -33,7 +78,7 @@ void dlfree(void*);
   Returns a pointer to n_elements * element_size bytes, with all locations
   set to zero.
 */
-void* dlcalloc(size_t, size_t);
+extern void* (*dlcalloc)(size_t, size_t);
 
 /*
   realloc(void* p, size_t n)
@@ -57,7 +102,7 @@ void* dlcalloc(size_t, size_t);
   The old unix realloc convention of allowing the last-free'd chunk
   to be used as an argument to realloc is not supported.
 */
-void* dlrealloc(void*, size_t);
+extern void* (*dlrealloc)(void*, size_t);
 
 /*
   realloc_in_place(void* p, size_t n)
@@ -86,24 +131,7 @@ void* dlrealloc_in_place(void*, size_t);
 
   Overreliance on memalign is a sure way to fragment space.
 */
-void* dlmemalign(size_t, size_t);
-
-/*
-  int posix_memalign(void** pp, size_t alignment, size_t n);
-  Allocates a chunk of n bytes, aligned in accord with the alignment
-  argument. Differs from memalign only in that it (1) assigns the
-  allocated memory to *pp rather than returning it, (2) fails and
-  returns EINVAL if the alignment is not a power of two (3) fails and
-  returns ENOMEM if memory cannot be allocated.
-*/
-int dlposix_memalign(void**, size_t, size_t);
-
-/*
-  valloc(size_t n);
-  Equivalent to memalign(pagesize, n), where pagesize is the page
-  size of the system. If the pagesize is unknown, 4096 is used.
-*/
-void* dlvalloc(size_t);
+extern void* (*dlmemalign)(size_t, size_t);
 
 /*
   mallopt(int parameter_number, int parameter_value)
@@ -226,7 +254,7 @@ void dlmalloc_inspect_all(void (*handler)(void*, void*, size_t, void*),
   thus be inaccurate.
 */
 
-struct mallinfo dlmallinfo(void);
+extern struct mallinfo (*dlmallinfo)(void);
 
 /*
   independent_calloc(size_t n_elements, size_t element_size, void* chunks[]);
@@ -347,13 +375,6 @@ void** dlindependent_comalloc(size_t, size_t*, void**);
   may be worthwhile to sort this array before calling bulk_free.
 */
 size_t dlbulk_free(void**, size_t n_elements);
-
-/*
-  pvalloc(size_t n);
-  Equivalent to valloc(minimum-page-that-holds(n)), that is,
-  round up n to nearest pagesize.
- */
-void* dlpvalloc(size_t);
 
 /*
   malloc_trim(size_t pad);
@@ -505,9 +526,11 @@ void mspace_inspect_all(mspace msp,
                         void (*handler)(void*, void*, size_t, void*),
                         void* arg);
 
-_Hide void dlmalloc_atfork(void);
-_Hide void dlmalloc_abort(void);
+void dlmalloc_pre_fork(void) libcesque;
+void dlmalloc_post_fork_parent(void) libcesque;
+void dlmalloc_post_fork_child(void) libcesque;
+
+void dlmalloc_abort(void) relegated wontreturn;
 
 COSMOPOLITAN_C_END_
-#endif /* !(__ASSEMBLER__ + __LINKER__ + 0) */
 #endif /* COSMOPOLITAN_THIRD_PARTY_DLMALLOC_DLMALLOC_H_ */

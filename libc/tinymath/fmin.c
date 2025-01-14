@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2020 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -26,10 +26,14 @@
  * signed zeroes.
  */
 double fmin(double x, double y) {
-  if (__builtin_isnan(x)) return y;
-  if (__builtin_isnan(y)) return x;
-  if (__builtin_signbit(x) != __builtin_signbit(y)) {
-    return __builtin_signbit(x) ? x : y; /* C99 Annex F.9.9.2 */
+  if (isnan(x)) return y;
+  if (isnan(y)) return x;
+  if (signbit(x) != signbit(y)) {
+    return signbit(x) ? x : y; /* C99 Annex F.9.9.2 */
   }
   return x < y ? x : y;
 }
+
+#if LDBL_MANT_DIG == 53 && LDBL_MAX_EXP == 1024
+__weak_reference(fmin, fminl);
+#endif

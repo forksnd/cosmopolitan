@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2020 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -16,18 +16,23 @@
 │ TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR             │
 │ PERFORMANCE OF THIS SOFTWARE.                                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
-#include "libc/fmt/fmt.h"
+#include "libc/intrin/fds.h"
+#include "libc/fmt/internal.h"
 #include "libc/stdio/stdio.h"
 
 /**
  * Standard input decoder.
  * @see libc/fmt/vcscanf.h
  */
-int(scanf)(const char *fmt, ...) {
+int scanf(const char *fmt, ...) {
   int rc;
   va_list va;
   va_start(va, fmt);
-  rc = (vcscanf)((int (*)(void *))fgetc, NULL, stdin, fmt, va);
+  flockfile(stdin);
+  rc = __vcscanf((void *)fgetc_unlocked,   //
+                 (void *)ungetc_unlocked,  //
+                 stdin, fmt, va);
+  funlockfile(stdin);
   va_end(va);
   return rc;
 }

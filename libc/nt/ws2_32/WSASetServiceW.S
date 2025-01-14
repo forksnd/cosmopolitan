@@ -1,12 +1,13 @@
 #include "libc/nt/codegen.h"
-.imp	ws2_32,__imp_WSASetServiceW,WSASetServiceW,118
+.imp	ws2_32,__imp_WSASetServiceW,WSASetServiceW
 
 	.text.windows
+	.ftrace1
 WSASetService:
+	.ftrace2
 #ifdef __x86_64__
 	push	%rbp
 	mov	%rsp,%rbp
-	.profilable
 	mov	__imp_WSASetServiceW(%rip),%rax
 	jmp	__sysv2nt
 #elif defined(__aarch64__)

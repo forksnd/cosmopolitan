@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2020 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -18,41 +18,44 @@
 ╚─────────────────────────────────────────────────────────────────────────────*/
 #include "dsp/scale/cdecimate2xuint8x8.h"
 #include "libc/calls/calls.h"
-#include "libc/calls/ioctl.h"
 #include "libc/calls/struct/sigaction.h"
 #include "libc/calls/struct/siginfo.h"
 #include "libc/calls/struct/stat.h"
 #include "libc/calls/struct/termios.h"
 #include "libc/calls/struct/winsize.h"
+#include "libc/calls/termios.h"
 #include "libc/calls/ucontext.h"
+#include "libc/ctype.h"
+#include "libc/dce.h"
 #include "libc/errno.h"
 #include "libc/fmt/conv.h"
 #include "libc/fmt/itoa.h"
-#include "libc/intrin/bits.h"
 #include "libc/intrin/bsf.h"
+#include "libc/intrin/bsr.h"
 #include "libc/intrin/hilbert.h"
-#include "libc/intrin/morton.h"
-#include "libc/intrin/safemacros.internal.h"
-#include "libc/intrin/tpenc.h"
+#include "libc/intrin/safemacros.h"
+#include "libc/limits.h"
 #include "libc/log/log.h"
-#include "libc/macros.internal.h"
+#include "libc/macros.h"
 #include "libc/runtime/runtime.h"
 #include "libc/sock/sock.h"
 #include "libc/sock/struct/pollfd.h"
 #include "libc/stdio/stdio.h"
 #include "libc/str/str.h"
-#include "libc/str/tab.internal.h"
+#include "libc/str/tab.h"
 #include "libc/str/unicode.h"
+#include "libc/sysv/consts/clock.h"
 #include "libc/sysv/consts/ex.h"
 #include "libc/sysv/consts/exit.h"
+#include "libc/sysv/consts/fileno.h"
 #include "libc/sysv/consts/map.h"
 #include "libc/sysv/consts/o.h"
 #include "libc/sysv/consts/poll.h"
 #include "libc/sysv/consts/prot.h"
 #include "libc/sysv/consts/sig.h"
 #include "libc/sysv/consts/termios.h"
-#include "libc/time/time.h"
-#include "third_party/getopt/getopt.h"
+#include "libc/time.h"
+#include "third_party/getopt/getopt.internal.h"
 
 #define USAGE \
   " [-hznmHNW] [-p PID] [PATH]\n\
@@ -63,7 +66,7 @@ DESCRIPTION\n\
 \n\
 FLAGS\n\
 \n\
-  -h         help\n\
+  -h or -?   help\n\
   -z         zoom\n\
   -m         morton ordering\n\
   -H         hilbert ordering\n\
@@ -188,15 +191,19 @@ static void LeaveScreen(void) {
   Write("\e[H\e[J");
 }
 
+static unsigned long rounddown2pow(unsigned long x) {
+  return x ? 1ul << bsrl(x) : 0;
+}
+
 static void GetTtySize(void) {
   struct winsize wsize;
   wsize.ws_row = tyn + 1;
   wsize.ws_col = txn;
-  _getttysize(out, &wsize);
+  tcgetwinsize(out, &wsize);
   tyn = MAX(2, wsize.ws_row) - 1;
   txn = MAX(17, wsize.ws_col) - 16;
-  tyn = _rounddown2pow(tyn);
-  txn = _rounddown2pow(txn);
+  tyn = rounddown2pow(tyn);
+  txn = rounddown2pow(txn);
   tyn = MIN(tyn, txn);
 }
 
@@ -210,21 +217,21 @@ static void EnableRaw(void) {
   term.c_cflag &= ~(CSIZE | PARENB);
   term.c_cflag |= CS8;
   term.c_iflag |= IUTF8;
-  ioctl(out, TCSETS, &term);
+  tcsetattr(out, TCSANOW, &term);
 }
 
 static void OnExit(void) {
   LeaveScreen();
   ShowCursor();
   DisableMouse();
-  ioctl(out, TCSETS, &oldterm);
+  tcsetattr(out, TCSANOW, &oldterm);
 }
 
-static void OnSigInt(int sig, struct siginfo *sa, void *uc) {
+static void OnSigInt(int sig, siginfo_t *sa, void *uc) {
   action |= INTERRUPTED;
 }
 
-static void OnSigWinch(int sig, struct siginfo *sa, void *uc) {
+static void OnSigWinch(int sig, siginfo_t *sa, void *uc) {
   action |= RESIZED;
 }
 
@@ -232,7 +239,7 @@ static void Setup(void) {
   tyn = 80;
   txn = 24;
   action = RESIZED;
-  ioctl(out, TCGETS, &oldterm);
+  tcgetattr(out, &oldterm);
   HideCursor();
   EnableRaw();
   EnableMouse();
@@ -257,7 +264,6 @@ static void SetExtent(long lo, long hi) {
 }
 
 static void Open(void) {
-  int err;
   if ((fd = open(path, O_RDONLY)) == -1) {
     FailPath("open() failed", errno);
   }
@@ -277,10 +283,29 @@ static void SetupCanvas(void) {
     munmap(buffer, buffersize);
   }
   displaysize = ROUNDUP(ROUNDUP((tyn * txn) << zoom, 16), 1ul << zoom);
-  canvassize = ROUNDUP(displaysize, FRAMESIZE);
-  buffersize = ROUNDUP(tyn * txn * 16 + PAGESIZE, FRAMESIZE);
+  canvassize = ROUNDUP(displaysize, getgransize());
+  buffersize = ROUNDUP(tyn * txn * 16 + 4096, getgransize());
   canvas = Allocate(canvassize);
   buffer = Allocate(buffersize);
+}
+
+/**
+ * Interleaves bits.
+ * @see https://en.wikipedia.org/wiki/Z-order_curve
+ * @see unmorton()
+ */
+static unsigned long morton(unsigned long y, unsigned long x) {
+  x = (x | x << 020) & 0x0000FFFF0000FFFF;
+  x = (x | x << 010) & 0x00FF00FF00FF00FF;
+  x = (x | x << 004) & 0x0F0F0F0F0F0F0F0F;
+  x = (x | x << 002) & 0x3333333333333333;
+  x = (x | x << 001) & 0x5555555555555555;
+  y = (y | y << 020) & 0x0000FFFF0000FFFF;
+  y = (y | y << 010) & 0x00FF00FF00FF00FF;
+  y = (y | y << 004) & 0x0F0F0F0F0F0F0F0F;
+  y = (y | y << 002) & 0x3333333333333333;
+  y = (y | y << 001) & 0x5555555555555555;
+  return x | y << 1;
 }
 
 static long IndexSquare(long y, long x) {
@@ -308,19 +333,21 @@ static long Index(long y, long x) {
 }
 
 static void PreventBufferbloat(void) {
-  long double now, rate;
-  static long double last;
-  now = nowl();
-  rate = 1. / fps;
-  if (now - last < rate) {
-    dsleep(rate - (now - last));
+  struct timespec now, rate;
+  static struct timespec last;
+  now = timespec_mono();
+  rate = timespec_frommicros(1. / fps * 1e6);
+  if (timespec_cmp(timespec_sub(now, last), rate) < 0) {
+    timespec_sleep(CLOCK_MONOTONIC,
+                   timespec_sub(rate, timespec_sub(now, last)));
   }
   last = now;
 }
 
 static bool HasPendingInput(void) {
   struct pollfd fds[1];
-  if (IsWindows()) return true; /* XXX */
+  if (IsWindows())
+    return true; /* XXX */
   fds[0].fd = 0;
   fds[0].events = POLLIN;
   fds[0].revents = 0;
@@ -332,8 +359,10 @@ static int GetCurrentRange(void) {
   int i;
   if (ranges.i) {
     for (i = 0; i < ranges.i; ++i) {
-      if (offset < ranges.p[i].a) return MAX(0, i - 1);
-      if (offset < ranges.p[i].b) return i;
+      if (offset < ranges.p[i].a)
+        return MAX(0, i - 1);
+      if (offset < ranges.p[i].b)
+        return i;
     }
     return ranges.i - 1;
   } else {
@@ -449,9 +478,11 @@ static void OnPrevEnd(void) {
 static void OnMouse(char *p) {
   int e, x, y;
   e = strtol(p, &p, 10);
-  if (*p == ';') ++p;
+  if (*p == ';')
+    ++p;
   x = min(txn, max(1, strtol(p, &p, 10))) - 1;
-  if (*p == ';') ++p;
+  if (*p == ';')
+    ++p;
   y = min(tyn, max(1, strtol(p, &p, 10))) - 1;
   e |= (*p == 'm') << 2;
   switch (e) {
@@ -500,7 +531,8 @@ static void ReadKeyboard(void) {
   char buf[32], *p = buf;
   bzero(buf, sizeof(buf));
   if (readansi(0, buf, sizeof(buf)) == -1) {
-    if (errno == EINTR) return;
+    if (errno == EINTR)
+      return;
     exit(errno);
   }
   switch (*p++) {
@@ -675,14 +707,16 @@ static void LoadRanges(void) {
   range.b = 0;
   ranges.i = 0;
   for (;;) {
-    if ((n = read(fd, b, sizeof(b))) == -1) exit(1);
-    if (!n) break;
+    if ((n = read(fd, b, sizeof(b))) == -1)
+      exit(1);
+    if (!n)
+      break;
     for (i = 0; i < n; ++i) {
       switch (t) {
         case 0:
           if (isxdigit(b[i])) {
             range.a <<= 4;
-            range.a += hextoint(b[i]);
+            range.a += kHexToInt[b[i] & 255];
           } else if (b[i] == '-') {
             t = 1;
           }
@@ -690,7 +724,7 @@ static void LoadRanges(void) {
         case 1:
           if (isxdigit(b[i])) {
             range.b <<= 4;
-            range.b += hextoint(b[i]);
+            range.b += kHexToInt[b[i] & 255];
           } else if (b[i] == ' ') {
             t = 2;
           }
@@ -706,7 +740,7 @@ static void LoadRanges(void) {
           }
           break;
         default:
-          unreachable;
+          __builtin_unreachable();
       }
     }
   }
@@ -748,7 +782,7 @@ static void Render(void) {
         p = FormatInt64(p, fg);
         *p++ = 'm';
       }
-      w = _tpenc(kCp437[c]);
+      w = tpenc(kCp437[c]);
       do {
         *p++ = w & 0xff;
         w >>= 8;
@@ -784,7 +818,8 @@ static void Render(void) {
   for (i = 0, n = p - buffer; i < n; i += got) {
     got = 0;
     if ((rc = write(out, buffer + i, n - i)) == -1) {
-      if (errno == EINTR) continue;
+      if (errno == EINTR)
+        continue;
       exit(errno);
     }
     got = rc;
@@ -805,7 +840,8 @@ static void Zoom(long have) {
     n = have >> zoom;
     i = n / txn;
     r = n % txn;
-    if (r) ++i;
+    if (r)
+      ++i;
     if (order == LINEAR) {
       for (; i < tyn; ++i) {
         canvas[txn * i] = '~';
@@ -854,7 +890,8 @@ static void MemZoom(void) {
     }
     if (ok && HasPendingInput()) {
       ReadKeyboard();
-      if (!IsWindows()) continue; /* XXX */
+      if (!IsWindows())
+        continue; /* XXX */
     }
     ok = true;
     if (pid) {
@@ -865,10 +902,8 @@ static void MemZoom(void) {
   } while (!(action & INTERRUPTED));
 }
 
-static wontreturn void PrintUsage(int rc) {
-  Write("SYNOPSIS\n\n  ");
-  Write(program_invocation_name);
-  Write(USAGE);
+static wontreturn void PrintUsage(int rc, int fd) {
+  tinyprint(fd, "SYNOPSIS\n\n ", program_invocation_name, USAGE, NULL);
   exit(rc);
 }
 
@@ -876,7 +911,7 @@ static void GetOpts(int argc, char *argv[]) {
   int opt;
   char *p;
   fps = 10;
-  while ((opt = getopt(argc, argv, "hzHNWf:p:")) != -1) {
+  while ((opt = getopt(argc, argv, "?hmzHNWf:p:")) != -1) {
     switch (opt) {
       case 'z':
         ++zoom;
@@ -905,9 +940,13 @@ static void GetOpts(int argc, char *argv[]) {
         }
         break;
       case 'h':
-        PrintUsage(EXIT_SUCCESS);
+      case '?':
       default:
-        PrintUsage(EX_USAGE);
+        if (opt == optopt) {
+          PrintUsage(EXIT_SUCCESS, STDOUT_FILENO);
+        } else {
+          PrintUsage(EX_USAGE, STDERR_FILENO);
+        }
     }
   }
   if (pid) {
@@ -919,16 +958,17 @@ static void GetOpts(int argc, char *argv[]) {
     stpcpy(p, "/maps");
   } else {
     if (optind == argc) {
-      PrintUsage(EX_USAGE);
+      PrintUsage(EX_USAGE, STDERR_FILENO);
     }
     if (!memccpy(path, argv[optind], '\0', sizeof(path))) {
-      PrintUsage(EX_USAGE);
+      PrintUsage(EX_USAGE, STDERR_FILENO);
     }
   }
 }
 
 int main(int argc, char *argv[]) {
-  if (!NoDebug()) ShowCrashReports();
+  if (!NoDebug())
+    ShowCrashReports();
   out = 1;
   GetOpts(argc, argv);
   Open();

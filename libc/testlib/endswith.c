@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2020 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -20,9 +20,11 @@
 #include "libc/testlib/testlib.h"
 
 bool testlib_endswith(size_t cw, const void *s, const void *suffix) {
-  if (s == suffix) return true;
-  if (!s || !suffix) return false;
-  return cw == sizeof(wchar_t)    ? _wcsendswith(s, suffix)
-         : cw == sizeof(char16_t) ? _endswith16(s, suffix)
-                                  : _endswith(s, suffix);
+  if (s == suffix)
+    return true;
+  if (!s || !suffix)
+    return false;
+  return cw == sizeof(wchar_t)    ? wcsendswith(s, suffix)
+         : cw == sizeof(char16_t) ? endswith16(s, suffix)
+                                  : endswith(s, suffix);
 }

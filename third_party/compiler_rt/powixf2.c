@@ -1,4 +1,3 @@
-/* clang-format off */
 /* ===-- powixf2.cpp - Implement __powixf2 ---------------------------------===
  *
  *                     The LLVM Compiler Infrastructure
@@ -13,7 +12,7 @@
  * ===----------------------------------------------------------------------===
  */
 
-STATIC_YOINK("huge_compiler_rt_license");
+__static_yoink("huge_compiler_rt_license");
 
 #if !_ARCH_PPC
 

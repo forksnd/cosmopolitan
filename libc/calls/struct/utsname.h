@@ -1,9 +1,8 @@
 #ifndef COSMOPOLITAN_LIBC_CALLS_STRUCT_UTSNAME_H_
 #define COSMOPOLITAN_LIBC_CALLS_STRUCT_UTSNAME_H_
 
-#define SYS_NMLN 321
+#define SYS_NMLN 150
 
-#if !(__ASSEMBLER__ + __LINKER__ + 0)
 COSMOPOLITAN_C_START_
 
 struct utsname {             /* cosmo abi */
@@ -15,8 +14,7 @@ struct utsname {             /* cosmo abi */
   char domainname[SYS_NMLN]; /* domain name */
 };
 
-int uname(struct utsname *);
+int uname(struct utsname *) libcesque;
 
 COSMOPOLITAN_C_END_
-#endif /* !(__ASSEMBLER__ + __LINKER__ + 0) */
 #endif /* COSMOPOLITAN_LIBC_CALLS_STRUCT_UTSNAME_H_ */

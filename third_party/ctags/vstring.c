@@ -1,4 +1,3 @@
-// clang-format off
 /*
 *   $Id: vstring.c 558 2007-06-15 19:17:02Z elliotth $
 *
@@ -13,6 +12,7 @@
 /*
 *   INCLUDE FILES
 */
+#include "libc/ctype.h"
 #include "third_party/ctags/general.h"  /* must always come first */
 
 #include "libc/limits.h"

@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2022 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -17,22 +17,22 @@
 │ PERFORMANCE OF THIS SOFTWARE.                                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
 #include "libc/assert.h"
-#include "libc/calls/blocksigs.internal.h"
 #include "libc/calls/calls.h"
 #include "libc/calls/struct/sigaction.h"
 #include "libc/calls/struct/sigset.h"
+#include "libc/calls/struct/sigset.internal.h"
 #include "libc/calls/struct/timespec.h"
+#include "libc/ctype.h"
 #include "libc/dce.h"
 #include "libc/errno.h"
 #include "libc/fmt/conv.h"
 #include "libc/fmt/itoa.h"
-#include "libc/intrin/bits.h"
 #include "libc/intrin/kprintf.h"
-#include "libc/intrin/midpoint.h"
-#include "libc/intrin/safemacros.internal.h"
+#include "libc/intrin/safemacros.h"
 #include "libc/mem/mem.h"
 #include "libc/mem/sortedints.internal.h"
 #include "libc/runtime/runtime.h"
+#include "libc/serialize.h"
 #include "libc/sock/sock.h"
 #include "libc/sock/struct/sockaddr.h"
 #include "libc/str/str.h"
@@ -44,10 +44,10 @@
 #include "libc/sysv/consts/sig.h"
 #include "libc/sysv/consts/sock.h"
 #include "libc/sysv/consts/timer.h"
-#include "libc/time/struct/tm.h"
+#include "libc/time.h"
 #include "net/http/http.h"
 #include "net/http/ip.h"
-#include "third_party/getopt/getopt.h"
+#include "third_party/getopt/getopt.internal.h"
 #include "third_party/musl/passwd.h"
 
 #define LOG(FMT, ...)                                                \
@@ -146,8 +146,10 @@ struct SortedInts g_whitelisted;
 
 static wontreturn void ShowUsage(int fd, int rc) {
   write(fd, USAGE, sizeof(USAGE) - 1);
-  if (IsLinux()) write(fd, LINUX_DOCS, sizeof(LINUX_DOCS) - 1);
-  if (IsBsd()) write(fd, BSD_DOCS, sizeof(BSD_DOCS) - 1);
+  if (IsLinux())
+    write(fd, LINUX_DOCS, sizeof(LINUX_DOCS) - 1);
+  if (IsBsd())
+    write(fd, BSD_DOCS, sizeof(BSD_DOCS) - 1);
   _Exit(rc);
 }
 
@@ -215,7 +217,7 @@ void GetOpts(int argc, char *argv[]) {
 }
 
 void OnTerm(int sig) {
-  char tmp[15];
+  char tmp[21];
   LOG("got %s", strsignal_r(sig, tmp));
   g_shutdown = sig;
 }
@@ -232,12 +234,12 @@ void BlockIp(uint32_t ip) {
     if (g_iptables) {
       execve(g_iptables,
              (char *const[]){
-                 "iptables",          //
-                 "-t", "raw",         //
-                 "-I", g_chain,       //
-                 "-s", FormatIp(ip),  //
-                 "-j", "DROP",        //
-                 0,                   //
+                 "iptables",             //
+                 "-t", "raw",            //
+                 "-I", (char *)g_chain,  //
+                 "-s", FormatIp(ip),     //
+                 "-j", "DROP",           //
+                 0,                      //
              },
              (char *const[]){0});
     } else if (g_pfctl) {
@@ -264,14 +266,14 @@ void RequireRoot(void) {
 
 void ListenForTerm(void) {
   struct sigaction sa = {.sa_handler = OnTerm};
-  _npassert(!sigaction(SIGTERM, &sa, 0));
-  _npassert(!sigaction(SIGHUP, &sa, 0));
-  _npassert(!sigaction(SIGINT, &sa, 0));
+  npassert(!sigaction(SIGTERM, &sa, 0));
+  npassert(!sigaction(SIGHUP, &sa, 0));
+  npassert(!sigaction(SIGINT, &sa, 0));
 }
 
 void AutomaticallyHarvestZombies(void) {
   struct sigaction sa = {.sa_handler = SIG_IGN, .sa_flags = SA_NOCLDWAIT};
-  _npassert(!sigaction(SIGCHLD, &sa, 0));
+  npassert(!sigaction(SIGCHLD, &sa, 0));
 }
 
 void FindFirewall(void) {
@@ -289,8 +291,10 @@ void FindFirewall(void) {
 }
 
 void OpenLog(void) {
-  if (!g_logname) return;
-  if (!g_daemonize) return;
+  if (!g_logname)
+    return;
+  if (!g_daemonize)
+    return;
   if ((g_logfd = open(g_logname, O_WRONLY | O_APPEND | O_CREAT, 0644)) == -1) {
     kprintf("error: open(%#s) failed: %s\n", g_logname, strerror(errno));
     ShowUsage(2, 5);
@@ -306,20 +310,22 @@ void Daemonize(void) {
 
 void UseLog(void) {
   if (g_logfd > 0) {
-    _npassert(dup2(g_logfd, 2) == 2);
+    npassert(dup2(g_logfd, 2) == 2);
     if (g_logfd != 2) {
-      _npassert(!close(g_logfd));
+      npassert(!close(g_logfd));
     }
   }
 }
 
 void UninterruptibleSleep(int ms) {
   struct timespec ts = timespec_add(timespec_real(), timespec_frommillis(ms));
-  while (clock_nanosleep(CLOCK_REALTIME, TIMER_ABSTIME, &ts, 0)) errno = 0;
+  while (clock_nanosleep(CLOCK_REALTIME, TIMER_ABSTIME, &ts, 0))
+    errno = 0;
 }
 
 void Unlink(const char *path) {
-  if (!path) return;
+  if (!path)
+    return;
   if (!unlink(path)) {
     LOG("deleted %s", path);
   } else {
@@ -334,12 +340,13 @@ void WritePid(void) {
   ssize_t rc;
   int fd, pid;
   char buf[12] = {0};
-  if (!g_pidname) return;
+  if (!g_pidname)
+    return;
   if ((fd = open(g_pidname, O_RDWR | O_CREAT, 0644)) == -1) {
     LOG("error: open(%#s) failed: %s", g_pidname, strerror(errno));
     _Exit(4);
   }
-  _npassert((rc = pread(fd, buf, 11, 0)) != -1);
+  npassert((rc = pread(fd, buf, 11, 0)) != -1);
   if (rc) {
     pid = atoi(buf);
     LOG("killing old blackholed process %d", pid);
@@ -359,9 +366,9 @@ void WritePid(void) {
     }
   }
   FormatInt32(buf, getpid());
-  _npassert(!ftruncate(fd, 0));
-  _npassert((rc = pwrite(fd, buf, strlen(buf), 0)) == strlen(buf));
-  _npassert(!close(fd));
+  npassert(!ftruncate(fd, 0));
+  npassert((rc = pwrite(fd, buf, strlen(buf), 0)) == strlen(buf));
+  npassert(!close(fd));
 }
 
 bool IsMyIp(uint32_t ip) {

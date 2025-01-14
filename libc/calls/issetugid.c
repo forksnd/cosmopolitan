@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2020 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -19,8 +19,8 @@
 #include "libc/calls/calls.h"
 #include "libc/calls/syscall-sysv.internal.h"
 #include "libc/dce.h"
-#include "libc/intrin/_getauxval.internal.h"
-#include "libc/intrin/strace.internal.h"
+#include "libc/intrin/getauxval.h"
+#include "libc/intrin/strace.h"
 #include "libc/sysv/consts/auxv.h"
 
 /**
@@ -36,8 +36,8 @@
 int issetugid(void) {
   int rc;
   if (IsLinux()) {
-    rc = !!_getauxval(AT_SECURE).value;
-  } else if (IsMetal()) {
+    rc = !!__getauxval(AT_SECURE).value;
+  } else if (IsMetal() || IsWindows()) {
     rc = 0;
   } else {
     rc = sys_issetugid();

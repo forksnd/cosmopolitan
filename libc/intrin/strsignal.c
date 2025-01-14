@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2020 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -18,7 +18,7 @@
 ╚─────────────────────────────────────────────────────────────────────────────*/
 #include "libc/str/str.h"
 
-static char g_strsignal[15];
+static char g_strsignal[21];
 
 /**
  * Returns string describing signal code.
@@ -33,9 +33,10 @@ static char g_strsignal[15];
  *
  * @param sig is signal number which should be in range 1 through 128
  * @return string which is valid code describing signal
- * @see strsignal_r() for better thread safety
+ * @see strsignal_r()
  * @see sigaction()
+ * @threadunsafe
  */
 char *strsignal(int sig) {
-  return strsignal_r(sig, g_strsignal);
+  return (char *)strsignal_r(sig, g_strsignal);
 }

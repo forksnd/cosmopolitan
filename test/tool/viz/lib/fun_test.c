@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2020 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -17,9 +17,9 @@
 │ PERFORMANCE OF THIS SOFTWARE.                                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
 #include "libc/log/check.h"
-#include "libc/macros.internal.h"
+#include "libc/macros.h"
+#include "libc/mem/gc.h"
 #include "libc/stdio/rand.h"
-#include "libc/mem/gc.internal.h"
 #include "libc/str/str.h"
 #include "libc/testlib/ezbench.h"
 #include "libc/testlib/testlib.h"
@@ -195,18 +195,24 @@ void ExpandLuminosityRange(unsigned n, unsigned char *Y) {
   CHECK_ALIGNED(16, Y);
   for (i = 0; i < n; i += 16) {
     memcpy(b, Y + i, 16);
-    for (j = 0; j < 16; ++j) b[j] = MAX(0, b[j] - 16);
-    for (j = 0; j < 16; ++j) s[j] = b[j];
-    for (j = 0; j < 16; ++j) s[j] *= 150;
-    for (j = 0; j < 16; ++j) s[j] /= 128;
-    for (j = 0; j < 16; ++j) s[j] = MIN(255, s[j]);
-    for (j = 0; j < 16; ++j) b[j] = s[j];
+    for (j = 0; j < 16; ++j)
+      b[j] = MAX(0, b[j] - 16);
+    for (j = 0; j < 16; ++j)
+      s[j] = b[j];
+    for (j = 0; j < 16; ++j)
+      s[j] *= 150;
+    for (j = 0; j < 16; ++j)
+      s[j] /= 128;
+    for (j = 0; j < 16; ++j)
+      s[j] = MIN(255, s[j]);
+    for (j = 0; j < 16; ++j)
+      b[j] = s[j];
     memcpy(Y + i, b, 16);
   }
 }
 
 TEST(ExpandLuminosityRange, test) {
-  unsigned char Y[32];
+  _Alignas(16) unsigned char Y[32];
   Y[0] = 0;
   ExpandLuminosityRange(16, Y);
   EXPECT_EQ(0, Y[0]);

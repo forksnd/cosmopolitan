@@ -1,4 +1,3 @@
-/* clang-format off */
 /*
  *  Copyright The Mbed TLS Contributors
  *  SPDX-License-Identifier: Apache-2.0
@@ -269,7 +268,7 @@ void test_sha512_valid_param_wrapper( void ** params )
 void test_sha512_invalid_param( )
 {
     mbedtls_sha512_context ctx;
-    unsigned char buf[64] = { 0 };
+    unsigned char buf[128] = { 0 };
     size_t const buflen = sizeof( buf );
     int valid_type = 0;
     int invalid_type = 42;

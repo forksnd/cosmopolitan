@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2020 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -16,9 +16,9 @@
 │ TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR             │
 │ PERFORMANCE OF THIS SOFTWARE.                                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
+#include "libc/calls/calls.h"
 #include "libc/calls/struct/sigset.h"
 #include "libc/sysv/consts/limits.h"
-#include "libc/sysv/consts/sig.h"
 #include "libc/sysv/errfuns.h"
 
 /**
@@ -29,11 +29,9 @@
  * @asyncsignalsafe
  */
 int sigaddset(sigset_t *set, int sig) {
-  _Static_assert(NSIG == sizeof(set->__bits) * CHAR_BIT, "");
-  _Static_assert(sizeof(set->__bits[0]) * CHAR_BIT == 64, "");
   if (1 <= sig && sig <= NSIG) {
     if (1 <= sig && sig <= _NSIG) {
-      set->__bits[(sig - 1) >> 6] |= 1ull << ((sig - 1) & 63);
+      *set |= 1ull << (sig - 1);
     }
     return 0;
   } else {

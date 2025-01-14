@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2020 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -19,7 +19,6 @@
 #include "libc/assert.h"
 #include "libc/calls/blockcancel.internal.h"
 #include "libc/calls/calls.h"
-#include "libc/calls/ioctl.h"
 #include "libc/calls/struct/metatermios.internal.h"
 #include "libc/calls/struct/termios.h"
 #include "libc/calls/struct/winsize.h"
@@ -28,14 +27,15 @@
 #include "libc/calls/termios.h"
 #include "libc/calls/termios.internal.h"
 #include "libc/dce.h"
-#include "libc/intrin/asan.internal.h"
-#include "libc/intrin/kprintf.h"
-#include "libc/log/rop.h"
+#include "libc/log/rop.internal.h"
 #include "libc/str/str.h"
+#include "libc/sysv/consts/at.h"
 #include "libc/sysv/consts/o.h"
 #include "libc/sysv/consts/pty.h"
 #include "libc/sysv/consts/termios.h"
 #include "libc/sysv/errfuns.h"
+
+#define PTMGET 0x40287401  // openbsd
 
 struct IoctlPtmGet {
   int m;
@@ -47,15 +47,14 @@ struct IoctlPtmGet {
 static int openpty_impl(int *mfd, int *sfd, char *name,
                         const struct termios *tio,  //
                         const struct winsize *wsz) {
-  int m, s, p;
-  union metatermios mt;
+  int m, s;
   struct IoctlPtmGet t;
   RETURN_ON_ERROR((m = posix_openpt(O_RDWR | O_NOCTTY)));
   if (!IsOpenbsd()) {
     RETURN_ON_ERROR(grantpt(m));
     RETURN_ON_ERROR(unlockpt(m));
     RETURN_ON_ERROR(_ptsname(m, t.sname, sizeof(t.sname)));
-    RETURN_ON_ERROR((s = sys_open(t.sname, O_RDWR, 0)));
+    RETURN_ON_ERROR((s = sys_openat(AT_FDCWD, t.sname, O_RDWR, 0)));
   } else {
     RETURN_ON_ERROR(sys_ioctl(m, PTMGET, &t));
     close(m);
@@ -64,12 +63,16 @@ static int openpty_impl(int *mfd, int *sfd, char *name,
   }
   *mfd = m;
   *sfd = s;
-  if (name) strcpy(name, t.sname);
-  if (tio) _npassert(!sys_ioctl(s, TCSETSF, __termios2host(&mt, tio)));
-  if (wsz) _npassert(!sys_ioctl(s, TIOCGWINSZ, wsz));
+  if (name)
+    strcpy(name, t.sname);
+  if (tio)
+    npassert(!tcsetattr(s, TCSAFLUSH, tio));
+  if (wsz)
+    npassert(!tcsetwinsize(s, wsz));
   return 0;
 OnError:
-  if (m != -1) sys_close(m);
+  if (m != -1)
+    sys_close(m);
   return -1;
 }
 
@@ -90,15 +93,8 @@ int openpty(int *mfd, int *sfd, char *name,  //
   if (IsWindows() || IsMetal()) {
     return enosys();
   }
-  if (IsAsan() && (!__asan_is_valid(mfd, sizeof(int)) ||
-                   !__asan_is_valid(sfd, sizeof(int)) ||
-                   (name && !__asan_is_valid(name, 16)) ||
-                   (tio && !__asan_is_valid(tio, sizeof(*tio))) ||
-                   (wsz && !__asan_is_valid(wsz, sizeof(*wsz))))) {
-    return efault();
-  }
-  BLOCK_CANCELLATIONS;
-  rc = openpty(mfd, sfd, name, tio, wsz);
-  ALLOW_CANCELLATIONS;
+  BLOCK_CANCELATION;
+  rc = openpty_impl(mfd, sfd, name, tio, wsz);
+  ALLOW_CANCELATION;
   return rc;
 }

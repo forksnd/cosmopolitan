@@ -1,5 +1,5 @@
 /*-*- mode:unix-assembly; indent-tabs-mode:t; tab-width:8; coding:utf-8     -*-│
-│vi: set et ft=asm ts=8 tw=8 fenc=utf-8                                     :vi│
+│ vi: set noet ft=asm ts=8 sw=8 fenc=utf-8 nofixeol                        :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2020 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -33,16 +33,17 @@
 │ αcτµαlly pδrταblε εxεcµταblε § program header                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
 #include "ape/macros.internal.h"
-#include "ape/notice.inc"
 #include "ape/relocations.h"
 #include "libc/calls/metalfile.internal.h"
 #include "libc/dce.h"
 #include "libc/elf/def.h"
-#include "libc/macho.internal.h"
+#include "libc/macho.h"
 #include "libc/nexgen32e/uart.internal.h"
 #include "libc/nt/pedef.internal.h"
 #include "libc/runtime/pc.internal.h"
 #include "ape/ape.internal.h"
+#include "libc/thread/tls.h"
+#include "ape/ape.h"
 #include "libc/sysv/consts/prot.h"
 
 #define USE_SYMBOL_HACK 1
@@ -195,7 +196,7 @@ ape_mz:
 	.quad	ape_elf_entry			//  18: e_entry
 	.quad	ape_elf_phoff			//  20: e_phoff
 	.quad	ape_elf_shoff			//  28: e_shoff
-	.long	0				//  30: e_flags
+	.long	0x101ca75			//  30: ape e_flags
 	.short	64				//  34: e_ehsize
 	.short	56				//  36: e_phentsize
 	.short	ape_elf_phnum			//  38: e_phnum
@@ -223,7 +224,7 @@ stub:	mov	$0x40,%dl		// *literally* dos
 3:	.byte	0xbd,0,0		// a.k.a. mov imm,%bp
 	jmp	pc			// real mode, is real
 	jmp	_start			// surprise it's unix
-	.endfn	stub
+	.endfn	stub,globl
 
 /*─────────────────────────────────────────────────────────────────────────────╗
 │ αcτµαlly pδrταblε εxεcµταblε § ibm personal computer                         │
@@ -590,7 +591,7 @@ ape_disk:
 
 #ifdef APE_IS_SHELL_SCRIPT
 apesh:	.ascii	"\n@\n#'\"\n"			// sixth edition shebang
-	.ascii	"m=\"$(uname -m)\"\n"
+	.ascii	"m=$(uname -m 2>/dev/null) || m=x86_64\n"
 
 	.ascii	"if [ \"$m\" = x86_64 ] || [ \"$m\" = amd64 ]; then\n"
 //	Until all operating systems can be updated to support APE,
@@ -598,40 +599,42 @@ apesh:	.ascii	"\n@\n#'\"\n"			// sixth edition shebang
 //	modify the binary to follow the local system's convention.
 //	There isn't a one-size-fits-all approach for this, thus we
 //	present two choices.
-	.ascii	"o=\"$(command -v \"$0\")\"\n"
-//	Try to use a system-wide APE loader.
-	.ascii	"[ x\"$1\" != x--assimilate ] && "
-	.ascii	  "type ape >/dev/null 2>&1 && "
-	.ascii	    "exec ape \"$o\" \"$@\"\n"
+	.ascii	  "o=\"$(command -v \"$0\")\"\n"
+//	Try to use system-wide APE loader.
+	.ascii	  "[ x\"$1\" != x--assimilate ] && "
+	.ascii	    "type ape >/dev/null 2>&1 && "
+	.ascii	      "exec ape \"$o\" \"$@\"\n"
 #ifdef APE_LOADER
 //	There is no system-wide APE loader, but there is one
 //	embedded inside the APE. So if the system is not MacOs,
 //	extract the loader into a temp folder, and use it to
 //	load the APE without modifying it.
-	.ascii	"[ x\"$1\" != x--assimilate ] && {\n"
-	.ascii	  "t=\"${TMPDIR:-${HOME:-.}}/.ape\"\n"
-	.ascii	  "[ -x \"$t\" ] || {\n"
-	.ascii	    "mkdir -p \"${t%/*}\" &&\n"
-	.ascii	    "dd if=\"$o\" of=\"$t.$$\" skip="
-	.shstub	      ape_loader_dd_skip,2
-	.ascii	      " count="
-	.shstub	      ape_loader_dd_count,2
-	.ascii	      " bs=64 2>/dev/null\n"
+	.ascii	  "[ x\"$1\" != x--assimilate ] && {\n"
+	.ascii	    "t=\"${TMPDIR:-${HOME:-.}}/.ape-"
+	.ascii	     APE_VERSION_STR
+	.ascii	     "\"\n"
+	.ascii	    "[ -x \"$t\" ] || {\n"
+	.ascii	      "mkdir -p \"${t%/*}\" &&\n"
+	.ascii	      "dd if=\"$o\" of=\"$t.$$\" skip="
+	.shstub	        ape_loader_dd_skip,2
+	.ascii	        " count="
+	.shstub	        ape_loader_dd_count,2
+	.ascii	        " bs=64 2>/dev/null\n"
 #if SupportsXnu()
-	.ascii	    "[ -d /Applications ] && "
-	.ascii	      "dd if=\"$t.$$\""
-	.ascii	        " of=\"$t.$$\""
-	.ascii	        " skip=6"
-	.ascii	        " count=10"
-	.ascii	        " bs=64"
-	.ascii	        " conv=notrunc"
-	.ascii	        " 2>/dev/null\n"
+	.ascii	      "[ -d /Applications ] && "
+	.ascii	        "dd if=\"$t.$$\""
+	.ascii	          " of=\"$t.$$\""
+	.ascii	          " skip=5"
+	.ascii	          " count=8"
+	.ascii	          " bs=64"
+	.ascii	          " conv=notrunc"
+	.ascii	          " 2>/dev/null\n"
 #endif /* SupportsXnu() */
-	.ascii	    "chmod 755 \"$t.$$\"\n"
-	.ascii	    "mv -f \"$t.$$\" \"$t\"\n"
+	.ascii	      "chmod 755 \"$t.$$\"\n"
+	.ascii	      "mv -f \"$t.$$\" \"$t\"\n"
+	.ascii	    "}\n"
+	.ascii	    "exec \"$t\" \"$o\" \"$@\"\n"
 	.ascii	  "}\n"
-	.ascii	  "exec \"$t\" \"$o\" \"$@\"\n"
-	.ascii	"}\n"
 #endif /* APE_LOADER */
 #ifndef APE_NO_MODIFY_SELF
 //	The default behavior is: to overwrite the header in place.
@@ -641,155 +644,64 @@ apesh:	.ascii	"\n@\n#'\"\n"			// sixth edition shebang
 //	The alternative behavior is to copy to $TMPDIR or $HOME or
 //	the current directory. We like TMPDIR because it's part of
 //	the IEEE POSIX standard whereas alternatives (XDG) aren't.
-	.ascii	"t=\"${TMPDIR:-${HOME:-.}}/$0\"\n"
-	.ascii	"[ x\"$1\" != x--assimilate ] || [ ! -e \"$t\" ] && {\n"
-	.ascii	  "[ x\"$1\" != x--assimilate ] && {\n"
-	.ascii	    "mkdir -p \"${t%/*}\" 2>/dev/null\n"
-	.ascii	    "cp -f \"$o\" \"$t.$$\" &&\n"
-	.ascii	    "mv -f \"$t.$$\" \"$t\" || exit 120\n"
-	.ascii	    "o=\"$t\"\n"
-	.ascii	  "}\n"
+	.ascii	  "t=\"${TMPDIR:-${HOME:-.}}/$0\"\n"
+	.ascii	  "[ x\"$1\" != x--assimilate ] || [ ! -e \"$t\" ] && {\n"
+	.ascii	    "[ x\"$1\" != x--assimilate ] && {\n"
+	.ascii	      "mkdir -p \"${t%/*}\" 2>/dev/null\n"
+	.ascii	      "cp -f \"$o\" \"$t.$$\" &&\n"
+	.ascii	      "mv -f \"$t.$$\" \"$t\" || exit 120\n"
+	.ascii	      "o=\"$t\"\n"
+	.ascii	    "}\n"
 #endif /* APE_NO_MODIFY_SELF */
-	.ascii	"exec 7<> \"$o\" || exit 121\n"
-	.ascii	"printf '"
-	.ascii	  "\\177ELF"			// 0x0: ⌂ELF
-	.ascii	  "\\2"				//   4: long mode
-	.ascii	  "\\1"				//   5: little endian
-	.ascii	  "\\1"				//   6: elf v1.o
-	.ascii	  "\\011"			//   7: FreeBSD
-	.ascii	  "\\0"				//   8: os/abi ver.
-	.ascii	  "\\0\\0\\0"			//   9: padding 3/7
-	.ascii	  "\\0\\0\\0\\0"		//      padding 4/7
-	.ascii	  "\\2\\0"			//  10: εxεcµταblε
-	.ascii	  "\\076\\0"			//  12: NexGen32e
-	.ascii	  "\\1\\0\\0\\0"		//  14: elf v1.o
-	.shstub	  ape_elf_entry,8		//  18: e_entry
-	.shstub	  ape_elf_phoff,8		//  20: e_phoff
-	.shstub	  ape_elf_shoff,8		//  28: e_shoff
-	.ascii	  "\\0\\0\\0\\0"		//  30: e_flags
-	.ascii	  "\\100\\0"			//  34: e_ehsize
-	.ascii	  "\\070\\0"			//  36: e_phentsize
-	.shstub	  ape_elf_phnum,2		//  38: e_phnum
-	.ascii	  "\\0\\0"			//  3a: e_shentsize
-	.shstub	  ape_elf_shnum,2		//  3c: e_shnum
-	.shstub	  ape_elf_shstrndx,2		//  3e: e_shstrndx
-	.ascii	  "' >&7\n"
-	.ascii	"exec 7<&-\n"
+	.ascii	  "exec 7<> \"$o\" || exit 121\n"
+	.ascii	  "printf '"
+	.ascii	    "\\177ELF"			// 0x0: ⌂ELF
+	.ascii	    "\\2"			//   4: long mode
+	.ascii	    "\\1"			//   5: little endian
+	.ascii	    "\\1"			//   6: elf v1.o
+	.ascii	    "\\011"			//   7: FreeBSD
+	.ascii	    "\\0"			//   8: os/abi ver.
+	.ascii	    "\\0\\0\\0"			//   9: padding 3/7
+	.ascii	    "\\0\\0\\0\\0"		//      padding 4/7
+	.ascii	    "\\2\\0"			//  10: εxεcµταblε
+	.ascii	    "\\076\\0"			//  12: NexGen32e
+	.ascii	    "\\1\\0\\0\\0"		//  14: elf v1.o
+	.shstub	    ape_elf_entry,8		//  18: e_entry
+	.shstub	    ape_elf_phoff,8		//  20: e_phoff
+	.shstub	    ape_elf_shoff,8		//  28: e_shoff
+	.ascii	    "\\165\\312\\1\\1"		//  30: ape e_flags
+	.ascii	    "\\100\\0"			//  34: e_ehsize
+	.ascii	    "\\070\\0"			//  36: e_phentsize
+	.shstub	    ape_elf_phnum,2		//  38: e_phnum
+	.ascii	    "\\0\\0"			//  3a: e_shentsize
+	.shstub	    ape_elf_shnum,2		//  3c: e_shnum
+	.shstub	    ape_elf_shstrndx,2		//  3e: e_shstrndx
+	.ascii	    "' >&7\n"
+	.ascii	  "exec 7<&-\n"
 #if SupportsXnu()
-	.ascii	"[ -d /Applications ] && "
-	.ascii	  "dd if=\"$o\""
-	.ascii	    " of=\"$o\""
-	.ascii	    " bs=8"
-	.ascii	    " skip="
-	.shstub	    ape_macho_dd_skip,2
-	.ascii	    " count="
-	.shstub	    ape_macho_dd_count,2
-	.ascii	    " conv=notrunc 2>/dev/null\n"
+	.ascii	  "[ -d /Applications ] && "
+	.ascii	    "dd if=\"$o\""
+	.ascii	      " of=\"$o\""
+	.ascii	      " bs=8"
+	.ascii	      " skip="
+	.shstub	      ape_macho_dd_skip,2
+	.ascii	      " count="
+	.shstub	      ape_macho_dd_count,2
+	.ascii	      " conv=notrunc 2>/dev/null\n"
 #endif /* XNU */
-	.ascii	"[ x\"$1\" = x--assimilate ] && exit 0\n"
+	.ascii	  "[ x\"$1\" = x--assimilate ] && exit 0\n"
 #ifndef APE_NO_MODIFY_SELF
-	.ascii	"exec \"$0\" \"$@\"\n"		// try to preserve argv[0]
+	.ascii	  "exec \"$0\" \"$@\"\n"	// try to preserve argv[0]
 #else
-	.ascii	"}\n"
-	.ascii	"o=\"$t\"\n"
-	.ascii	"exec \"$o\" \"$@\"\n"
+	.ascii	  "}\n"
+	.ascii	  "o=\"$t\"\n"
+	.ascii	  "exec \"$o\" \"$@\"\n"
 #endif /* APE_NO_MODIFY_SELF */
-	.ascii	"exit $?\n"
-	.ascii	"fi\n"
-
-	.ascii	"PHDRS='' <<'@'\n"
-	.endobj	apesh
-
-#if !IsTiny()
-//	elf program headers get inserted here
-//	because they need to be in the first 4096 bytes
-        .section .emush,"a",@progbits
-emush:	.ascii	"\n@\n#'\"\n"
-	.ascii	"s=\"$(uname -s)\"\n"
-
-//	our script is running on a non-x86_64 architecture
-//	1. `dd` out the appropriate blink vm blob
-//	2. gunzip the blink virtual machine executable
-//	3. relaunch this program inside the blink vm
-	.ascii	"o=\"$(command -v \"$0\")\"\n"
-	.ascii	"e=\"${TMPDIR:-${HOME:-.}}/.ape-blink-0.9.2\"\n"
-
-//	Blink for Apple Silicon, e.g. M1 Macbook
-	.ascii	"if [ \"$s\" = Darwin ] && [ \"$m\" = arm64 ]; then\n"
-	.ascii	"if ! [ -x \"$e\" ]; then\n"
-	.ascii	"echo \"extracting blink-darwin-arm64 to ${e}\" >&2\n"
-	.ascii	"dd if=\"$o\" bs=1 skip=$(("
-	.byte	blink_darwin_arm64_b9
-	.byte	blink_darwin_arm64_b8
-	.byte	blink_darwin_arm64_b7
-	.byte	blink_darwin_arm64_b6
-	.byte	blink_darwin_arm64_b5
-	.byte	blink_darwin_arm64_b4
-	.byte	blink_darwin_arm64_b3
-	.byte	blink_darwin_arm64_b2
-	.byte	blink_darwin_arm64_b1
-	.byte	blink_darwin_arm64_b0
-	.ascii	")) count=$(("
-	.byte	blink_darwin_arm64_size_b9
-	.byte	blink_darwin_arm64_size_b8
-	.byte	blink_darwin_arm64_size_b7
-	.byte	blink_darwin_arm64_size_b6
-	.byte	blink_darwin_arm64_size_b5
-	.byte	blink_darwin_arm64_size_b4
-	.byte	blink_darwin_arm64_size_b3
-	.byte	blink_darwin_arm64_size_b2
-	.byte	blink_darwin_arm64_size_b1
-	.byte	blink_darwin_arm64_size_b0
-	.ascii	")) conv=notrunc 2>/dev/null | gunzip >\"$e.$$\"\n"
-	.ascii	"mv -f \"$e.$$\" \"$e\"\n"
-	.ascii	"chmod +x \"$e\"\n"
-	.ascii	"fi\n"
-	.ascii	"exec \"$e\" \"$o\" \"$@\"\n"
-	.ascii	"fi\n"
-
-//	Blink for Aarch64 Linux, e.g. Raspberry Pi
-	.ascii	"if [ \"$s\" = Linux ]; then\n"
-	.ascii	"if [ \"$m\" = aarch64 ] || [ \"$m\" = arm64 ]; then\n"
-	.ascii	"if ! [ -x \"$e\" ]; then\n"
-	.ascii	"echo \"extracting blink-aarch64 to ${e}\" >&2\n"
-	.ascii	"dd if=\"$o\" bs=1 skip=$(("
-	.byte	blink_aarch64_b9
-	.byte	blink_aarch64_b8
-	.byte	blink_aarch64_b7
-	.byte	blink_aarch64_b6
-	.byte	blink_aarch64_b5
-	.byte	blink_aarch64_b4
-	.byte	blink_aarch64_b3
-	.byte	blink_aarch64_b2
-	.byte	blink_aarch64_b1
-	.byte	blink_aarch64_b0
-	.ascii	")) count=$(("
-	.byte	blink_aarch64_size_b9
-	.byte	blink_aarch64_size_b8
-	.byte	blink_aarch64_size_b7
-	.byte	blink_aarch64_size_b6
-	.byte	blink_aarch64_size_b5
-	.byte	blink_aarch64_size_b4
-	.byte	blink_aarch64_size_b3
-	.byte	blink_aarch64_size_b2
-	.byte	blink_aarch64_size_b1
-	.byte	blink_aarch64_size_b0
-	.ascii	")) conv=notrunc 2>/dev/null | gunzip >\"$e.$$\"\n"
-	.ascii	"mv -f \"$e.$$\" \"$e\"\n"
-	.ascii	"chmod +x \"$e\"\n"
-	.ascii	"fi\n"
-	.ascii	"exec \"$e\" \"$o\" \"$@\"\n"
-	.ascii	"fi\n"
-	.ascii	"fi\n"
-
-	.ascii	"echo unsupported architecture >&2\n"
-	.rept	16
-	.ascii	"exit 127\n"
-	.endr
-
+	.ascii	  "exit $?\n"
+	.ascii	"fi\n"				// x86_64
+	.ascii	"echo error: this ape binary only supports x86_64 >&2\n"
 	.ascii	"exit 1\n"
-	.endobj	emush
-#endif /* !IsTiny() */
+	.endobj	apesh
 
 #ifdef APE_LOADER
         .section .ape.loader,"a",@progbits
@@ -808,8 +720,19 @@ ape_loader_end:
 #if SupportsSystemv() || SupportsMetal()
 	.section .elf.phdrs,"a",@progbits
 
+	.globl	ape_phdrs
+ape_phdrs:
 	.long	PT_LOAD
 	.long	PF_R|PF_X
+	.stub	ape_cod_offset,quad
+	.stub	ape_cod_vaddr,quad
+	.stub	ape_cod_paddr,quad
+	.stub	ape_cod_filesz,quad
+	.stub	ape_cod_memsz,quad
+	.stub	ape_cod_align,quad
+
+	.long	PT_LOAD
+	.long	PF_R
 	.stub	ape_rom_offset,quad
 	.stub	ape_rom_vaddr,quad
 	.stub	ape_rom_paddr,quad
@@ -826,46 +749,49 @@ ape_loader_end:
 	.stub	ape_ram_memsz,quad
 	.stub	ape_ram_align,quad
 
-//	APE Stack Configuration
-//
-//	We actually respect this when allocating a deterministically
-//	addressed stack on Windows and other operating systems. However
-//	there's a few caveats:
-//
-//	- If ape_stack_pf has PF_X then OpenBSD probably won't work
-//	- We don't bother creating a deterministic stack in MODE=tiny
-//
-//	With that said, here's some examples of configuration:
-//
-//	    STATIC_SYMBOL("ape_stack_pf", "7");  // RWX
-//	    STATIC_STACK_ADDR(0x6fffffff0000);
-//	    STATIC_STACK_SIZE(65536);
-//
-//	@see ape.lds for defaults
+//	These values are left empty because some UNIX OSes give p_filesz
+//	priority over `ulimit -s` a.k.a. RLIMIT_STACK which is preferred
+//	because we use an 8mb stack by default so that decadent software
+//	doesn't unexpectedly crash, but putting that here meant NetBSD's
+//	rusage accounting (which is the best) always reported 6mb of RSS
 	.long	PT_GNU_STACK
-	.stub	ape_stack_pf,long		// override w/ PF_X for execstack
-	.stub	ape_stack_offset,quad		// ignored
-	.stub	ape_stack_vaddr,quad		// is mmap()'d with MAP_FIXED
-	.stub	ape_stack_paddr,quad		// ignored
-	.stub	ape_stack_filesz,quad		// ignored
-	.stub	ape_stack_memsz,quad		// is mmap(size) argument
-	.stub	ape_stack_align,quad		// must be 16+
+	.stub	ape_stack_pf,long
+	.quad	0
+	.quad	0
+	.quad	0
+	.quad	0
+	.quad	0
+	.quad	16
 
 #if SupportsOpenbsd() || SupportsNetbsd()
 	.long	PT_NOTE
 	.long	PF_R
 	.stub	ape_note_offset,quad
-	.stub	ape_note_vaddr,quad
-	.stub	ape_note_paddr,quad
+	.quad	0
+	.quad	0
 	.stub	ape_note_filesz,quad
 	.stub	ape_note_memsz,quad
-	.stub	ape_note_align,quad
+	.quad	4
 #endif
 	.previous
 #endif /* SupportsSystemv() || SupportsMetal() */
 
+	.section .note.ape.ident,"a",@progbits
+	.balign	4
+ape.ident:
+	.long	2f-1f
+	.long	4f-3f
+	.long	1
+1:	.asciz	"APE"
+2:	.balign	4
+3:	.long	APE_VERSION_NOTE
+4:	.size	ape.ident,.-ape.ident
+	.type	ape.ident,@object
+	.previous
+
 #if SupportsOpenbsd()
 	.section .note.openbsd.ident,"a",@progbits
+	.balign	4
 openbsd.ident:
 	.long	2f-1f
 	.long	4f-3f
@@ -880,6 +806,7 @@ openbsd.ident:
 
 #if SupportsNetbsd()
 	.section .note.netbsd.ident,"a",@progbits
+	.balign	4
 netbsd.ident:
 	.long	2f-1f
 	.long	4f-3f
@@ -932,8 +859,8 @@ ape_macho:
 	.long	MAC_CPU_NEXGEN32E
 	.long	MAC_CPU_NEXGEN32E_ALL
 	.long	MAC_EXECUTE
-	.long	5				// number of load commands
-	.long	60f-10f				// size of all load commands
+	.long	6				// number of load commands
+	.long	70f-10f				// size of all load commands
 	.long	MAC_NOUNDEFS			// flags
 	.long	0				// reserved
 10:	.long	MAC_LC_SEGMENT_64
@@ -944,26 +871,27 @@ ape_macho:
 20:	.long	MAC_LC_SEGMENT_64
 	.long	30f-20b
 	.ascin	"__TEXT",16
+	.stub	ape_cod_vaddr,quad
+	.stub	ape_cod_memsz,quad
+	.stub	ape_cod_offset,quad
+	.stub	ape_cod_filesz,quad
+	.long	PROT_EXEC|PROT_READ|PROT_WRITE	// maxprot
+	.long	PROT_EXEC|PROT_READ		// initprot
+	.long	0				// segment section count
+	.long	0				// flags
+30:	.long	MAC_LC_SEGMENT_64
+	.long	40f-30b
+	.ascin	"__RODATA",16
 	.stub	ape_rom_vaddr,quad
 	.stub	ape_rom_memsz,quad
 	.stub	ape_rom_offset,quad
 	.stub	ape_rom_filesz,quad
 	.long	PROT_EXEC|PROT_READ|PROT_WRITE	// maxprot
-	.long	PROT_EXEC|PROT_READ		// initprot
-	.long	1				// segment section count
+	.long	PROT_READ			// initprot
+	.long	0				// segment section count
 	.long	0				// flags
-210:	.ascin	"__text",16			// section name (.text)
-	.ascin	"__TEXT",16
-	.stub	ape_text_vaddr,quad
-	.stub	ape_text_memsz,quad
-	.stub	ape_text_offset,long
-	.long	12				// align 2**12 = 4096
-	.long	0				// reloc table offset
-	.long	0				// relocation count
-	.long	MAC_S_ATTR_SOME_INSTRUCTIONS	// section type & attributes
-	.long	0,0,0				// reserved
-30:	.long	MAC_LC_SEGMENT_64
-	.long	40f-30b
+40:	.long	MAC_LC_SEGMENT_64
+	.long	50f-40b
 	.ascin	"__DATA",16
 	.stub	ape_ram_vaddr,quad
 	.stub	ape_ram_memsz,quad
@@ -971,39 +899,19 @@ ape_macho:
 	.stub	ape_ram_filesz,quad
 	.long	PROT_EXEC|PROT_READ|PROT_WRITE	// maxprot
 	.long	PROT_READ|PROT_WRITE		// initprot
-	.long	2				// segment section count
+	.long	0				// segment section count
 	.long	0				// flags
-310:	.ascin	"__data",16			// section name (.data)
-	.ascin	"__DATA",16
-	.stub	ape_data_vaddr,quad
-	.stub	ape_data_memsz,quad
-	.stub	ape_data_offset,long
-	.long	12				// align 2**12 = 4096
-	.long	0				// reloc table offset
-	.long	0				// relocation count
-	.long	0				// section type & attributes
-	.long	0,0,0				// reserved
-320:	.ascin	"__bss",16			// section name (.bss)
-	.ascin	"__DATA",16
-	.stub	ape_bss_vaddr,quad		// virtual address
-	.stub	ape_bss_memsz,quad		// memory size
-	.long	0				// file offset
-	.long	12				// align 2**12 = 4096
-	.long	0				// reloc table offset
-	.long	0				// relocation count
-	.long	MAC_S_ZEROFILL			// section type & attributes
-	.long	0,0,0				// reserved
-40:	.long	MAC_LC_UUID
-	.long	50f-40b
+50:	.long	MAC_LC_UUID
+	.long	60f-50b
 	.stub	ape_uuid1,quad
 	.stub	ape_uuid2,quad
-50:	.long	MAC_LC_UNIXTHREAD
-	.long	60f-50b				// cmdsize
+60:	.long	MAC_LC_UNIXTHREAD
+	.long	70f-60b				// cmdsize
 	.long	MAC_THREAD_NEXGEN32E		// flavaflav
-	.long	(520f-510f)/4			// count
-510:	.quad	0				// rax
-	.quad	IMAGE_BASE_VIRTUAL		// rbx
-	.quad	_HOSTXNU			// rcx
+	.long	(620f-610f)/4			// count
+610:	.quad	0				// rax
+	.quad	0				// rbx
+	.quad	0				// rcx
 	.quad	0				// rdx
 	.quad	0				// rdi
 	.quad	0				// rsi
@@ -1017,13 +925,13 @@ ape_macho:
 	.quad	0				// r13
 	.quad	0				// r14
 	.quad	0				// r15
-	.quad	_start				// rip
+	.quad	_apple				// rip
 	.quad	0				// rflags
 	.quad	0				// cs
 	.quad	0				// fs
 	.quad	0				// gs
-520:
-60:
+620:
+70:
 
 .endobj	ape_macho,globl,hidden
 .previous /* .macho */
@@ -1102,7 +1010,8 @@ DLLEXE = DLLSTD
 //	   ││││││││        │       │┌6:Contains Initialized Data
 //	   ││││││││ o      │       ││┌5:Contains Code
 //	   ││││││││┌┴─┐rrrr│  ooror│││rorrr
-PETEXT = 0b01100000000000000000000001100000
+PETEXT = 0b01100000000000000000000000100000
+PERDAT = 0b01000000000000000000000001000000
 PEDATA = 0b11000000000000000000000011000000
 PEIMPS = 0b11000000000000000000000001000000
 
@@ -1110,11 +1019,11 @@ PEIMPS = 0b11000000000000000000000001000000
 	.balign	__SIZEOF_POINTER__
 ape_pe:	.ascin	"PE",4
 	.short	kNtImageFileMachineNexgen32e
-	.stub	ape_pe_shnum,short	// NumberOfSections
+	.short	ape_pe_shnum		// NumberOfSections
 	.long	0x5c64126b		// TimeDateStamp
 	.long	0			// PointerToSymbolTable
 	.long	0			// NumberOfSymbols
-	.stub	ape_pe_optsz,short	// SizeOfOptionalHeader
+	.short	ape_pe_optsz		// SizeOfOptionalHeader
 	.short	PEEXE			// Characteristics
 	.short	kNtPe64bit		// Optional Header Magic
 	.byte	14			// MajorLinkerVersion
@@ -1125,9 +1034,9 @@ ape_pe:	.ascin	"PE",4
 	.long	RVA(ape_pe_entry)	// EntryPoint
 	.long	0			// BaseOfCode
 	.quad	ape_pe_base		// ImageBase
-	.long	4096			// SectionAlignment
-	.long	4096			// FileAlignment
-	.short	v_ntversion		// MajorOperatingSystemVersion
+	.long	ape_pe_sectionalignment	// SectionAlignment
+	.long	ape_pe_filealignment	// FileAlignment
+	.short	10			// MajorOperatingSystemVersion
 	.short	0			// MinorOperatingSystemVersion
 	.short	0			// MajorImageVersion
 	.short	0			// MinorImageVersion
@@ -1135,43 +1044,28 @@ ape_pe:	.ascin	"PE",4
 	.short	0			// MinorSubsystemVersion
 	.long	0			// Win32VersionValue
 	.long	RVA(_end)		// SizeOfImage
-	.long	RVA(_ehead)		// SizeOfHeaders
+	.long	ape_pe_sizeofheaders	// SizeOfHeaders
 	.long	0			// Checksum
 	.short	v_ntsubsystem		// Subsystem: 0=Neutral,2=GUI,3=Console
-	.stub	v_ntdllchar,short	// DllCharacteristics
-	.quad	0x0000000000100000	// StackReserve
-	.quad	0x00000000000fc000	// StackCommit
+	.short	v_ntdllchar		// DllCharacteristics
+	.quad	0x10000			// StackReserve
+	.quad	0x1000			// StackCommit
 	.quad	0			// HeapReserve
 	.quad	0			// HeapCommit
 	.long	0			// LoaderFlags
-	.long	16			// NumberOfDirectoryEntries
+	.long	2			// NumberOfDirectoryEntries
 	.long	0,0			// ExportsDirectory
-	.stub	ape_idata,long		// ImportsDirectory
-	.stub	ape_idata_idtsize,long	// ImportsDirectorySize
-	.long	0,0			// ResourcesDirectory
-	.long	0,0			// ExceptionsDirectory
-	.long	0,0			// SecurityDirectory
-	.long	0,0			// BaseRelocationTable
-	.long	0,0			// DebugDirectory
-	.long	0,0			// DescriptionString
-	.long	0,0			// MachineSpecific
-	.long	0,0			// ThreadLocalStorage
-	.long	0,0			// LoadConfigurationDirectory
-	.long	0,0			// BoundImportDirectory
-	.stub	ape_idata,long		// ImportAddressDirectory
-	.stub	ape_idata_iatsize,long	// ImportAddressDirectorySize
-	.long	0,0			// DelayImportDescriptor
-	.long	0,0			// ComPlusRuntimeHeader
-	.long	0,0			// Reserved
+	.long	ape_idata		// ImportsDirectory
+	.long	ape_idata_idtsize	// ImportsDirectorySize
 	.endobj	ape_pe,globl
 	.previous
 
 	.section .pe.sections,"a",@progbits
 	.ascin	".text",8		// Section Name
-	.stub	ape_text_memsz,long	// Virtual Size or Physical Address
-	.stub	ape_text_rva,long	// Relative Virtual Address
-	.stub	ape_text_filesz,long	// Physical Size
-	.stub	ape_text_offset,long	// Physical Offset
+	.long	ape_text_memsz		// Virtual Size or Physical Address
+	.long	ape_text_rva		// Relative Virtual Address
+	.long	ape_text_filesz		// Physical Size
+	.long	ape_text_offset		// Physical Offset
 	.long	0			// Relocation Table Offset
 	.long	0			// Line Number Table Offset
 	.short	0			// Relocation Count
@@ -1180,11 +1074,24 @@ ape_pe:	.ascin	"PE",4
 	.previous
 
 	.section .pe.sections,"a",@progbits
+	.ascin	".rdata",8		// Section Name
+	.long	ape_rom_memsz		// Virtual Size or Physical Address
+	.long	ape_rom_rva		// Relative Virtual Address
+	.long	ape_rom_filesz		// Physical Size
+	.long	ape_rom_offset		// Physical Offset
+	.long	0			// Relocation Table Offset
+	.long	0			// Line Number Table Offset
+	.short	0			// Relocation Count
+	.short	0			// Line Number Count
+	.long	PERDAT			// Flags
+	.previous
+
+	.section .pe.sections,"a",@progbits
 	.ascin	".data",8		// Section Name
-	.stub	ape_ram_memsz,long	// Virtual Size or Physical Address
-	.stub	ape_ram_rva,long	// Relative Virtual Address
-	.stub	ape_ram_filesz,long	// Physical Size
-	.stub	ape_ram_offset,long	// Physical Offset
+	.long	ape_ram_memsz		// Virtual Size or Physical Address
+	.long	ape_ram_rva		// Relative Virtual Address
+	.long	ape_ram_filesz		// Physical Size
+	.long	ape_ram_offset		// Physical Offset
 	.long	0			// Relocation Table Offset
 	.long	0			// Line Number Table Offset
 	.short	0			// Relocation Count
@@ -1201,6 +1108,7 @@ ape_pe:	.ascin	"PE",4
 	.type	ape_idata_idt,@object
 	.globl	ape_idata_idt,ape_idata_idtend
 	.hidden	ape_idata_idt,ape_idata_idtend
+	.balign	4
 ape_idata_idt:
 	.previous/*
 	...
@@ -1209,6 +1117,7 @@ ape_idata_idt:
 	*/.section .idata.ro.idt.3,"a",@progbits
 	.long	0,0,0,0,0
 ape_idata_idtend:
+	.byte	0
 	.previous
 
 	.section .piro.data.sort.iat.1,"aw",@progbits
@@ -1216,13 +1125,16 @@ ape_idata_idtend:
 	.type	ape_idata_iat,@object
 	.globl	ape_idata_iat,ape_idata_iatend
 	.hidden	ape_idata_iat,ape_idata_iatend
+	.balign	8
 ape_idata_iat:
 	.previous/*
 	...
 	decentralized content
 	...
 	*/.section .piro.data.sort.iat.3,"aw",@progbits
+	.quad	0
 ape_idata_iatend:
+	.byte	0
 	.previous
 
 #endif /* SupportsWindows() */
@@ -1332,8 +1244,6 @@ realmodeloader:
 	call	lhinit
 	call	rlinit
 	call	sinit4
-	.optfn	_start16
-	call	_start16
 	call	longmodeloader
 	.endfn	realmodeloader
 
@@ -1849,7 +1759,6 @@ kernel:	movabs	$ape_stack_vaddr,%rsp
 	.ldsvar	v_ape_realbytes
 	.ldsvar	v_ape_highsectors
 	.ldsvar	ape_idata_ro
-	.ldsvar	ape_pad_rodata
 	.ldsvar	ape_piro
 	.ldsvar	ape_piro_end
 	.type	ape_macho_end,@object
@@ -1862,55 +1771,31 @@ kernel:	movabs	$ape_stack_vaddr,%rsp
 	.type	ape_text_nops,@object
 	.type	__test_end,@object
 
-	.section .commentprologue,"a",@progbits
-	.globl	kLegalNotices
-	.type	kLegalNotices,@object
-	.hidden	kLegalNotices
-kLegalNotices:/*
-	...
-	decentralized content
-	...
-	*/.previous
-	.section .commentepilogue,"a",@progbits
-	.byte	0
-	.previous
-
 	.section .ape.pad.head,"a",@progbits
 	.type	ape_pad_head,@object
 	.hidden	ape_pad_head
 ape_pad_head:
-	.previous
 
 	.section .ape.pad.text,"a",@progbits
 	.type	ape_pad_text,@object
 	.hidden	ape_pad_text
 ape_pad_text:
-	.previous
 
 	.section .ape.pad.privileged,"a",@progbits
 	.type	ape_pad_privileged,@object
 	.hidden	ape_pad_privileged
 ape_pad_privileged:
-	.previous
-
-	.section .ape.pad.rodata,"a",@progbits
-	.type	ape_pad_rodata,@object
-	.hidden	ape_pad_rodata
-ape_pad_rodata:
-	.previous
 
 	.section .ape.pad.data,"a",@progbits
 	.type	ape_pad_data,@object
 	.hidden	ape_pad_data
 ape_pad_data:
-	.previous
 
 #if SupportsWindows()
 	.section .idata.ro,"a",@progbits
 	.type	ape_idata_ro,@object
 	.hidden	ape_idata_ro
 ape_idata_ro:
-	.previous
 #endif /* SupportsWindows() */
 
 	.section .dataprologue,"aw",@progbits
@@ -1918,50 +1803,45 @@ ape_idata_ro:
 	.globl	__data_start
 	.hidden	__data_start
 __data_start:
-	.previous
 
 	.section .dataepilogue,"aw",@progbits
 	.type	__data_end,@object
 	.globl	__data_end
 	.hidden	__data_end
 __data_end:
-	.previous
 
 	.section .bssprologue,"aw",@nobits
 	.type	__bss_start,@object
 	.globl	__bss_start
 	.hidden	__bss_start
 __bss_start:
-	.previous
 
 	.section .bssepilogue,"aw",@nobits
 	.type	__bss_end,@object
 	.globl	__bss_end
 	.hidden	__bss_end
 __bss_end:
-	.previous
 
-#if !IsTiny()
-#ifdef APE_IS_SHELL_SCRIPT
+	.section .fstls,"awT",@nobits
+	.align	TLS_ALIGNMENT
 
-	.section .blink,"a",@progbits
-	.globl	blink_aarch64_size
-blink_aarch64:
-	.incbin	"ape/blink-aarch64.gz"
-	.endobj	blink_aarch64,globl
-blink_aarch64_size = . - blink_aarch64
-	.previous
-
-	.section .blink,"a",@progbits
-	.globl	blink_darwin_arm64_size
-blink_darwin_arm64:
-	.incbin	"ape/blink-darwin-arm64.gz"
-	.endobj	blink_darwin_arm64,globl
-blink_darwin_arm64_size = . - blink_darwin_arm64
-	.previous
-
-#endif /* APE_IS_SHELL_SCRIPT */
-#endif /* !IsTiny() */
+	.section .notice,"aR",@progbits
+	.asciz	"\n\n\
+Cosmopolitan\n\
+Copyright 2024 Justine Alexandra Roberts Tunney\n\
+\n\
+Permission to use, copy, modify, and/or distribute this software for\n\
+any purpose with or without fee is hereby granted, provided that the\n\
+above copyright notice and this permission notice appear in all copies.\n\
+\n\
+THE SOFTWARE IS PROVIDED \"AS IS\" AND THE AUTHOR DISCLAIMS ALL\n\
+WARRANTIES WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED\n\
+WARRANTIES OF MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE\n\
+AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL\n\
+DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR\n\
+PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER\n\
+TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR\n\
+PERFORMANCE OF THIS SOFTWARE."
 
 .end
 

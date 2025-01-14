@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2022 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -16,18 +16,20 @@
 │ TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR             │
 │ PERFORMANCE OF THIS SOFTWARE.                                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
+#include "libc/thread/lock.h"
 #include "libc/thread/thread.h"
 
 /**
  * Gets mutex type.
  *
  * @param type will be set to one of these on success
+ *     - `PTHREAD_MUTEX_DEFAULT`
  *     - `PTHREAD_MUTEX_NORMAL`
  *     - `PTHREAD_MUTEX_RECURSIVE`
  *     - `PTHREAD_MUTEX_ERRORCHECK`
  * @return 0 on success, or error on failure
  */
 errno_t pthread_mutexattr_gettype(const pthread_mutexattr_t *attr, int *type) {
-  *type = attr->_type;
+  *type = MUTEX_TYPE(attr->_word);
   return 0;
 }

@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2020 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -25,7 +25,7 @@
  *
  * This function is similar to getline() except it'll truncate lines
  * exceeding size. The line ending marker is included and may be removed
- * using _chomp().
+ * using chomp().
  *
  * @param s is is nul-terminated string that's non-null
  * @param size is byte length of `s`
@@ -38,11 +38,13 @@ wchar_t *fgetws_unlocked(wchar_t *s, int size, FILE *f) {
   if (size > 0) {
     while (--size > 0) {
       if ((c = fgetwc_unlocked(f)) == -1) {
-        if (ferror_unlocked(f) == EINTR) continue;
+        if (ferror_unlocked(f) == EINTR)
+          continue;
         break;
       }
       *p++ = c;
-      if (c == '\n') break;
+      if (c == '\n')
+        break;
     }
     *p = '\0';
   }

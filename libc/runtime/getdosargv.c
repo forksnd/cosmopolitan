@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2020 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -16,11 +16,8 @@
 │ TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR             │
 │ PERFORMANCE OF THIS SOFTWARE.                                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
-#include "libc/intrin/bits.h"
-#include "libc/intrin/safemacros.internal.h"
-#include "libc/intrin/tpenc.h"
-#include "libc/nt/thunk/msabi.h"
 #include "libc/runtime/internal.h"
+#include "libc/stdio/sysparam.h"
 #include "libc/str/str.h"
 #include "libc/str/utf16.h"
 
@@ -31,10 +28,11 @@ struct DosArgv {
   wint_t wc;
 };
 
-textwindows noasan void DecodeDosArgv(int ignore, struct DosArgv *st) {
+textwindows void DecodeDosArgv(int ignore, struct DosArgv *st) {
   wint_t x, y;
   for (;;) {
-    if (!(x = *st->s++)) break;
+    if (!(x = *st->s++))
+      break;
     if (!IsUcs2(x)) {
       if ((y = *st->s++)) {
         x = MergeUtf16(x, y);
@@ -47,16 +45,17 @@ textwindows noasan void DecodeDosArgv(int ignore, struct DosArgv *st) {
   st->wc = x;
 }
 
-static textwindows noasan void AppendDosArgv(wint_t wc, struct DosArgv *st) {
+static textwindows void AppendDosArgv(wint_t wc, struct DosArgv *st) {
   uint64_t w;
-  w = _tpenc(wc);
+  w = tpenc(wc);
   do {
-    if (st->p >= st->pe) break;
+    if (st->p >= st->pe)
+      break;
     *st->p++ = w & 0xff;
   } while (w >>= 8);
 }
 
-static textwindows noasan int Count(int c, struct DosArgv *st) {
+static textwindows int Count(int c, struct DosArgv *st) {
   int ignore, n = 0;
   asm("" : "=g"(ignore));
   while (st->wc == c) {
@@ -83,8 +82,8 @@ static textwindows noasan int Count(int c, struct DosArgv *st) {
 // @see test/libc/dosarg_test.c
 // @see libc/runtime/ntspawn.c
 // @note kudos to Simon Tatham for figuring out quoting behavior
-textwindows noasan int GetDosArgv(const char16_t *cmdline, char *buf,
-                                  size_t size, char **argv, size_t max) {
+textwindows int GetDosArgv(const char16_t *cmdline, char *buf, size_t size,
+                           char **argv, size_t max) {
   bool inquote;
   int i, argc, slashes, quotes, ignore;
   static struct DosArgv st_;
@@ -100,13 +99,15 @@ textwindows noasan int GetDosArgv(const char16_t *cmdline, char *buf,
     while (st->wc && (st->wc == ' ' || st->wc == '\t')) {
       DecodeDosArgv(ignore, st);
     }
-    if (!st->wc) break;
+    if (!st->wc)
+      break;
     if (++argc < max) {
       argv[argc - 1] = st->p < st->pe ? st->p : NULL;
     }
     inquote = false;
     while (st->wc) {
-      if (!inquote && (st->wc == ' ' || st->wc == '\t')) break;
+      if (!inquote && (st->wc == ' ' || st->wc == '\t'))
+        break;
       if (st->wc == '"' || st->wc == '\\') {
         slashes = Count('\\', st);
         quotes = Count('"', st);
@@ -124,7 +125,8 @@ textwindows noasan int GetDosArgv(const char16_t *cmdline, char *buf,
             quotes--;
           }
           if (quotes > 0) {
-            if (!inquote) quotes--;
+            if (!inquote)
+              quotes--;
             for (i = 3; i <= quotes + 1; i += 3) {
               AppendDosArgv('"', st);
             }
@@ -139,7 +141,9 @@ textwindows noasan int GetDosArgv(const char16_t *cmdline, char *buf,
     AppendDosArgv('\0', st);
   }
   AppendDosArgv('\0', st);
-  if (size) buf[min(st->p - buf, size - 1)] = '\0';
-  if (max) argv[min(argc, max - 1)] = NULL;
+  if (size)
+    buf[MIN(st->p - buf, size - 1)] = '\0';
+  if (max)
+    argv[MIN(argc, max - 1)] = NULL;
   return argc;
 }

@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2021 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -19,29 +19,26 @@
 #include "libc/calls/struct/iovec.h"
 #include "libc/calls/struct/iovec.internal.h"
 #include "libc/dce.h"
-#include "libc/intrin/asan.internal.h"
 #include "libc/intrin/kprintf.h"
 #include "libc/limits.h"
-#include "libc/macros.internal.h"
-
-#ifdef DescribeIovec
-#undef DescribeIovec
-#endif
+#include "libc/macros.h"
 
 #define N 300
 
 #define append(...) o += ksnprintf(buf + o, N - o, __VA_ARGS__)
 
-const char *DescribeIovec(char buf[N], ssize_t rc, const struct iovec *iov,
-                          int iovlen) {
+const char *_DescribeIovec(char buf[N], ssize_t rc, const struct iovec *iov,
+                           int iovlen) {
   const char *d;
   int i, j, o = 0;
 
-  if (!iov) return "NULL";
-  if (rc == -1) return "n/a";
-  if (rc == -2) rc = SSIZE_MAX;
-  if ((!IsAsan() && kisdangerous(iov)) ||
-      (IsAsan() && !__asan_is_valid(iov, sizeof(*iov) * iovlen))) {
+  if (!iov)
+    return "NULL";
+  if (rc == -1)
+    return "n/a";
+  if (rc == -2)
+    rc = SSIZE_MAX;
+  if (kisdangerous(iov)) {
     ksnprintf(buf, N, "%p", iov);
     return buf;
   }

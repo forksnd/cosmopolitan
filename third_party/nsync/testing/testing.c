@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:t;c-basic-offset:8;tab-width:8;coding:utf-8   -*-│
-│vi: set et ft=c ts=8 tw=8 fenc=utf-8                                       :vi│
+│ vi: set noet ft=c ts=8 sw=8 fenc=utf-8                                   :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2016 Google Inc.                                                   │
 │                                                                              │
@@ -15,26 +15,24 @@
 │ See the License for the specific language governing permissions and          │
 │ limitations under the License.                                               │
 ╚─────────────────────────────────────────────────────────────────────────────*/
+#include "third_party/nsync/testing/testing.h"
 #include "libc/calls/calls.h"
 #include "libc/fmt/conv.h"
 #include "libc/limits.h"
 #include "libc/log/log.h"
 #include "libc/runtime/runtime.h"
 #include "libc/stdio/stdio.h"
-#include "libc/stdio/temp.h"
+#include "libc/temp.h"
 #include "libc/str/str.h"
 #include "third_party/nsync/atomic.internal.h"
 #include "third_party/nsync/common.internal.h"
-#include "third_party/nsync/dll.h"
 #include "third_party/nsync/mu.h"
 #include "third_party/nsync/mu_wait.h"
 #include "third_party/nsync/races.internal.h"
 #include "third_party/nsync/testing/atm_log.h"
 #include "third_party/nsync/testing/closure.h"
 #include "third_party/nsync/testing/smprintf.h"
-#include "third_party/nsync/testing/testing.h"
 #include "third_party/nsync/testing/time_extra.h"
-// clang-format off
 
 struct testing_base_s {
 	int flags;		/* flags from testing_new(); r/o after init */
@@ -55,7 +53,7 @@ struct testing_base_s {
 
 	nsync_mu testing_mu;      /* protects fields below */
 	int is_uniprocessor;      /* whether the system is a uniprocessor */
-	nsync_dll_list_ children; /* list of testing_s structs whose base is this testing_base_s */
+	struct Dll *children; /* list of testing_s structs whose base is this testing_base_s */
 	int child_count;	  /* count of testing_s structs whose base is this testing_base_s */
 	int exit_status;	  /* final exit status */
 };
@@ -70,7 +68,7 @@ struct testing_s {
 	nsync_time stop_time;	 /* when the timer was stopped; for benchmarks */
 	void (*f) (testing);		   /* test function to run */
 	const char *name;		   /* name of test */
-	nsync_dll_element_ siblings;       /* part of list of siblings */
+	struct Dll siblings;       /* part of list of siblings */
 };
 
 /* Output the header for benchmarks. */
@@ -147,7 +145,7 @@ testing_base testing_new (int argc, char *argv[], int flags) {
 	int argn;
 	testing_base tb = (testing_base)malloc (sizeof (*tb));
 	ShowCrashReports ();
-	memset ((void *) tb, 0, sizeof (*tb));
+	bzero ((void *) tb, sizeof (*tb));
 	tb->flags = flags;
 	tb->fp = stderr;
 	tb->argc = argc;
@@ -224,7 +222,7 @@ static void finish_run (testing t) {
 	if (tb->exit_status < t->test_status) {
 		tb->exit_status = t->test_status;
 	}
-	tb->children = nsync_dll_remove_ (tb->children, &t->siblings);
+	dll_remove (&tb->children, &t->siblings);
 	tb->child_count--;
 	nsync_mu_unlock (&tb->testing_mu);
 	free (t);
@@ -241,9 +239,9 @@ static void run_test (testing t) {
 	t->test_status = 0;
 	t->n = 0;
 	t->stop_time = nsync_time_zero;
-	t->start_time = nsync_time_now ();
+	t->start_time = nsync_time_now (NSYNC_CLOCK);
 	(*t->f) (t);
-	elapsed_str = nsync_time_str (nsync_time_sub (nsync_time_now (), t->start_time), 2);
+	elapsed_str = nsync_time_str (nsync_time_sub (nsync_time_now (NSYNC_CLOCK), t->start_time), 2);
 	if (!ATM_LOAD (&t->partial_line)) {
 		fprintf (t->fp, "%-25s %-45s  %s %8s\n", tb->prog, t->name,
 		         t->test_status != 0? "failed": "passed", elapsed_str);
@@ -277,9 +275,9 @@ static void run_benchmark (testing t) {
 		t->test_status = 0;
 		t->n = n;
 		t->stop_time = nsync_time_zero;
-		t->start_time = nsync_time_now ();
+		t->start_time = nsync_time_now (NSYNC_CLOCK);
 		(*t->f) (t);
-		elapsed = nsync_time_to_dbl (nsync_time_sub (nsync_time_now (), t->start_time));
+		elapsed = nsync_time_to_dbl (nsync_time_sub (nsync_time_now (NSYNC_CLOCK), t->start_time));
 		if (elapsed < 1e-1) {
 			elapsed = 1e-1;
 		}
@@ -358,8 +356,8 @@ void testing_run_ (testing_base tb, void (*f) (testing t), const char *name, int
 	    (tb->include_pat == NULL || match (tb->include_pat, name)) &&
 	    (tb->exclude_pat == NULL || !match (tb->exclude_pat, name))) {
 		testing t = (testing) malloc (sizeof (*t));
-		memset ((void *) t, 0, sizeof (*t));
-		nsync_dll_init_ (&t->siblings, t);
+		bzero ((void *) t, sizeof (*t));
+		dll_init (&t->siblings);
 		t->base = tb;
 		t->f = f;
 		t->name = name;
@@ -378,7 +376,7 @@ void testing_run_ (testing_base tb, void (*f) (testing t), const char *name, int
 			nsync_mu_lock (&tb->testing_mu);
 			nsync_mu_wait (&tb->testing_mu, &spare_thread, tb, NULL);
 			tb->child_count++;
-			tb->children = nsync_dll_make_last_in_list_ (tb->children, &t->siblings);
+			dll_make_last (&tb->children, &t->siblings);
 			nsync_mu_unlock (&tb->testing_mu);
 			closure_fork (closure_testing (&run_test, t));
 		} else {
@@ -394,7 +392,7 @@ void testing_run_ (testing_base tb, void (*f) (testing t), const char *name, int
 			nsync_mu_lock (&tb->testing_mu);
 			nsync_mu_wait (&tb->testing_mu, &spare_thread, tb, NULL);
 			tb->child_count++;
-			tb->children = nsync_dll_make_last_in_list_ (tb->children, &t->siblings);
+			dll_make_last (&tb->children, &t->siblings);
 			nsync_mu_unlock (&tb->testing_mu);
 			closure_fork (closure_testing (&run_benchmark, t));
 		}
@@ -447,9 +445,9 @@ int testing_is_uniprocessor (testing t) {
 
 		ATM_STORE_REL (&state, 0);
 		closure_fork (closure_uniprocessor_check (&uniprocessor_check, &state, &s[0]));
-		nsync_time_sleep (nsync_time_ms (100));
+		nsync_time_sleep (NSYNC_CLOCK, nsync_time_ms (100));
 		ATM_STORE_REL (&state, 1);
-		nsync_time_sleep (nsync_time_ms (400));
+		nsync_time_sleep (NSYNC_CLOCK, nsync_time_ms (400));
 		ATM_STORE_REL (&state, 2);
 		while (!ATM_LOAD_ACQ (&s[0].done)) {
 		}
@@ -457,9 +455,9 @@ int testing_is_uniprocessor (testing t) {
 		ATM_STORE_REL (&state, 0);
 		closure_fork (closure_uniprocessor_check (&uniprocessor_check, &state, &s[1]));
 		closure_fork (closure_uniprocessor_check (&uniprocessor_check, &state, &s[2]));
-		nsync_time_sleep (nsync_time_ms (100));
+		nsync_time_sleep (NSYNC_CLOCK, nsync_time_ms (100));
 		ATM_STORE_REL (&state, 1);
-		nsync_time_sleep (nsync_time_ms (400));
+		nsync_time_sleep (NSYNC_CLOCK, nsync_time_ms (400));
 		ATM_STORE_REL (&state, 2);
 		while (!ATM_LOAD_ACQ (&s[1].done) || !ATM_LOAD_ACQ (&s[2].done)) {
 		}
@@ -474,7 +472,7 @@ void testing_stop_timer (testing t) {
 	if (nsync_time_cmp (t->stop_time, nsync_time_zero) != 0) {
 		abort ();
 	}
-	t->stop_time = nsync_time_now ();
+	t->stop_time = nsync_time_now (NSYNC_CLOCK);
 }
 
 void testing_start_timer (testing t) {
@@ -482,7 +480,7 @@ void testing_start_timer (testing t) {
 		abort ();
 	}
 	t->start_time = nsync_time_add (t->start_time,
-		nsync_time_sub (nsync_time_now (), t->stop_time));
+		nsync_time_sub (nsync_time_now (NSYNC_CLOCK), t->stop_time));
 	t->stop_time = nsync_time_zero;
 }
 

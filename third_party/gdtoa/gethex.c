@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:t;c-basic-offset:8;tab-width:8;coding:utf-8   -*-│
-│vi: set et ft=c ts=8 tw=8 fenc=utf-8                                       :vi│
+│ vi: set noet ft=c ts=8 sw=8 fenc=utf-8                                   :vi │
 ╚──────────────────────────────────────────────────────────────────────────────╝
 │                                                                              │
 │  The author of this software is David M. Gay.                                │
@@ -31,7 +31,6 @@
 ╚─────────────────────────────────────────────────────────────────────────────*/
 #include "libc/errno.h"
 #include "third_party/gdtoa/gdtoa.internal.h"
-/* clang-format off */
 
 int
 __gdtoa_gethex(const char **sp, const FPI *fpi,
@@ -170,7 +169,9 @@ pcheck:
 			L = 0;
 			n = 0;
 		}
-		L |= (__gdtoa_hexdig[*s1] & 0x0f) << n;
+		// We can shift in a way that changes the sign bit or overflows,
+		// so we need to cast to unsigned to avoid undefined behavior
+		L |= (unsigned)(__gdtoa_hexdig[*s1] & 0x0f) << n;
 		n += 4;
 	}
 	*x++ = L;

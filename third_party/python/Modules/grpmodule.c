@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:4;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=4 sts=4 sw=4 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=4 sts=4 sw=4 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Python 3                                                                     │
 │ https://docs.python.org/3/license.html                                       │
@@ -18,9 +18,9 @@
 #include "third_party/python/Include/unicodeobject.h"
 #include "third_party/python/Include/warnings.h"
 #include "third_party/python/Include/yoink.h"
-#include "third_party/python/Modules/clinic/grpmodule.inc"
 #include "third_party/python/Modules/posixmodule.h"
-/* clang-format off */
+
+#include "third_party/python/Modules/clinic/grpmodule.inc"
 
 PYTHON_PROVIDE("grp");
 PYTHON_PROVIDE("grp.getgrall");
@@ -278,7 +278,12 @@ PyInit_grp(void)
     return m;
 }
 
-_Section(".rodata.pytab.1") const struct _inittab _PyImport_Inittab_grp = {
+#ifdef __aarch64__
+_Section(".rodata.pytab.1 //")
+#else
+_Section(".rodata.pytab.1")
+#endif
+ const struct _inittab _PyImport_Inittab_grp = {
     "grp",
     PyInit_grp,
 };

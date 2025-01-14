@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2020 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -22,12 +22,11 @@
 #include "dsp/tty/ttyrgb.h"
 #include "dsp/tty/windex.h"
 #include "libc/assert.h"
-#include "libc/intrin/bits.h"
-#include "libc/intrin/safemacros.internal.h"
+#include "libc/intrin/safemacros.h"
 #include "libc/limits.h"
 #include "libc/log/check.h"
 #include "libc/log/log.h"
-#include "libc/macros.internal.h"
+#include "libc/macros.h"
 #include "libc/math.h"
 #include "libc/nexgen32e/x86feature.h"
 #include "libc/runtime/runtime.h"
@@ -609,7 +608,7 @@ static struct Pick PickBlockUnicodeAnsi(struct TtyRgb tl, struct TtyRgb tr,
   struct TtyRgb tr2 = GetQuant(tr);
   struct TtyRgb bl2 = GetQuant(bl);
   struct TtyRgb br2 = GetQuant(br);
-  unsigned i, p1, p2;
+  unsigned p1, p2;
   uint16_t picks1[96] forcealign(32);
   uint16_t picks2[32] forcealign(32);
   memset(picks1, 0x79, sizeof(picks1));
@@ -628,15 +627,6 @@ static struct Pick PickBlockUnicodeTrue(struct TtyRgb tl, struct TtyRgb tr,
   memset(picks, 0x79, sizeof(picks));
   PickUnicode(picks, tl, tr, bl, br, tl, tr, bl, br);
   i = windex(picks, 96);
-  if (i >= 88) {
-    unsigned j;
-    fprintf(stderr, "uint16_t picks[96] = {");
-    for (j = 0; j < 96; ++j) {
-      fprintf(stderr, "%3d,", picks[j]);
-    }
-    fprintf(stderr, "}\n");
-  }
-  CHECK_LT(i, 88);
   return kPicksUnicode[i];
 }
 
@@ -646,7 +636,7 @@ static struct Pick PickBlockCp437Ansi(struct TtyRgb tl, struct TtyRgb tr,
   struct TtyRgb tr2 = GetQuant(tr);
   struct TtyRgb bl2 = GetQuant(bl);
   struct TtyRgb br2 = GetQuant(br);
-  unsigned i, p1, p2;
+  unsigned p1, p2;
   uint16_t picks1[32] forcealign(32);
   uint16_t picks2[32] forcealign(32);
   memset(picks1, 0x79, sizeof(picks1));
@@ -660,7 +650,6 @@ static struct Pick PickBlockCp437Ansi(struct TtyRgb tl, struct TtyRgb tr,
 
 static struct Pick PickBlockCp437True(struct TtyRgb tl, struct TtyRgb tr,
                                       struct TtyRgb bl, struct TtyRgb br) {
-  unsigned i;
   uint16_t picks[32] forcealign(32);
   memset(picks, 0x79, sizeof(picks));
   PickCp437(picks, tl, tr, bl, br, tl, tr, bl, br);
@@ -677,7 +666,8 @@ static char *CopyBlock(char *v, const struct TtyRgb chunk[hasatleast 4],
                        struct Glyph *glyph) {
   unsigned i;
   CHECK_LT(pick.bg, 4);
-  if (pick.fg != 0xff) CHECK_LT(pick.fg, 4);
+  if (pick.fg != 0xff)
+    CHECK_LT(pick.fg, 4);
   i = 0;
   if (pick.fg == 0xff) {
     if (!ttyeq(*bg, chunk[pick.bg])) {
@@ -755,7 +745,8 @@ static dontinline char *CopyRun(char *v, size_t n,
     v = CopyGlyph(v, *glyph);
     *x += 2;
     *c += 2;
-    if (*x >= n) break;
+    if (*x >= n)
+      break;
     CopyChunk(chunk, *c, n);
   } while (ChunkEq(chunk, lastchunk));
   *x -= 2;

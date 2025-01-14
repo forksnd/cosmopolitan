@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2022 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -19,27 +19,56 @@
 #include "libc/assert.h"
 #include "libc/fmt/itoa.h"
 #include "libc/fmt/magnumstrs.internal.h"
-#include "libc/intrin/describeflags.internal.h"
-#include "libc/macros.internal.h"
+#include "libc/intrin/describeflags.h"
+#include "libc/macros.h"
+#include "libc/str/str.h"
+#include "libc/sysv/consts/o.h"
 #include "libc/sysv/consts/sol.h"
 
-#define N (PAGESIZE / 2 / sizeof(struct DescribeFlags))
+#define N (4096 / 2 / sizeof(struct DescribeFlags))
 
 /**
  * Describes clock_gettime() clock argument.
  */
-const char *(DescribeOpenFlags)(char buf[128], int x) {
-  char *s;
+const char *_DescribeOpenFlags(char buf[128], int x) {
+  char *p;
   int i, n;
+  const char *pipe;
   struct DescribeFlags d[N];
-  if (x == -1) return "-1";
-  // TODO(jart): unify DescribeFlags and MagnumStr data structures
-  for (n = 0; kOpenFlags[n].x != MAGNUM_TERMINATOR; ++n) {
-    if (n == N) notpossible;
+  if (x == -1)
+    return "-1";
+  p = buf;
+  switch (x & O_ACCMODE) {
+    case O_RDONLY:
+      p = stpcpy(p, "O_RDONLY");
+      x &= ~O_ACCMODE;
+      pipe = "|";
+      break;
+    case O_WRONLY:
+      p = stpcpy(p, "O_WRONLY");
+      x &= ~O_ACCMODE;
+      pipe = "|";
+      break;
+    case O_RDWR:
+      p = stpcpy(p, "O_RDWR");
+      x &= ~O_ACCMODE;
+      pipe = "|";
+      break;
+    default:
+      pipe = "";
+      break;
   }
-  for (i = 0; i < n; ++i) {
-    d[i].flag = MAGNUM_NUMBER(kOpenFlags, i);
-    d[i].name = MAGNUM_STRING(kOpenFlags, i);
+  if (x) {
+    p = stpcpy(p, pipe);
+    for (n = 0; kOpenFlags[n].x != MAGNUM_TERMINATOR; ++n) {
+      if (n == N)
+        notpossible;
+    }
+    for (i = 0; i < n; ++i) {
+      d[i].flag = MAGNUM_NUMBER(kOpenFlags, i);
+      d[i].name = MAGNUM_STRING(kOpenFlags, i);
+    }
+    _DescribeFlags(p, 128 - (p - buf), d, n, "O_", x);
   }
-  return DescribeFlags(buf, 128, d, n, "O_", x);
+  return buf;
 }

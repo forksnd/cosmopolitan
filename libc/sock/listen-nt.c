@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2020 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -17,15 +17,31 @@
 │ PERFORMANCE OF THIS SOFTWARE.                                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
 #include "libc/assert.h"
+#include "libc/nt/thunk/msabi.h"
 #include "libc/nt/winsock.h"
 #include "libc/sock/internal.h"
+#include "libc/sock/struct/sockaddr.h"
 #include "libc/sock/syscall_fd.internal.h"
+#include "libc/sysv/consts/af.h"
+#include "libc/sysv/consts/fio.h"
+#ifdef __x86_64__
 
-textwindows int sys_listen_nt(struct Fd *fd, int backlog) {
-  _npassert(fd->kind == kFdSocket);
-  if (__sys_listen_nt(fd->handle, backlog) != -1) {
-    return 0;
-  } else {
-    return __winsockerr();
+__msabi extern typeof(__sys_listen_nt) *const __imp_listen;
+
+textwindows int sys_listen_nt(struct Fd *f, int backlog) {
+  unassert(f->kind == kFdSocket);
+
+  // winsock listen() requires bind() be called beforehand
+  if (!f->isbound) {
+    struct sockaddr_in sin = {AF_INET};
+    if (sys_bind_nt(f, (struct sockaddr *)&sin, sizeof(sin)) == -1)
+      return -1;
   }
+
+  if (__imp_listen(f->handle, backlog) == -1)
+    return __winsockerr();
+
+  return 0;
 }
+
+#endif /* __x86_64__ */

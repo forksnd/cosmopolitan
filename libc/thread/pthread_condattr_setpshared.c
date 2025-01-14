@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2022 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -24,14 +24,15 @@
  *
  * @param pshared can be one of
  *     - `PTHREAD_PROCESS_PRIVATE` (default)
- *     - `PTHREAD_PROCESS_SHARED` (unsupported)
+ *     - `PTHREAD_PROCESS_SHARED`
  * @return 0 on success, or error on failure
  * @raises EINVAL if `pshared` is invalid
  */
 errno_t pthread_condattr_setpshared(pthread_condattr_t *attr, int pshared) {
   switch (pshared) {
+    case PTHREAD_PROCESS_SHARED:
     case PTHREAD_PROCESS_PRIVATE:
-      *attr = pshared;
+      attr->_pshared = pshared;
       return 0;
     default:
       return EINVAL;

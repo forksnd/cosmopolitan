@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2023 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -16,9 +16,10 @@
 │ TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR             │
 │ PERFORMANCE OF THIS SOFTWARE.                                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
-#include "libc/str/tab.internal.h"
+#include "libc/stdalign.h"
+#include "libc/str/tab.h"
 
-_Alignas(uint8_t) const uint8_t kToUpper[256] = {
+alignas(uint8_t) const uint8_t kToUpper[256] = {
     0,   1,   2,   3,   4,   5,   6,    7,   8,    9,   10,  11,   12,  13,
     14,  15,  16,  17,  18,  19,  20,   21,  22,   23,  24,  25,   26,  27,
     28,  29,  30,  31,  ' ', '!', '\"', '#', '$',  '%', '&', '\'', '(', ')',

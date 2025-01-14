@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2022 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -18,8 +18,8 @@
 ╚─────────────────────────────────────────────────────────────────────────────*/
 #include "libc/assert.h"
 #include "libc/calls/syscall_support-nt.internal.h"
-#include "libc/intrin/describeflags.internal.h"
-#include "libc/intrin/strace.internal.h"
+#include "libc/intrin/describeflags.h"
+#include "libc/intrin/strace.h"
 #include "libc/nt/enum/filemapflags.h"
 #include "libc/nt/memory.h"
 
@@ -44,7 +44,8 @@ textwindows void *MapViewOfFileEx(int64_t hFileMappingObject,
   pStartingAddress = __imp_MapViewOfFileEx(
       hFileMappingObject, dwDesiredAccess, dwFileOffsetHigh, dwFileOffsetLow,
       dwNumberOfBytesToMap, opt_lpDesiredBaseAddress);
-  if (!pStartingAddress) __winerr();
+  if (!pStartingAddress)
+    __winerr();
   NTTRACE("MapViewOfFileEx(%ld, %s, %'ld, %'zu, %p) → %p% m",
           hFileMappingObject, DescribeNtFileMapFlags(dwDesiredAccess),
           (uint64_t)dwFileOffsetHigh << 32 | dwFileOffsetLow,

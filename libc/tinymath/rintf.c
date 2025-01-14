@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:t;c-basic-offset:8;tab-width:8;coding:utf-8   -*-│
-│vi: set et ft=c ts=8 tw=8 fenc=utf-8                                       :vi│
+│ vi: set noet ft=c ts=8 sw=8 fenc=utf-8                                   :vi │
 ╚──────────────────────────────────────────────────────────────────────────────╝
 │                                                                              │
 │  Musl Libc                                                                   │
@@ -27,12 +27,8 @@
 ╚─────────────────────────────────────────────────────────────────────────────*/
 #include "libc/math.h"
 #include "libc/runtime/fenv.h"
+__static_yoink("musl_libc_notice");
 
-asm(".ident\t\"\\n\\n\
-Musl libc (MIT License)\\n\
-Copyright 2005-2014 Rich Felker, et. al.\"");
-asm(".include \"libc/disclaimer.inc\"");
-// clang-format off
 
 #if FLT_EVAL_METHOD==0
 #define EPS FLT_EPSILON
@@ -43,6 +39,12 @@ asm(".include \"libc/disclaimer.inc\"");
 #endif
 static const float_t toint = 1/EPS;
 
+/**
+ * Rounds to integer in current rounding mode.
+ *
+ * The floating-point exception `FE_INEXACT` is raised if the result is
+ * different from the input.
+ */
 float rintf(float x)
 {
 	union {float f; uint32_t i;} u = {x};

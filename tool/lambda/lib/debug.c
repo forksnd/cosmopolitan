@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2022 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -16,6 +16,7 @@
 │ TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR             │
 │ PERFORMANCE OF THIS SOFTWARE.                                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
+#include "libc/ctype.h"
 #include "libc/fmt/itoa.h"
 #include "libc/intrin/kprintf.h"
 #include "libc/str/str.h"
@@ -45,7 +46,7 @@ int GetDepth(struct Closure *env) {
 }
 
 void PrintClosure(struct Closure *c, const char *name, int indent, FILE *f) {
-  int i, j;
+  int j;
   char ibuf[21];
   while (c && c != &root) {
     for (j = 0; j < indent; ++j) {
@@ -71,9 +72,9 @@ void PrintMachineState(FILE *f) {
   int i;
   char buf[256];
   static int op;
-  struct Closure *c;
   fputc('\n', f);
-  for (i = 0; i < 80; ++i) fputwc(L'─', f);
+  for (i = 0; i < 80; ++i)
+    fputwc(L'─', f);
   ksnprintf(buf, sizeof(buf),
             "%d\n   ip      %ld | op %d %s | arg %d | end %ld\n", op++, ip,
             mem[ip], GetOpName(mem[ip]), mem[ip + 1], end);
@@ -98,7 +99,8 @@ void PrintExpressions(FILE *f, char alog, char vlog) {
   ps.envp = envp;
   for (p = &ps; p; p = p->next) {
     Print(p->term, 1, GetDepth(p->envp), f);
-    if (p->next) fputc(' ', f);
+    if (p->next)
+      fputc(' ', f);
   }
   if (alog) {
     fputs(" ⟹ ", f);

@@ -1,9 +1,9 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╚──────────────────────────────────────────────────────────────────────────────╝
 │                                                                              │
 │  Lua                                                                         │
-│  Copyright © 2004-2021 Lua.org, PUC-Rio.                                     │
+│  Copyright © 2004-2023 Lua.org, PUC-Rio.                                     │
 │                                                                              │
 │  Permission is hereby granted, free of charge, to any person obtaining       │
 │  a copy of this software and associated documentation files (the             │
@@ -26,12 +26,13 @@
 │                                                                              │
 ╚─────────────────────────────────────────────────────────────────────────────*/
 #define lua_c
+#include "third_party/lua/lrepl.h"
 #include "libc/calls/calls.h"
 #include "libc/calls/struct/sigaction.h"
 #include "libc/errno.h"
-#include "libc/intrin/nomultics.internal.h"
+#include "libc/intrin/nomultics.h"
 #include "libc/log/check.h"
-#include "libc/macros.internal.h"
+#include "libc/macros.h"
 #include "libc/mem/alg.h"
 #include "libc/mem/gc.h"
 #include "libc/mem/mem.h"
@@ -39,20 +40,15 @@
 #include "libc/stdio/stdio.h"
 #include "libc/str/str.h"
 #include "libc/sysv/consts/sa.h"
+#include "libc/sysv/consts/sig.h"
 #include "libc/thread/thread.h"
 #include "third_party/linenoise/linenoise.h"
 #include "third_party/lua/cosmo.h"
 #include "third_party/lua/lauxlib.h"
 #include "third_party/lua/lprefix.h"
-#include "third_party/lua/lrepl.h"
 #include "third_party/lua/lua.h"
 #include "third_party/lua/lualib.h"
-// clang-format off
-
-asm(".ident\t\"\\n\\n\
-Lua 5.4.3 (MIT License)\\n\
-Copyright 1994–2021 Lua.org, PUC-Rio.\"");
-asm(".include \"libc/disclaimer.inc\"");
+__static_yoink("lua_notice");
 
 
 static const char *const kKeywordHints[] = {
@@ -70,9 +66,9 @@ bool lua_repl_blocking;
 bool lua_repl_isterminal;
 linenoiseCompletionCallback *lua_repl_completions_callback;
 struct linenoiseState *lua_repl_linenoise;
+const char *lua_progname;
 static lua_State *globalL;
-static const char *g_progname;
-static const char *g_historypath;
+static char *g_historypath;
 
 /*
 ** {==================================================================
@@ -104,8 +100,9 @@ void lua_readline_completions (const char *p, linenoiseCompletions *c) {
   size_t n;
   bool found;
   lua_State *L;
+  const char *a;
   const char *name;
-  char *a, *b, *s, *component;
+  char *b, *s, *component;
 
   // start searching globals
   L = globalL;
@@ -148,7 +145,7 @@ void lua_readline_completions (const char *p, linenoiseCompletions *c) {
     while (lua_next(L, -2)) {
       if (lua_type(L, -2) == LUA_TSTRING) {
         name = lua_tolstring(L, -2, &n);
-        if (_startswithi(name, a) && (s = malloc(a - p + n + 1))) {
+        if (startswithi(name, a) && (s = malloc(a - p + n + 1))) {
           memcpy(s, p, a - p);
           memcpy(s + (a - p), name, n + 1);
           lua_readline_addcompletion(c, s);
@@ -161,7 +158,7 @@ void lua_readline_completions (const char *p, linenoiseCompletions *c) {
   lua_pop(L, 1); // pop table
 
   for (i = 0; i < ARRAYLEN(kKeywordHints); ++i) {
-    if (_startswithi(kKeywordHints[i], p)) {
+    if (startswithi(kKeywordHints[i], p)) {
       if ((s = strdup(kKeywordHints[i]))) {
         lua_readline_addcompletion(c, s);
       }
@@ -253,6 +250,7 @@ static ssize_t pushline (lua_State *L, int firstline) {
   } else {
     lua_repl_unlock();
     fputs(prmt, stdout);
+    free(prmt);
     fflush(stdout);
     b = linenoiseGetLine(stdin);
     if (b) {
@@ -316,7 +314,6 @@ static void lstop (lua_State *L, lua_Debug *ar) {
 static int multiline (lua_State *L) {
   for (;;) {  /* repeat until gets a complete statement */
     size_t len;
-    ssize_t rc;
     const char *line = lua_tolstring(L, 1, &len);  /* get what it has */
     int status = luaL_loadbuffer(L, line, len, "=stdin");  /* try it */
     if (!incomplete(L, status) || pushline(L, 0) != 1)
@@ -328,26 +325,27 @@ static int multiline (lua_State *L) {
 }
 
 
-void lua_initrepl(lua_State *L, const char *progname) {
+void lua_initrepl(lua_State *L) {
   const char *prompt;
   lua_repl_lock();
-  g_progname = progname;
   if ((lua_repl_isterminal = linenoiseIsTerminal())) {
     linenoiseSetCompletionCallback(lua_readline_completions);
     linenoiseSetHintsCallback(lua_readline_hint);
     linenoiseSetFreeHintsCallback(free);
     prompt = get_prompt(L, 1);
-    if ((g_historypath = linenoiseGetHistoryPath(progname))) {
+    if ((g_historypath = linenoiseGetHistoryPath(lua_progname))) {
       if (linenoiseHistoryLoad(g_historypath) == -1) {
-        fprintf(stderr, "%r%s: failed to load history: %m%n", g_historypath);
+        fprintf(stderr, "%r%s: failed to load history: %m\n", g_historypath);
         free(g_historypath);
         g_historypath = 0;
       }
     }
     lua_repl_linenoise = linenoiseBegin(prompt, 0, 1);
     lua_pop(L, 1);  /* remove prompt */
-    __replmode = true;
-    if (isatty(2)) __replstderr = true;
+    __ttyconf.replmode = true;
+    if (isatty(2)) {
+      __ttyconf.replstderr = true;
+    }
   }
   lua_repl_unlock();
 }
@@ -355,7 +353,7 @@ void lua_initrepl(lua_State *L, const char *progname) {
 
 void lua_freerepl(void) {
   lua_repl_lock();
-  __replmode = false;
+  __ttyconf.replmode = false;
   linenoiseEnd(lua_repl_linenoise);
   free(g_historypath);
   lua_repl_unlock();
@@ -469,7 +467,7 @@ void lua_l_print (lua_State *L) {
     lua_getglobal(L, "print");
     lua_insert(L, 1);
     if (lua_pcall(L, n, 0, 0) != LUA_OK)
-      lua_l_message(g_progname, lua_pushfstring(L, "error calling 'print' (%s)",
+      lua_l_message(lua_progname, lua_pushfstring(L, "error calling 'print' (%s)",
                                                 lua_tostring(L, -1)));
   }
 }
@@ -483,7 +481,7 @@ void lua_l_print (lua_State *L) {
 int lua_report (lua_State *L, int status) {
   if (status != LUA_OK) {
     const char *msg = lua_tostring(L, -1);
-    lua_l_message(g_progname, msg);
+    lua_l_message(lua_progname, msg);
     lua_pop(L, 1);  /* remove message */
   }
   return status;

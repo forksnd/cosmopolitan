@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2021 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -18,9 +18,10 @@
 ╚─────────────────────────────────────────────────────────────────────────────*/
 #include "libc/calls/calls.h"
 #include "libc/calls/struct/sigaction.h"
+#include "libc/calls/struct/sigset.h"
 #include "libc/dce.h"
 #include "libc/errno.h"
-#include "libc/mem/gc.internal.h"
+#include "libc/mem/gc.h"
 #include "libc/mem/mem.h"
 #include "libc/runtime/runtime.h"
 #include "libc/stdio/rand.h"
@@ -28,13 +29,16 @@
 #include "libc/str/str.h"
 #include "libc/sysv/consts/sig.h"
 #include "libc/testlib/testlib.h"
-#include "libc/time/time.h"
+#include "libc/time.h"
 
 #define PATH "hog"
 
 FILE *f;
 char buf[512];
-char testlib_enable_tmp_setup_teardown;
+
+void SetUpOnce(void) {
+  testlib_enable_tmp_setup_teardown();
+}
 
 TEST(fwrite, test) {
   ASSERT_NE(NULL, (f = fopen(PATH, "wb")));
@@ -53,7 +57,6 @@ TEST(fwrite, test) {
   ASSERT_NE(NULL, (f = fopen(PATH, "a+b")));
   EXPECT_EQ(5, fwrite("hello", 1, 5, f));
   EXPECT_NE(-1, fclose(f));
-  if (IsWindows()) return;
   ASSERT_NE(NULL, (f = fopen(PATH, "r")));
   EXPECT_EQ(10, fread(buf, 1, 10, f));
   EXPECT_TRUE(!memcmp(buf, "hellohello", 10));
@@ -77,7 +80,6 @@ TEST(fwrite, testSmallBuffer) {
   setbuffer(f, gc(malloc(1)), 1);
   EXPECT_EQ(5, fwrite("hello", 1, 5, f));
   EXPECT_NE(-1, fclose(f));
-  if (IsWindows()) return;
   ASSERT_NE(NULL, (f = fopen(PATH, "r")));
   setbuffer(f, gc(malloc(1)), 1);
   EXPECT_EQ(10, fread(buf, 1, 10, f));
@@ -106,7 +108,6 @@ TEST(fwrite, testLineBuffer) {
   setvbuf(f, NULL, _IOLBF, 64);
   EXPECT_EQ(5, fwrite("heyy\n", 1, 5, f));
   EXPECT_NE(-1, fclose(f));
-  if (IsWindows()) return;
   ASSERT_NE(NULL, (f = fopen(PATH, "r")));
   setvbuf(f, NULL, _IOLBF, 64);
   EXPECT_EQ(10, fread(buf, 1, 10, f));
@@ -131,7 +132,6 @@ TEST(fwrite, testNoBuffer) {
   setvbuf(f, NULL, _IONBF, 64);
   EXPECT_EQ(5, fwrite("heyy\n", 1, 5, f));
   EXPECT_NE(-1, fclose(f));
-  if (IsWindows()) return;
   ASSERT_NE(NULL, (f = fopen(PATH, "r")));
   setvbuf(f, NULL, _IONBF, 64);
   EXPECT_EQ(10, fread(buf, 1, 10, f));
@@ -162,7 +162,8 @@ void OnSigInt(int sig) {
 }
 
 TEST(fwrite, signalStorm) {
-  if (IsWindows()) return;
+  if (IsWindows())
+    return;
   int pid;
   struct sigaction oldchld, oldint;
   struct sigaction sachld = {.sa_handler = SIG_IGN};
@@ -173,14 +174,15 @@ TEST(fwrite, signalStorm) {
   if (!pid) {
     do {
       ASSERT_NE(-1, kill(getppid(), SIGINT));
-      usleep(1);
+      usleep(5000);
     } while (!gotsigint);
     _exit(0);
   }
   pause();
   MeatyReadWriteTest();
   EXPECT_NE(-1, kill(pid, SIGINT));
-  while (wait(0) == -1 && errno == EINTR) donothing;
+  while (wait(0) == -1 && errno == EINTR)
+    donothing;
   EXPECT_NE(-1, sigaction(SIGCHLD, &oldchld, NULL));
   EXPECT_NE(-1, sigaction(SIGINT, &oldint, NULL));
 }

@@ -1,4 +1,3 @@
-// clang-format off
 /*
 *   $Id: perl.c 601 2007-08-02 04:45:16Z perlguy0 $
 *
@@ -14,6 +13,7 @@
 /*
 *   INCLUDE FILES
 */
+#include "libc/ctype.h"
 #include "third_party/ctags/general.h"  /* must always come first */
 
 #include "libc/mem/alg.h"

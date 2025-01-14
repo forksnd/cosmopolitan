@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2022 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -107,6 +107,8 @@ TEST(sortedints, fuzz) {
     b = ContainsInt(&T, x);
     b = ContainsInt(&T, -x);
     y = CountInt(&T, x);
+    (void)b;
+    (void)y;
   }
   for (int i = 1; i < T.n; ++i) {
     ASSERT_GE(T.p[i], T.p[i - 1]);
@@ -123,4 +125,5 @@ BENCH(sortedints, bench) {
   }
   EZBENCH2("insert big", donothing, InsertInt(&T, lemur64(), true));
   EZBENCH2("contains big", donothing, ContainsInt(&T, lemur64()));
+  (void)x;
 }

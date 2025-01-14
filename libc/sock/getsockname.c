@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2020 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -18,34 +18,79 @@
 ╚─────────────────────────────────────────────────────────────────────────────*/
 #include "libc/calls/internal.h"
 #include "libc/dce.h"
-#include "libc/intrin/asan.internal.h"
-#include "libc/intrin/strace.internal.h"
+#include "libc/intrin/fds.h"
+#include "libc/intrin/strace.h"
+#include "libc/nt/errors.h"
+#include "libc/nt/thunk/msabi.h"
+#include "libc/nt/winsock.h"
 #include "libc/sock/internal.h"
 #include "libc/sock/sock.h"
 #include "libc/sock/struct/sockaddr.h"
 #include "libc/sock/struct/sockaddr.internal.h"
 #include "libc/sock/syscall_fd.internal.h"
+#include "libc/sysv/consts/af.h"
 #include "libc/sysv/errfuns.h"
+
+__msabi extern typeof(__sys_getsockname_nt) *const __imp_getsockname;
+__msabi extern typeof(__sys_getpeername_nt) *const __imp_getpeername;
+
+static int __getsockpeername(int fd, struct sockaddr *out_addr,
+                             uint32_t *inout_addrsize, const char *name,
+                             int impl_sysv(int, void *, uint32_t *),
+                             int (*__msabi impl_win32)(uint64_t, void *,
+                                                       uint32_t *)) {
+  int rc;
+  struct sockaddr_storage ss = {0};
+  uint32_t size = sizeof(ss);
+
+  if (IsWindows()) {
+    if (__isfdkind(fd, kFdSocket)) {
+      if ((rc = impl_win32(g_fds.p[fd].handle, &ss, &size))) {
+        if (impl_win32 == __imp_getsockname && WSAGetLastError() == WSAEINVAL) {
+          // The socket has not been bound to an address with bind, or
+          // ADDR_ANY is specified in bind but connection has not yet
+          // occurred. -MSDN
+          ss.ss_family = g_fds.p[fd].family;
+          rc = 0;
+        } else {
+          rc = __winsockerr();
+        }
+      }
+    } else {
+      rc = ebadf();
+    }
+  } else {
+    rc = impl_sysv(fd, &ss, &size);
+  }
+
+  if (!rc) {
+    if (IsBsd()) {
+      __convert_bsd_to_sockaddr(&ss);
+    }
+    __write_sockaddr(&ss, out_addr, inout_addrsize);
+  }
+
+  STRACE("%s(%d, [%s]) -> %d% lm", name, fd,
+         DescribeSockaddr(out_addr, inout_addrsize ? *inout_addrsize : 0), rc);
+  return rc;
+}
 
 /**
  * Returns details about network interface kernel granted socket.
  * @return 0 on success or -1 w/ errno
  * @see getpeername()
  */
-int getsockname(int fd, struct sockaddr *out_addr, uint32_t *out_addrsize) {
-  int rc;
-  if (!out_addrsize || !out_addrsize ||
-      (IsAsan() && (!__asan_is_valid(out_addrsize, 4) ||
-                    !__asan_is_valid(out_addr, *out_addrsize)))) {
-    rc = efault();
-  } else if (!IsWindows()) {
-    rc = sys_getsockname(fd, out_addr, out_addrsize);
-  } else if (__isfdkind(fd, kFdSocket)) {
-    rc = sys_getsockname_nt(&g_fds.p[fd], out_addr, out_addrsize);
-  } else {
-    rc = ebadf();
-  }
-  STRACE("getsockname(%d, [%s]) -> %d% lm", fd,
-         DescribeSockaddr(out_addr, out_addrsize ? *out_addrsize : 0), rc);
-  return rc;
+int getsockname(int fd, struct sockaddr *out_addr, uint32_t *inout_addrsize) {
+  return __getsockpeername(fd, out_addr, inout_addrsize, "getsockname",
+                           __sys_getsockname, __imp_getsockname);
+}
+
+/**
+ * Returns details about remote end of connected socket.
+ * @return 0 on success or -1 w/ errno
+ * @see getsockname()
+ */
+int getpeername(int fd, struct sockaddr *out_addr, uint32_t *inout_addrsize) {
+  return __getsockpeername(fd, out_addr, inout_addrsize, "getpeername",
+                           __sys_getpeername, __imp_getpeername);
 }

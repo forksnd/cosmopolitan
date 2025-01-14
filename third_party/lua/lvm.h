@@ -1,10 +1,10 @@
 #ifndef lvm_h
 #define lvm_h
+
 #include "third_party/lua/ldo.h"
 #include "third_party/lua/lobject.h"
 #include "third_party/lua/ltm.h"
 
-/* clang-format off */
 
 #if !defined(LUA_NOCVTN2S)
 #define cvt2str(o)	ttisnumber(o)
@@ -102,6 +102,11 @@ typedef enum {
     { setobj2t(L, cast(TValue *,slot), v); \
       luaC_barrierback(L, gcvalue(t), v); }
 
+
+/*
+** Shift right is the same as shift left with a negative 'y'
+*/
+#define luaV_shiftr(x,y)	luaV_shiftl(x,intop(-, 0, y))
 
 
 

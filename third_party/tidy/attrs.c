@@ -1,4 +1,3 @@
-/* clang-format off */
 /* attrs.c -- recognize HTML attributes
 
   (c) 1998-2009 (W3C) MIT, ERCIM, Keio University
@@ -11,7 +10,7 @@
 #include "third_party/tidy/message.h"
 #include "third_party/tidy/tmbstr.h"
 #include "libc/assert.h"
-#include "libc/fmt/fmt.h"
+#include "libc/ctype.h"
 #include "third_party/tidy/utf8.h"
 
 #if __GNUC__ >= 11 /* [jart] this one looks legit */

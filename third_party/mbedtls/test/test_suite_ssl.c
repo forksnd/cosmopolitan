@@ -1,4 +1,3 @@
-/* clang-format off */
 /*
  *  Copyright The Mbed TLS Contributors
  *  SPDX-License-Identifier: Apache-2.0
@@ -19,9 +18,9 @@
 #include "third_party/mbedtls/ssl_invasive.h"
 #include "libc/testlib/testlib.h"
 #include "libc/log/log.h"
-#include "libc/time/time.h"
+#include "libc/time.h"
 #include "libc/stdio/rand.h"
-#include "libc/intrin/safemacros.internal.h"
+#include "libc/intrin/safemacros.h"
 #include "third_party/mbedtls/test/test.inc"
 /*
  * *** THIS FILE WAS MACHINE GENERATED ***
@@ -2269,6 +2268,8 @@ void test_ssl_mock_sanity( )
     unsigned char message[MSGLEN];
     unsigned char received[MSGLEN];
     mbedtls_mock_socket socket;
+
+    memset(message, 0, sizeof(message));
 
     mbedtls_mock_socket_init( &socket );
     TEST_ASSERT( mbedtls_mock_tcp_send_b( &socket, message, MSGLEN ) < 0 );

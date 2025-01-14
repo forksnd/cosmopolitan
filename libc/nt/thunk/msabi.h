@@ -1,10 +1,8 @@
 #ifndef COSMOPOLITAN_LIBC_NT_THUNK_MSABI_H_
 #define COSMOPOLITAN_LIBC_NT_THUNK_MSABI_H_
-#if !(__ASSEMBLER__ + __LINKER__ + 0)
 #ifdef __x86_64__
 
-#if !defined(__STRICT_ANSI__) &&               \
-    (__GNUC__ * 100 + __GNUC_MINOR__ >= 408 || \
+#if (__GNUC__ * 100 + __GNUC_MINOR__ >= 408 || \
      (__has_attribute(__ms_abi__) || defined(__llvm__)))
 /**
  * Defines function as using Microsoft x64 calling convention.
@@ -20,7 +18,7 @@
  * Returns true if header should provide MS-ABI overrides.
  */
 #ifndef ShouldUseMsabiAttribute
-#if defined(__msabi) && defined(NDEBUG) && !defined(__PG__)
+#if defined(__msabi) && defined(NDEBUG) && !defined(__PG__) && !defined(FTRACE)
 #define ShouldUseMsabiAttribute() 1
 #else
 #define ShouldUseMsabiAttribute() 0
@@ -33,5 +31,4 @@
 #define ShouldUseMsabiAttribute() 0
 #endif
 #endif /* __x86_64__ */
-#endif /* !(__ASSEMBLER__ + __LINKER__ + 0) */
 #endif /* COSMOPOLITAN_LIBC_NT_THUNK_MSABI_H_ */

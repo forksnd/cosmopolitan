@@ -4,7 +4,6 @@
 #include "net/http/url.h"
 #include "third_party/lua/lauxlib.h"
 #include "third_party/lua/visitor.h"
-#if !(__ASSEMBLER__ + __LINKER__ + 0)
 COSMOPOLITAN_C_START_
 
 struct EncoderConfig {
@@ -20,16 +19,17 @@ struct Serializer {
   const char *reason;
   char *strbuf;
   size_t strbuflen;
+  uintptr_t bsp;
 };
 
 bool LuaHasMultipleItems(lua_State *);
-char *LuaFormatStack(lua_State *) dontdiscard;
+char *LuaFormatStack(lua_State *) __wur;
 int LuaCallWithTrace(lua_State *, int, int, lua_State *);
 int LuaEncodeJsonData(lua_State *, char **, int, struct EncoderConfig);
 int LuaEncodeLuaData(lua_State *, char **, int, struct EncoderConfig);
 int LuaEncodeUrl(lua_State *);
 int LuaParseUrl(lua_State *);
-int LuaPushHeader(lua_State *, struct HttpMessage *, char *, int);
+int LuaPushHeader(lua_State *, struct HttpMessage *, const char *, int);
 int LuaPushHeaders(lua_State *, struct HttpMessage *, const char *);
 void LuaPrintStack(lua_State *);
 void LuaPushLatin1(lua_State *, const char *, size_t);
@@ -39,5 +39,4 @@ int SerializeObjectEnd(char **, struct Serializer *, int, bool);
 int SerializeObjectIndent(char **, struct Serializer *, int);
 
 COSMOPOLITAN_C_END_
-#endif /* !(__ASSEMBLER__ + __LINKER__ + 0) */
 #endif /* COSMOPOLITAN_THIRD_PARTY_LUA_COSMO_H_ */

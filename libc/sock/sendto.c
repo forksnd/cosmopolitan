@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2020 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -22,9 +22,9 @@
 #include "libc/calls/struct/iovec.h"
 #include "libc/calls/struct/iovec.internal.h"
 #include "libc/dce.h"
-#include "libc/intrin/asan.internal.h"
-#include "libc/intrin/strace.internal.h"
-#include "libc/macros.internal.h"
+#include "libc/intrin/describeflags.h"
+#include "libc/intrin/strace.h"
+#include "libc/macros.h"
 #include "libc/sock/internal.h"
 #include "libc/sock/sock.h"
 #include "libc/sock/struct/sockaddr.h"
@@ -43,57 +43,54 @@
  * @param fd is the file descriptor returned by socket()
  * @param buf is the data to send, which we'll copy if necessary
  * @param size is the byte-length of buf
- * @param flags MSG_OOB, MSG_DONTROUTE, MSG_PARTIAL, MSG_NOSIGNAL, etc.
+ * @param flags can have `MSG_OOB`, `MSG_DONTROUTE`, and `MSG_DONTWAIT`
  * @param opt_addr is a binary ip:port destination override, which is
  *     mandatory for UDP if connect() wasn't called
  * @param addrsize is the byte-length of addr's true polymorphic form
  * @return number of bytes transmitted, or -1 w/ errno
  * @error EINTR, EHOSTUNREACH, ECONNRESET (UDP ICMP Port Unreachable),
  *     EPIPE (if MSG_NOSIGNAL), EMSGSIZE, ENOTSOCK, EFAULT, etc.
- * @cancellationpoint
+ * @cancelationpoint
  * @asyncsignalsafe
- * @restartable (unless SO_RCVTIMEO)
+ * @restartable (unless SO_SNDTIMEO on Linux or Windows)
  */
 ssize_t sendto(int fd, const void *buf, size_t size, int flags,
                const struct sockaddr *opt_addr, uint32_t addrsize) {
   ssize_t rc;
   uint32_t bsdaddrsize;
   union sockaddr_storage_bsd bsd;
-  BEGIN_CANCELLATION_POINT;
+  BEGIN_CANCELATION_POINT;
 
-  if (IsAsan() && (!__asan_is_valid(buf, size) ||
-                   (opt_addr && !__asan_is_valid(opt_addr, addrsize)))) {
-    rc = efault();
-  } else {
-    if (!IsWindows()) {
-      if (!IsBsd() || !opt_addr) {
-        rc = sys_sendto(fd, buf, size, flags, opt_addr, addrsize);
-      } else if (!(rc = sockaddr2bsd(opt_addr, addrsize, &bsd, &bsdaddrsize))) {
-        rc = sys_sendto(fd, buf, size, flags, &bsd, bsdaddrsize);
-      }
-    } else if (__isfdopen(fd)) {
-      if (__isfdkind(fd, kFdSocket)) {
-        rc = sys_sendto_nt(fd, (struct iovec[]){{buf, size}}, 1, flags,
-                           opt_addr, addrsize);
-      } else if (__isfdkind(fd, kFdFile)) {
-        if (flags) {
-          rc = einval();
-        } else if (opt_addr) {
-          rc = eisconn();
-        } else {
-          rc = sys_write_nt(fd, (struct iovec[]){{buf, size}}, 1, -1);
-        }
+  if (fd < g_fds.n && g_fds.p[fd].kind == kFdZip) {
+    rc = enotsock();
+  } else if (!IsWindows()) {
+    if (!IsBsd() || !opt_addr) {
+      rc = sys_sendto(fd, buf, size, flags, opt_addr, addrsize);
+    } else if (!(rc = sockaddr2bsd(opt_addr, addrsize, &bsd, &bsdaddrsize))) {
+      rc = sys_sendto(fd, buf, size, flags, &bsd, bsdaddrsize);
+    }
+  } else if (__isfdopen(fd)) {
+    if (__isfdkind(fd, kFdSocket)) {
+      rc = sys_sendto_nt(fd, (struct iovec[]){{(void *)buf, size}}, 1, flags,
+                         opt_addr, addrsize);
+    } else if (__isfdkind(fd, kFdFile)) {
+      if (flags) {
+        rc = einval();
+      } else if (opt_addr) {
+        rc = eisconn();
       } else {
-        rc = enotsock();
+        rc = sys_write_nt(fd, (struct iovec[]){{(void *)buf, size}}, 1, -1);
       }
     } else {
-      rc = ebadf();
+      rc = enotsock();
     }
+  } else {
+    rc = ebadf();
   }
 
-  END_CANCELLATION_POINT;
-  DATATRACE("sendto(%d, %#.*hhs%s, %'zu, %#x, %p, %u) → %'ld% lm", fd,
-            MAX(0, MIN(40, rc)), buf, rc > 40 ? "..." : "", size, flags,
-            opt_addr, addrsize, rc);
+  END_CANCELATION_POINT;
+  DATATRACE("sendto(%d, %#.*hhs%s, %'zu, %s, %s) → %'ld% lm", fd,
+            MAX(0, MIN(40, rc)), buf, rc > 40 ? "..." : "", size,
+            DescribeMsg(flags), DescribeSockaddr(opt_addr, addrsize), rc);
   return rc;
 }

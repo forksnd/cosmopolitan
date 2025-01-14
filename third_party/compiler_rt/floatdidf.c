@@ -1,4 +1,3 @@
-/* clang-format off */
 /*===-- floatdidf.c - Implement __floatdidf -------------------------------===
  *
  *                     The LLVM Compiler Infrastructure
@@ -13,7 +12,7 @@
  *===----------------------------------------------------------------------===
  */
 
-STATIC_YOINK("huge_compiler_rt_license");
+__static_yoink("huge_compiler_rt_license");
 
 #include "libc/literal.h"
 #include "third_party/compiler_rt/int_lib.h"

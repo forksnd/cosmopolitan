@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2020 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -19,18 +19,18 @@
 #include "libc/assert.h"
 #include "libc/calls/syscall-sysv.internal.h"
 #include "libc/calls/syscall_support-sysv.internal.h"
+#include "libc/cosmo.h"
 #include "libc/dce.h"
 #include "libc/errno.h"
-#include "libc/intrin/strace.internal.h"
+#include "libc/intrin/strace.h"
 #include "libc/sysv/consts/o.h"
 #include "libc/sysv/errfuns.h"
-#include "libc/thread/thread.h"
 
 #define F_DUP2FD         10
 #define F_DUP2FD_CLOEXEC 18
 
 static struct Dup3 {
-  pthread_once_t once;
+  _Atomic(uint32_t) once;
   bool demodernize;
 } g_dup3;
 
@@ -45,9 +45,9 @@ static void sys_dup3_test(void) {
 
 int32_t sys_dup3(int32_t oldfd, int32_t newfd, int flags) {
   int how;
-  _unassert(oldfd >= 0);
-  _unassert(newfd >= 0);
-  _unassert(!(flags & ~O_CLOEXEC));
+  unassert(oldfd >= 0);
+  unassert(newfd >= 0);
+  unassert(!(flags & ~O_CLOEXEC));
 
   if (IsFreebsd()) {
     if (flags & O_CLOEXEC) {
@@ -58,11 +58,11 @@ int32_t sys_dup3(int32_t oldfd, int32_t newfd, int flags) {
     return __sys_fcntl(oldfd, how, newfd);
   }
 
-  pthread_once(&g_dup3.once, sys_dup3_test);
+  cosmo_once(&g_dup3.once, sys_dup3_test);
 
   if (!g_dup3.demodernize) {
     return __sys_dup3(oldfd, newfd, flags);
   } else {
-    return __fixupnewfd(sys_dup2(oldfd, newfd), flags);
+    return __fixupnewfd(sys_dup2(oldfd, newfd, 0), flags);
   }
 }

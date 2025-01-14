@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2021 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -21,11 +21,14 @@
 
 static inline int PickGoodWidth(unsigned x) {
   if (x < 16) {
-    if (x < 2) return 0;
-    if (x < 8) return 7;
+    if (x < 2)
+      return 1;
+    if (x < 8)
+      return 7;
     return 15;
   } else {
-    if (x < 32) return 31;
+    if (x < 32)
+      return 31;
     return 63;
   }
 }
@@ -45,7 +48,7 @@ char *FormatBinary64(char p[hasatleast 67], uint64_t x, char z) {
       *p++ = '0';
       *p++ = 'b';
     }
-    i = PickGoodWidth(_bsrl(x));
+    i = PickGoodWidth(bsrl(x));
     do {
       b = 1;
       b <<= i;

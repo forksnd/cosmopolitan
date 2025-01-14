@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2021 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -25,7 +25,7 @@ int32_t sys_mount_linux(const char *source, const char *target,
                         const char *filesystemtype, uint64_t mountflags,
                         const void *data) asm("sys_mount");
 int32_t sys_mount_bsd(const char *type, const char *dir, int32_t flags,
-                      void *data) asm("sys_mount");
+                      const void *data) asm("sys_mount");
 
 /**
  * Mounts file system.
@@ -84,7 +84,8 @@ int mount(const char *source, const char *target, const char *type,
     if (!IsBsd()) {
       return sys_mount_linux(source, target, type, flags, data);
     } else {
-      if (!strcmp(type, "iso9660")) type = "cd9660";
+      if (!strcmp(type, "iso9660"))
+        type = "cd9660";
       if (!strcmp(type, "vfat")) {
         if (IsOpenbsd() || IsNetbsd()) {
           type = "msdos";

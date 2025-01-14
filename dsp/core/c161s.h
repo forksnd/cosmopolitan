@@ -1,12 +1,9 @@
 #ifndef COSMOPOLITAN_DSP_CORE_C161S_H_
 #define COSMOPOLITAN_DSP_CORE_C161S_H_
 #include "dsp/core/c161.h"
-#include "libc/macros.internal.h"
-#if !(__ASSEMBLER__ + __LINKER__ + 0)
+#include "libc/macros.h"
 
-forceinline pureconst artificial signed char C161S(signed char al,
-                                                   signed char bl,
-                                                   signed char cl) {
+__funline signed char C161S(signed char al, signed char bl, signed char cl) {
   short ax, bx, cx;
   ax = al;
   bx = bl;
@@ -22,5 +19,4 @@ forceinline pureconst artificial signed char C161S(signed char al,
   return al;
 }
 
-#endif /* !(__ASSEMBLER__ + __LINKER__ + 0) */
 #endif /* COSMOPOLITAN_DSP_CORE_C161S_H_ */

@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:4;tab-width:4;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2021 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -26,7 +26,6 @@
 #include "third_party/mbedtls/math.h"
 #include "third_party/mbedtls/profile.h"
 #include "third_party/mbedtls/select.h"
-/* clang-format off */
 
 static bool
 mbedtls_p256_isz( uint64_t p[4] )
@@ -38,7 +37,7 @@ static bool
 mbedtls_p256_gte( uint64_t p[5] )
 {
     return( (((int64_t)p[4] > 0) |
-             (!p[4] &
+             ((!p[4]) &
               ((p[3] > 0xffffffff00000001) |
                ((p[3] == 0xffffffff00000001) &
                 ((p[2] > 0x0000000000000000) |

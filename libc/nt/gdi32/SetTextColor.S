@@ -1,12 +1,13 @@
 #include "libc/nt/codegen.h"
-.imp	gdi32,__imp_SetTextColor,SetTextColor,1912
+.imp	gdi32,__imp_SetTextColor,SetTextColor
 
 	.text.windows
+	.ftrace1
 SetTextColor:
+	.ftrace2
 #ifdef __x86_64__
 	push	%rbp
 	mov	%rsp,%rbp
-	.profilable
 	mov	__imp_SetTextColor(%rip),%rax
 	jmp	__sysv2nt
 #elif defined(__aarch64__)

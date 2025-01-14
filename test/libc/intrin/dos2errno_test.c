@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2021 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -18,14 +18,14 @@
 ╚─────────────────────────────────────────────────────────────────────────────*/
 #include "libc/dce.h"
 #include "libc/errno.h"
-#include "libc/intrin/dos2errno.internal.h"
-#include "libc/intrin/kprintf.h"
+#include "libc/intrin/dos2errno.h"
 #include "libc/nt/errors.h"
 #include "libc/sock/internal.h"
 #include "libc/str/str.h"
 #include "libc/testlib/testlib.h"
 
 TEST(__dos2errno, test) {
+#ifdef __x86__
   EXPECT_EQ(0, __dos2errno(0));
   EXPECT_EQ(EACCES, __dos2errno(kNtErrorSectorNotFound));
   EXPECT_EQ(EADDRNOTAVAIL, __dos2errno(kNtErrorInvalidNetname));
@@ -33,4 +33,5 @@ TEST(__dos2errno, test) {
   if (IsWindows()) {
     EXPECT_EQ(ENOLCK, __dos2errno(kNtErrorNotLocked));
   }
+#endif
 }

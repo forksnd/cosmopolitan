@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2022 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -20,6 +20,7 @@
 
 char NeedBit(FILE* f) {
   char b = GetBit(f);
-  if (b == -1) Error(9, "UNEXPECTED EOF");
+  if (b == -1)
+    Error(9, "UNEXPECTED EOF");
   return b;
 }

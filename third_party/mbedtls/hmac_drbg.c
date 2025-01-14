@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:4;tab-width:4;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright The Mbed TLS Contributors                                          │
 │                                                                              │
@@ -21,14 +21,8 @@
 #include "third_party/mbedtls/error.h"
 #include "third_party/mbedtls/hmac_drbg.h"
 #include "third_party/mbedtls/platform.h"
+__static_yoink("mbedtls_notice");
 
-asm(".ident\t\"\\n\\n\
-Mbed TLS (Apache 2.0)\\n\
-Copyright ARM Limited\\n\
-Copyright Mbed TLS Contributors\"");
-asm(".include \"libc/disclaimer.inc\"");
-
-/* clang-format off */
 /*
  *  HMAC_DRBG implementation (NIST SP 800-90)
  *

@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2020 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -16,11 +16,11 @@
 │ TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR             │
 │ PERFORMANCE OF THIS SOFTWARE.                                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
-#include "libc/macros.internal.h"
+#include "libc/macros.h"
 #include "libc/mem/mem.h"
 #include "libc/str/str.h"
 #include "libc/sysv/errfuns.h"
-#include "libc/time/time.h"
+#include "libc/time.h"
 #include "libc/x/x.h"
 #include "tool/viz/lib/convolution.h"
 #include "tool/viz/lib/graphic.h"
@@ -49,14 +49,15 @@ long unsharp(long cn, long yw, long xw, unsigned char img[cn][yw][xw], long yn,
         }
         if (y < yn) {
           for (x = 0; x < xn; ++x) {
-            (*t)[y % 3][x] = CONVOLVE5X5(/* clang-format off */
+            (*t)[y % 3][x] =
+                CONVOLVE5X5(/* clang-format off */
                     7, (-1 / 256.), img[c],
                           1,  4,   6,  4, 1,
                           4, 16,  24, 16, 4,
                           6, 24,-476, 24, 6,
                           4, 16,  24, 16, 4,
                           1,  4,   6,  4, 1
-                                         /* clang-format on */);
+                            /* clang-format on */);
           }
         }
       }
@@ -66,7 +67,9 @@ long unsharp(long cn, long yw, long xw, unsigned char img[cn][yw][xw], long yn,
     rc = enomem();
   }
   free(t);
-  if (ix) free(ix - 2);
-  if (iy) free(iy - 2);
+  if (ix)
+    free(ix - 2);
+  if (iy)
+    free(iy - 2);
   return rc;
 }

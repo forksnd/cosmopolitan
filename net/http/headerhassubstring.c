@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2021 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -33,8 +33,9 @@
 bool HeaderHas(struct HttpMessage *m, const char *b, int h, const char *s,
                size_t n) {
   size_t i;
-  _unassert(0 <= h && h < kHttpHeadersMax);
-  if (n == -1) n = s ? strlen(s) : 0;
+  unassert(0 <= h && h < kHttpHeadersMax);
+  if (n == -1)
+    n = s ? strlen(s) : 0;
   if (m->headers[h].a) {
     if (memmem(b + m->headers[h].a, m->headers[h].b - m->headers[h].a, s, n)) {
       return true;

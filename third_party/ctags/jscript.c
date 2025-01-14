@@ -1,4 +1,3 @@
-// clang-format off
 /*
  *	 $Id: jscript.c 763 2010-07-28 14:22:42Z dfishburn $
  *
@@ -22,14 +21,14 @@
 #include "third_party/ctags/general.h"	/* must always come first */
 #include "libc/str/str.h"	/* to define isalpha () */
 #include "libc/runtime/runtime.h"
+#include "libc/ctype.h"
+
 #ifdef DEBUG
 #include "libc/calls/calls.h"
-#include "libc/calls/dprintf.h"
+#include "libc/stdio/dprintf.h"
 #include "libc/calls/weirdtypes.h"
-#include "libc/fmt/fmt.h"
-#include "libc/mem/fmt.h"
 #include "libc/stdio/stdio.h"
-#include "libc/stdio/temp.h"
+#include "libc/temp.h"
 #include "third_party/musl/tempnam.h"
 #endif
 
@@ -1106,6 +1105,8 @@ static boolean parseStatement (tokenInfo *const token, boolean is_inside_class)
 	boolean is_prototype = FALSE;
 	boolean has_methods = FALSE;
 	vString *	fulltag;
+
+        (void)is_prototype;
 
 	vStringClear(saveScope);
 	/*

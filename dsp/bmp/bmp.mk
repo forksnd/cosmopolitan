@@ -1,5 +1,5 @@
 #-*-mode:makefile-gmake;indent-tabs-mode:t;tab-width:8;coding:utf-8-*-┐
-#───vi: set et ft=make ts=8 tw=8 fenc=utf-8 :vi───────────────────────┘
+#── vi: set et ft=make ts=8 sw=8 fenc=utf-8 :vi ──────────────────────┘
 
 PKGS += DSP_BMP
 
@@ -25,8 +25,7 @@ DSP_BMP_A_CHECKS =				\
 
 DSP_BMP_A_DIRECTDEPS =				\
 	LIBC_NEXGEN32E				\
-	LIBC_TINYMATH				\
-	LIBC_STUBS
+	LIBC_TINYMATH
 
 DSP_BMP_A_DEPS :=				\
 	$(call uniq,$(foreach x,$(DSP_BMP_A_DIRECTDEPS),$($(x))))
@@ -41,11 +40,11 @@ $(DSP_BMP_A).pkg:				\
 
 o/$(MODE)/dsp/bmp/float2short.o			\
 o/$(MODE)/dsp/bmp/scalevolume.o: private	\
-		OVERRIDE_CFLAGS +=		\
+		CFLAGS +=			\
 			$(MATHEMATICAL)
 
 o/tiny/dsp/bmp/scalevolume.o: private		\
-		OVERRIDE_CFLAGS +=		\
+		CFLAGS +=			\
 			-Os
 
 DSP_BMP_LIBS = $(foreach x,$(DSP_BMP_ARTIFACTS),$($(x)))

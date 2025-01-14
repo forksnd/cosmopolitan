@@ -1,15 +1,16 @@
-#include "libc/macros.internal.h"
+#include "libc/macros.h"
 .text.unlikely
 
+	.ftrace1
 el2hlt:
+	.ftrace2
 #ifdef __x86_64__
 	.leafprologue
-	.profilable
 	mov	EL2HLT(%rip),%ecx
 	jmp	__errfun
 #elif defined(__aarch64__)
 	adrp	x1,EL2HLT
-	ldr	w0,[x1,#:lo12:EL2HLT]
+	ldrsw	x0,[x1,#:lo12:EL2HLT]
 	b	__errfun
 #else
 #error "unsupported architecture"

@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2021 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -16,10 +16,9 @@
 │ TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR             │
 │ PERFORMANCE OF THIS SOFTWARE.                                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
-#include "libc/assert.h"
 #include "libc/intrin/bsf.h"
-#include "libc/intrin/cxaatexit.internal.h"
-#include "libc/intrin/strace.internal.h"
+#include "libc/intrin/cxaatexit.h"
+#include "libc/intrin/strace.h"
 #include "libc/intrin/weaken.h"
 #include "libc/mem/mem.h"
 #include "libc/runtime/runtime.h"
@@ -44,7 +43,7 @@ StartOverLocked:
     for (;;) {
       mask = b->mask;
       while (mask) {
-        i = _bsf(mask);
+        i = bsf(mask);
         mask &= ~(1u << i);
         if (!pred || pred == b->p[i].pred) {
           b->mask &= ~(1u << i);
@@ -60,7 +59,6 @@ StartOverLocked:
       if (!pred) {
         b2 = b->next;
         if (b2) {
-          _npassert(b != &__cxa_blocks.root);
           if (_weaken(free)) {
             _weaken(free)(b);
           }

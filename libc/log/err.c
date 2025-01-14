@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:t;c-basic-offset:8;tab-width:8;coding:utf-8   -*-│
-│vi: set et ft=c ts=8 tw=8 fenc=utf-8                                       :vi│
+│ vi: set noet ft=c ts=8 sw=8 fenc=utf-8                                   :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright (c) 1993                                                           │
 │      The Regents of the University of California.  All rights reserved.      │
@@ -29,18 +29,16 @@
 │ SUCH DAMAGE.                                                                 │
 ╚─────────────────────────────────────────────────────────────────────────────*/
 #include "libc/errno.h"
+#include "libc/fmt/magnumstrs.internal.h"
 #include "libc/log/bsd.h"
 #include "libc/runtime/runtime.h"
 #include "libc/stdio/stdio.h"
 #include "libc/str/str.h"
 // clang-format off
 
-asm(".ident\t\"\\n\\n\
-FreeBSD Err (BSD-3 License)\\n\
-Copyright (c) 1993\\n\
-\tThe Regents of the University of California.\\n\
-\tAll rights reserved.\"");
-asm(".include \"libc/disclaimer.inc\"");
+__notice(freebsd_err_notice, "\
+FreeBSD Error Library (BSD-3 License)\n\
+Copyright 1993 The Regents of the University of California");
 
 static FILE *err_file; /* file to use for error output */
 static void (*err_exit)(int);

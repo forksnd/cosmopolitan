@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2022 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -17,15 +17,11 @@
 │ PERFORMANCE OF THIS SOFTWARE.                                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
 #include "libc/fmt/itoa.h"
-#include "libc/intrin/describeflags.internal.h"
+#include "libc/intrin/describeflags.h"
 #include "libc/str/str.h"
 #include "libc/sysv/consts/sock.h"
 
-#ifdef DescribeSocketType
-#undef DescribeSocketType
-#endif
-
-const char *DescribeSocketType(char buf[64], int type) {
+const char *_DescribeSocketType(char buf[64], int type) {
   int x;
   char *p;
   p = buf;
@@ -43,7 +39,9 @@ const char *DescribeSocketType(char buf[64], int type) {
   } else {
     p = FormatInt32(p, x);
   }
-  if (type & SOCK_CLOEXEC) p = stpcpy(p, "|SOCK_CLOEXEC");
-  if (type & SOCK_NONBLOCK) p = stpcpy(p, "|SOCK_NONBLOCK");
+  if (type & SOCK_CLOEXEC)
+    p = stpcpy(p, "|SOCK_CLOEXEC");
+  if (type & SOCK_NONBLOCK)
+    p = stpcpy(p, "|SOCK_NONBLOCK");
   return buf;
 }

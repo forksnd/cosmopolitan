@@ -1,4 +1,3 @@
-/* clang-format off */
 //===-- lib/extendsfdf2.c - single -> double conversion -----------*- C -*-===//
 //
 //                     The LLVM Compiler Infrastructure
@@ -9,7 +8,7 @@
 //===----------------------------------------------------------------------===//
 //
 
-STATIC_YOINK("huge_compiler_rt_license");
+__static_yoink("huge_compiler_rt_license");
 
 #define SRC_SINGLE
 #define DST_DOUBLE

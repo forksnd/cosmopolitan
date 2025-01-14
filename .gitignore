@@ -1,7 +1,8 @@
 # -*- conf -*-
 
 /o
-/.prompt.jtlp
+/cosmocc
+/.cosmocc
 
 # TODO: Find some way to have Python write to o/
 __pycache__
@@ -14,3 +15,4 @@ __pycache__
 /tool/emacs/*.elc
 /perf.data
 /perf.data.old
+/qemu*core

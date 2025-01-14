@@ -1,4 +1,3 @@
-/* clang-format off */
 
 /*-------------------------------------------------------------*/
 /*--- Huffman coding low-level stuff                        ---*/
@@ -20,7 +19,7 @@
    ------------------------------------------------------------------ */
 
 
-#include "libc/mem/gc.internal.h"
+#include "libc/mem/gc.h"
 #include "libc/mem/mem.h"
 #include "third_party/bzip2/bzlib_private.inc"
 

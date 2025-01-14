@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2023 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -18,16 +18,14 @@
 ╚─────────────────────────────────────────────────────────────────────────────*/
 #include "libc/math.h"
 #include "libc/runtime/fenv.h"
+#if !(LDBL_MANT_DIG == 53 && LDBL_MAX_EXP == 1024)
 
 /**
  * Rounds to nearest integer.
  */
 long double nearbyintl(long double x) {
-#if LDBL_MANT_DIG == 53 && LDBL_MAX_EXP == 1024
-  return nearbyint(x);
-#else
 #ifdef FE_INEXACT
-  // #pragma STDC FENV_ACCESS ON
+  /* #pragma STDC FENV_ACCESS ON */
   int e;
   e = fetestexcept(FE_INEXACT);
 #endif
@@ -36,5 +34,6 @@ long double nearbyintl(long double x) {
   if (!e) feclearexcept(FE_INEXACT);
 #endif
   return x;
-#endif
 }
+
+#endif /* long double is long */

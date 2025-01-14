@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2022 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -17,8 +17,11 @@
 │ PERFORMANCE OF THIS SOFTWARE.                                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
 #include "libc/calls/calls.h"
+#include "libc/calls/struct/sigset.h"
+#include "libc/calls/struct/ucontext.internal.h"
 #include "libc/calls/ucontext.h"
 #include "libc/runtime/runtime.h"
+#include "libc/sysv/consts/sig.h"
 #include "libc/testlib/ezbench.h"
 #include "libc/testlib/testlib.h"
 
@@ -49,9 +52,28 @@ TEST(getcontext, test) {
   ASSERT_TRUE(ok2);
 }
 
+TEST(getcontext, canReadAndWriteSignalMask) {
+  sigset_t ss, old;
+  volatile int n = 0;
+  sigemptyset(&ss);
+  sigaddset(&ss, SIGUSR1);
+  sigprocmask(SIG_SETMASK, &ss, &old);
+  ASSERT_EQ(0, getcontext(&context));
+  if (!n) {
+    n = 1;
+    context.uc_mcontext.RES0 = 0;
+    ASSERT_TRUE(sigismember(&context.uc_sigmask, SIGUSR1));
+    sigaddset(&context.uc_sigmask, SIGUSR2);
+    setcontext(&context);
+    abort();
+  }
+  sigprocmask(SIG_SETMASK, 0, &ss);
+  ASSERT_TRUE(sigismember(&ss, SIGUSR2));
+  sigprocmask(SIG_SETMASK, &old, 0);
+}
+
 void SetGetContext(void) {
-  static int a;
-  a = 0;
+  int a = 0;
   getcontext(&context);
   if (!a) {
     a = 1;
@@ -60,5 +82,21 @@ void SetGetContext(void) {
 }
 
 BENCH(getcontext, bench) {
-  EZBENCH2("get/setcontext", donothing, SetGetContext());
+  EZBENCH2("getsetcontext", donothing, SetGetContext());
+}
+
+BENCH(swapcontext, bench) {
+  ucontext_t main, loop;
+  volatile bool ready = false;
+  getcontext(&main);
+  if (ready) {
+    for (;;) {
+      swapcontext(&main, &loop);
+      // kprintf("boom\n");
+    }
+  } else {
+    ready = true;
+    EZBENCH2("swapcontextx2", donothing, swapcontext(&loop, &main));
+    // kprintf("dollar\n");
+  }
 }

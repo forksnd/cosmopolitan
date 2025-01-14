@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2021 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -16,14 +16,14 @@
 │ TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR             │
 │ PERFORMANCE OF THIS SOFTWARE.                                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
-#include "libc/intrin/bits.h"
+#include "third_party/mbedtls/san.h"
+#include "libc/serialize.h"
 #include "libc/sock/sock.h"
 #include "libc/sysv/consts/af.h"
 #include "third_party/mbedtls/asn1.h"
 #include "third_party/mbedtls/asn1write.h"
 #include "third_party/mbedtls/oid.h"
 #include "third_party/mbedtls/platform.h"
-#include "third_party/mbedtls/san.h"
 #include "third_party/mbedtls/x509_crt.h"
 
 /**
@@ -33,9 +33,10 @@
  */
 int mbedtls_x509write_crt_set_subject_alternative_name(
     mbedtls_x509write_cert *ctx, const struct mbedtls_san *san, size_t sanlen) {
-  int ret, a, b, c;
+  int ret;
+  const unsigned char *item;
   size_t i, len, cap, itemlen;
-  unsigned char *pc, *buf, *item, ip4[4];
+  unsigned char *pc, *buf, ip4[4];
   if (!sanlen) return 0;
   cap = sanlen * (253 + 5 + 1) + 5 + 1;
   if (!(buf = mbedtls_calloc(1, cap))) return MBEDTLS_ERR_ASN1_ALLOC_FAILED;

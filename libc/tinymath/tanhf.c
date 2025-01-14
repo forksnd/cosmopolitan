@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:t;c-basic-offset:8;tab-width:8;coding:utf-8   -*-│
-│vi: set et ft=c ts=8 tw=8 fenc=utf-8                                       :vi│
+│ vi: set noet ft=c ts=8 sw=8 fenc=utf-8                                   :vi │
 ╚──────────────────────────────────────────────────────────────────────────────╝
 │                                                                              │
 │  Musl Libc                                                                   │
@@ -26,20 +26,15 @@
 │                                                                              │
 ╚─────────────────────────────────────────────────────────────────────────────*/
 #include "libc/math.h"
-#include "libc/tinymath/feval.internal.h"
+#include "libc/tinymath/internal.h"
+__static_yoink("musl_libc_notice");
 
-asm(".ident\t\"\\n\\n\
-Musl libc (MIT License)\\n\
-Copyright 2005-2014 Rich Felker, et. al.\"");
-asm(".include \"libc/disclaimer.inc\"");
-/* clang-format off */
 
 /**
  * Returns hyperbolic tangent of 𝑥.
- *
- *     tanh(x) = (exp(x) - exp(-x))/(exp(x) + exp(-x))
- *             = (exp(2*x) - 1)/(exp(2*x) - 1 + 2)
- *             = (1 - exp(-2*x))/(exp(-2*x) - 1 + 2)
+ * 
+ * @define `tanhf(x)=(expf(x)-expf(-x))/(expf(x)+expf(-x))`
+ * @define `tanhf(x)=(expf(2.f*x)-1.f)/(expf(2.f*x)-1.f+2.f)`
  */
 float tanhf(float x)
 {
@@ -73,7 +68,7 @@ float tanhf(float x)
 		t = -t/(t+2);
 	} else {
 		/* |x| is subnormal */
-		fevalf(x*x);
+		FORCE_EVAL(x*x);
 		t = x;
 	}
 	return sign ? -t : t;

@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2020 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -32,10 +32,11 @@
  */
 const char *inet_ntop(int af, const void *src, char *dst, uint32_t size) {
   char *p;
-  unsigned char *ip;
   int i, t, a, b, c, d;
+  const unsigned char *ip;
   p = dst;
-  if (!size) return dst;
+  if (!size)
+    return dst;
   if ((ip = src)) {
     if (af == AF_INET) {
       if (size >= 16) {
@@ -78,15 +79,18 @@ const char *inet_ntop(int af, const void *src, char *dst, uint32_t size) {
               *p++ = ':';
               break;
             default:
-              unreachable;
+              __builtin_unreachable();
           }
           a = (ip[i + 0] & 0xF0) >> 4;
           b = (ip[i + 0] & 0x0F) >> 0;
           c = (ip[i + 1] & 0xF0) >> 4;
           d = (ip[i + 1] & 0x0F) >> 0;
-          if (a) *p++ = "0123456789abcdef"[a];
-          if (a || b) *p++ = "0123456789abcdef"[b];
-          if (a || b || c) *p++ = "0123456789abcdef"[c];
+          if (a)
+            *p++ = "0123456789abcdef"[a];
+          if (a || b)
+            *p++ = "0123456789abcdef"[b];
+          if (a || b || c)
+            *p++ = "0123456789abcdef"[c];
           *p++ = "0123456789abcdef"[d];
         }
         *p = '\0';

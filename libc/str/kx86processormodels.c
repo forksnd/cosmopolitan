@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2020 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -16,12 +16,10 @@
 │ TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR             │
 │ PERFORMANCE OF THIS SOFTWARE.                                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
-#include "libc/intrin/bits.h"
-#include "libc/macros.internal.h"
+#include "libc/macros.h"
 #include "libc/nexgen32e/x86info.h"
 
-_Hide const struct X86ProcessorModel kX86ProcessorModels[] = {
-    /* <SORTED> */
+const struct X86ProcessorModel kX86ProcessorModels[] = {
     {0x060F, X86_MARCH_CORE2, X86_GRADE_CLIENT},
     {0x0616, X86_MARCH_CORE2, X86_GRADE_MOBILE},
     {0x0617, X86_MARCH_CORE2, X86_GRADE_SERVER},
@@ -70,13 +68,21 @@ _Hide const struct X86ProcessorModel kX86ProcessorModels[] = {
     {0x067E, X86_MARCH_ICELAKE, X86_GRADE_MOBILE},
     {0x0685, X86_MARCH_KNIGHTSMILL, X86_GRADE_SCIENCE},
     {0x0686, X86_MARCH_TREMONT, X86_GRADE_APPLIANCE},
+    {0x068A, X86_MARCH_TREMONT, X86_GRADE_APPLIANCE},
     {0x068C, X86_MARCH_TIGERLAKE, X86_GRADE_MOBILE},
     {0x068D, X86_MARCH_TIGERLAKE, X86_GRADE_CLIENT},
     {0x068E, X86_MARCH_KABYLAKE, X86_GRADE_MOBILE},
+    {0x068F, X86_MARCH_SAPPHIRERAPIDS, X86_GRADE_SERVER},
     {0x0696, X86_MARCH_TREMONT, X86_GRADE_APPLIANCE},
+    {0x0696, X86_MARCH_TREMONT, X86_GRADE_APPLIANCE},
+    {0x0697, X86_MARCH_ALDERLAKE, X86_GRADE_CLIENT},
+    {0x069A, X86_MARCH_ALDERLAKE, X86_GRADE_CLIENT},
+    {0x069C, X86_MARCH_TREMONT, X86_GRADE_APPLIANCE},
     {0x069D, X86_MARCH_ICELAKE, X86_GRADE_SCIENCE},
     {0x069E, X86_MARCH_KABYLAKE, X86_GRADE_CLIENT},
-    /* </SORTED> */
+    {0x06A5, X86_MARCH_COMETLAKE, X86_GRADE_CLIENT},
+    {0x06A7, X86_MARCH_ROCKETLAKE, X86_GRADE_CLIENT},
+    {0x06B7, X86_MARCH_RAPTORLAKE, X86_GRADE_CLIENT},
+    {0x06BA, X86_MARCH_RAPTORLAKE, X86_GRADE_CLIENT},
+    {0},
 };
-
-_Hide const size_t kX86ProcessorModelCount = ARRAYLEN(kX86ProcessorModels);

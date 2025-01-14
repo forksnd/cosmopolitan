@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2020 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -16,75 +16,65 @@
 │ TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR             │
 │ PERFORMANCE OF THIS SOFTWARE.                                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
-#include "libc/calls/cp.internal.h"
-#include "libc/dce.h"
-#include "libc/intrin/asan.internal.h"
-#include "libc/intrin/strace.internal.h"
+#include "libc/calls/struct/timespec.h"
 #include "libc/sock/struct/pollfd.h"
-#include "libc/sock/struct/pollfd.internal.h"
-#include "libc/sysv/errfuns.h"
 
 /**
- * Waits for something to happen on multiple file descriptors at once.
+ * Checks status on multiple file descriptors at once.
  *
- * Warning: XNU has an inconsistency with other platforms. If you have
- * pollfds with fd≥0 and none of the meaningful events flags are added
- * e.g. POLLIN then XNU won't check for POLLNVAL. This matters because
- * one of the use-cases for poll() is quickly checking for open files.
+ * Servers that need to handle an unbounded number of client connections
+ * should just create a separate thread for each client. poll() isn't a
+ * scalable i/o solution on any platform.
  *
- * Note: Polling works best on Windows for sockets. We're able to poll
- * input on named pipes. But for anything that isn't a socket, or pipe
- * with POLLIN, (e.g. regular file) then POLLIN/POLLOUT are always set
- * into revents if they're requested, provided they were opened with a
- * mode that permits reading and/or writing.
+ * One of the use cases for poll() is to quickly check if a number of
+ * file descriptors are valid. The canonical way to do this is to set
+ * events to 0 which prevents blocking and causes only the invalid,
+ * hangup, and error statuses to be checked.
  *
- * Note: Windows has a limit of 64 file descriptors and ENOMEM with -1
- * is returned if that limit is exceeded. In practice the limit is not
- * this low. For example, pollfds with fd<0 don't count. So the caller
- * could flip the sign bit with a short timeout, to poll a larger set.
+ * On XNU, the POLLHUP and POLLERR statuses aren't checked unless either
+ * POLLIN, POLLOUT, or POLLPRI are specified in the events field. Cosmo
+ * will however polyfill the checking of POLLNVAL on XNU with the events
+ * doesn't specify any of the above i/o events.
+ *
+ * When XNU and BSD OSes report POLLHUP, they will always set POLLIN too
+ * when POLLIN is requested, even in cases when there isn't unread data.
+ *
+ * Your poll() function will check the status of all file descriptors
+ * before returning. This function won't block unless none of the fds
+ * had had any reportable status.
+ *
+ * The impact shutdown() will have on poll() is a dice roll across OSes.
  *
  * @param fds[𝑖].fd should be a socket, input pipe, or conosle input
- *     and if it's a negative number then the entry is ignored
+ *     and if it's a negative number then the entry is ignored, plus
+ *     revents will be set to zero
  * @param fds[𝑖].events flags can have POLLIN, POLLOUT, POLLPRI,
  *     POLLRDNORM, POLLWRNORM, POLLRDBAND, POLLWRBAND as well as
  *     POLLERR, POLLHUP, and POLLNVAL although the latter are
  *     always implied (assuming fd≥0) so they're ignored here
- * @param timeout_ms if 0 means don't wait and -1 means wait forever
- * @return number of items fds whose revents field has been set to
- *     nonzero to describe its events, or 0 if the timeout elapsed,
- *     or -1 w/ errno
+ * @param timeout_ms if 0 means don't wait and negative waits forever
+ * @return number of `fds` whose revents field has been set to a nonzero
+ *     number, 0 if the timeout elapsed without events, or -1 w/ errno
  * @return fds[𝑖].revents is always zero initializaed and then will
  *     be populated with POLL{IN,OUT,PRI,HUP,ERR,NVAL} if something
  *     was determined about the file descriptor
  * @raise ECANCELED if thread was cancelled in masked mode
+ * @raise EINVAL if `nfds` exceeded `RLIMIT_NOFILE`
+ * @raise ENOMEM on failure to allocate memory
  * @raise EINTR if signal was delivered
- * @cancellationpoint
+ * @cancelationpoint
  * @asyncsignalsafe
- * @threadsafe
  * @norestart
  */
 int poll(struct pollfd *fds, size_t nfds, int timeout_ms) {
-  int rc;
-  size_t n;
-  uint64_t millis;
-  BEGIN_CANCELLATION_POINT;
-
-  if (IsAsan() && (__builtin_mul_overflow(nfds, sizeof(struct pollfd), &n) ||
-                   !__asan_is_valid(fds, n))) {
-    rc = efault();
-  } else if (!IsWindows()) {
-    if (!IsMetal()) {
-      rc = sys_poll(fds, nfds, timeout_ms);
-    } else {
-      rc = sys_poll_metal(fds, nfds, timeout_ms);
-    }
+  struct timespec ts;
+  struct timespec *tsp;
+  if (timeout_ms >= 0) {
+    ts.tv_sec = timeout_ms / 1000;
+    ts.tv_nsec = timeout_ms % 1000 * 1000000;
+    tsp = &ts;
   } else {
-    millis = timeout_ms;
-    rc = sys_poll_nt(fds, nfds, &millis, 0);
+    tsp = 0;
   }
-
-  END_CANCELLATION_POINT;
-  STRACE("poll(%s, %'zu, %'d) → %d% lm", DescribePollFds(rc, fds, nfds), nfds,
-         timeout_ms, rc);
-  return rc;
+  return ppoll(fds, nfds, tsp, 0);
 }

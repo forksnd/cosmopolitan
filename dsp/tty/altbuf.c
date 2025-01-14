@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2020 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -24,9 +24,13 @@
  * The alternate buffer trick lets one restore the console exactly as it
  * was, once the program is done running.
  */
-int ttyenablealtbuf(int ttyfd) { return ttysend(ttyfd, "\e[?1049h"); }
+int ttyenablealtbuf(int ttyfd) {
+  return ttysend(ttyfd, "\e[?1049h");
+}
 
 /**
  * Asks teletypewriter to restore blinking box thing.
  */
-int ttydisablealtbuf(int ttyfd) { return ttysend(ttyfd, "\e[?1049l"); }
+int ttydisablealtbuf(int ttyfd) {
+  return ttysend(ttyfd, "\e[?1049l");
+}

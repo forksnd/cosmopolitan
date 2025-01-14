@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2020 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -16,16 +16,21 @@
 │ TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR             │
 │ PERFORMANCE OF THIS SOFTWARE.                                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
-#include "libc/intrin/bits.h"
+#include "libc/stdio/stdio.h"
 #include "libc/str/str.h"
 #include "libc/str/strwidth.h"
 #include "libc/str/unicode.h"
+#include "libc/testlib/benchmark.h"
 #include "libc/testlib/ezbench.h"
 #include "libc/testlib/testlib.h"
 
 TEST(wcwidth, test) {
   ASSERT_EQ(0, wcwidth(0));
   ASSERT_EQ(-1, wcwidth(1));
+  ASSERT_EQ(-1, wcwidth(-7));
+  ASSERT_EQ(1, wcwidth(0x10FFFD));
+  ASSERT_EQ(-1, wcwidth(0x10FFFD + 1));
+  ASSERT_EQ(2, wcwidth(L'😀'));
 }
 
 TEST(strwidth, testCjkWidesAndCombiningLowLines_withThompsonPikeEncoding) {
@@ -72,7 +77,12 @@ TEST(strwidth, testTextDelimitingControlCodes_dontHaveSubstance) {
   EXPECT_EQ(0, strwidth("\1", 0));
 }
 
+#define WCWIDTH(x) __expropriate(wcwidth(__veil("r", x)))
+
 BENCH(wcwidth, bench) {
-  volatile int x;
-  EZBENCH2("wcwidth", donothing, x = wcwidth(VEIL("r", u'→')));
+  BENCHMARK(1000, 1, WCWIDTH(u'a'));
+  BENCHMARK(1000, 1, WCWIDTH(u'a'));
+  BENCHMARK(1000, 1, WCWIDTH(u'→'));
+  BENCHMARK(1000, 1, WCWIDTH(L'😀'));
+  BENCHMARK(1000, 1, WCWIDTH(0));
 }

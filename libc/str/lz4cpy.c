@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2020 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -16,10 +16,10 @@
 │ TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR             │
 │ PERFORMANCE OF THIS SOFTWARE.                                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
-#include "libc/intrin/bits.h"
 #include "libc/intrin/pushpop.h"
 #include "libc/intrin/repmovsb.h"
 #include "libc/nexgen32e/kompressor.h"
+#include "libc/serialize.h"
 #include "libc/str/str.h"
 
 /**
@@ -32,7 +32,8 @@
  * @see rldecode() for a 16-byte decompressor
  */
 textstartup void *lz4cpy(void *dest, const void *blockdata, size_t blocksize) {
-  unsigned char *op, *ip, *ipe, *match;
+  unsigned char *op, *match;
+  const unsigned char *ip, *ipe;
   unsigned token, length, fifteen, offset, matchlen;
   for (op = dest, ip = blockdata, ipe = ip + blocksize;;) {
     token = *ip++;
@@ -44,7 +45,8 @@ textstartup void *lz4cpy(void *dest, const void *blockdata, size_t blocksize) {
       } while (*ip++ == 255);
     }
     repmovsb((void **)&op, (const void **)&ip, length);
-    if (ip >= ipe) break;
+    if (ip >= ipe)
+      break;
     offset = READ16LE(ip);
     matchlen = token & fifteen;
     ip += 2;

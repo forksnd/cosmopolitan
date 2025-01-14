@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2022 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -22,16 +22,13 @@
 #include "libc/sysv/consts/o.h"
 #include "libc/testlib/testlib.h"
 
-char testlib_enable_tmp_setup_teardown;
-
 void SetUpOnce(void) {
+  testlib_enable_tmp_setup_teardown();
   ASSERT_SYS(0, 0, pledge("stdio rpath wpath cpath fattr", 0));
 }
 
 TEST(chdir, efault) {
   ASSERT_SYS(EFAULT, -1, chdir(0));
-  if (IsWindows() || !IsAsan()) return;  // not possible
-  ASSERT_SYS(EFAULT, -1, chdir((void *)77));
 }
 
 TEST(chdir, enoent) {

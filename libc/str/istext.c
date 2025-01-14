@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2021 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -21,7 +21,7 @@
 /**
  * Returns true if buffer is most likely plaintext.
  */
-bool _istext(const void *data, size_t size) {
+bool32 istext(const void *data, size_t size) {
   const unsigned char *p, *pe;
   for (p = data, pe = p + size; p < pe; ++p) {
     if (*p <= 3) {

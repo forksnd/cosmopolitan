@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2020 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -19,25 +19,24 @@
 #include "libc/calls/calls.h"
 #include "libc/calls/internal.h"
 #include "libc/calls/syscall-sysv.internal.h"
+#include "libc/cosmo.h"
 #include "libc/dce.h"
 #include "libc/errno.h"
 #include "libc/fmt/itoa.h"
-#include "libc/intrin/asan.internal.h"
-#include "libc/intrin/describeflags.internal.h"
-#include "libc/intrin/strace.internal.h"
+#include "libc/intrin/describeflags.h"
+#include "libc/intrin/strace.h"
 #include "libc/mem/alloca.h"
 #include "libc/str/str.h"
 #include "libc/sysv/errfuns.h"
-#include "libc/thread/thread.h"
 
 static struct Splice {
-  pthread_once_t once;
+  _Atomic(uint32_t) once;
   bool ok;
 } g_splice;
 
 static bool HasSplice(void) {
+  int e;
   bool ok;
-  int e, rc;
   e = errno;
   if (IsLinux()) {
     // Our testing indicates splice() doesn't work as documneted on
@@ -79,14 +78,9 @@ ssize_t splice(int infd, int64_t *opt_in_out_inoffset, int outfd,
                int64_t *opt_in_out_outoffset, size_t uptobytes,
                uint32_t flags) {
   ssize_t rc;
-  pthread_once(&g_splice.once, splice_init);
+  cosmo_once(&g_splice.once, splice_init);
   if (!g_splice.ok) {
     rc = enosys();
-  } else if (IsAsan() && ((opt_in_out_inoffset &&
-                           !__asan_is_valid(opt_in_out_inoffset, 8)) ||
-                          (opt_in_out_outoffset &&
-                           !__asan_is_valid(opt_in_out_outoffset, 8)))) {
-    rc = efault();
   } else if (__isfdkind(infd, kFdZip) || __isfdkind(outfd, kFdZip)) {
     rc = enotsup();
   } else {

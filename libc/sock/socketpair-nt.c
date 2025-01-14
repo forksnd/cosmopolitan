@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2020 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -18,11 +18,13 @@
 ╚─────────────────────────────────────────────────────────────────────────────*/
 #include "libc/calls/internal.h"
 #include "libc/calls/state.internal.h"
+#include "libc/calls/struct/sigset.internal.h"
 #include "libc/calls/syscall_support-nt.internal.h"
 #include "libc/nt/createfile.h"
 #include "libc/nt/enum/accessmask.h"
 #include "libc/nt/enum/creationdisposition.h"
 #include "libc/nt/enum/fileflagandattributes.h"
+#include "libc/nt/enum/filesharemode.h"
 #include "libc/nt/ipc.h"
 #include "libc/nt/runtime.h"
 #include "libc/sock/internal.h"
@@ -30,11 +32,13 @@
 #include "libc/sysv/consts/o.h"
 #include "libc/sysv/consts/sock.h"
 #include "libc/sysv/errfuns.h"
+#ifdef __x86_64__
 
-textwindows int sys_socketpair_nt(int family, int type, int proto, int sv[2]) {
+textwindows static int sys_socketpair_nt_impl(int family, int type, int proto,
+                                              int sv[2]) {
   uint32_t mode;
+  int64_t hpipe, h1;
   char16_t pipename[64];
-  int64_t hpipe, h1, h2;
   int rc, reader, writer, oflags;
 
   // Supports only AF_UNIX
@@ -43,7 +47,8 @@ textwindows int sys_socketpair_nt(int family, int type, int proto, int sv[2]) {
   }
 
   oflags = 0;
-  if (type & SOCK_CLOEXEC) oflags |= O_CLOEXEC;
+  if (type & SOCK_CLOEXEC)
+    oflags |= O_CLOEXEC;
   type &= ~SOCK_CLOEXEC;
 
   if (type == SOCK_STREAM) {
@@ -54,14 +59,16 @@ textwindows int sys_socketpair_nt(int family, int type, int proto, int sv[2]) {
     return eopnotsupp();
   }
 
-  CreatePipeName(pipename);
+  __create_pipe_name(pipename);
   __fds_lock();
   reader = __reservefd_unlocked(-1);
   writer = __reservefd_unlocked(-1);
   __fds_unlock();
   if (reader == -1 || writer == -1) {
-    if (reader != -1) __releasefd(reader);
-    if (writer != -1) __releasefd(writer);
+    if (reader != -1)
+      __releasefd(reader);
+    if (writer != -1)
+      __releasefd(writer);
     return -1;
   }
   if ((hpipe = CreateNamedPipe(
@@ -72,7 +79,8 @@ textwindows int sys_socketpair_nt(int family, int type, int proto, int sv[2]) {
     return -1;
   }
 
-  h1 = CreateFile(pipename, kNtGenericWrite | kNtGenericRead, 0,
+  h1 = CreateFile(pipename, kNtGenericWrite | kNtGenericRead,
+                  kNtFileShareRead | kNtFileShareWrite | kNtFileShareDelete,
                   &kNtIsInheritable, kNtOpenExisting, kNtFileFlagOverlapped, 0);
 
   __fds_lock();
@@ -80,12 +88,12 @@ textwindows int sys_socketpair_nt(int family, int type, int proto, int sv[2]) {
   if (h1 != -1) {
 
     g_fds.p[reader].kind = kFdFile;
-    g_fds.p[reader].flags = oflags;
+    g_fds.p[reader].flags = O_RDWR | oflags;
     g_fds.p[reader].mode = 0140444;
     g_fds.p[reader].handle = hpipe;
 
     g_fds.p[writer].kind = kFdFile;
-    g_fds.p[writer].flags = oflags;
+    g_fds.p[writer].flags = O_RDWR | oflags;
     g_fds.p[writer].mode = 0140222;
     g_fds.p[writer].handle = h1;
 
@@ -104,3 +112,13 @@ textwindows int sys_socketpair_nt(int family, int type, int proto, int sv[2]) {
 
   return rc;
 }
+
+textwindows int sys_socketpair_nt(int family, int type, int proto, int sv[2]) {
+  int rc;
+  BLOCK_SIGNALS;
+  rc = sys_socketpair_nt_impl(family, type, proto, sv);
+  ALLOW_SIGNALS;
+  return rc;
+}
+
+#endif /* __x86_64__ */

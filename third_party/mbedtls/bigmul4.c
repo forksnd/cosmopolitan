@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:4;tab-width:4;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright The Mbed TLS Contributors                                          │
 │                                                                              │
@@ -18,7 +18,6 @@
 #include "libc/nexgen32e/x86feature.h"
 #include "third_party/mbedtls/bignum_internal.h"
 #include "third_party/mbedtls/math.h"
-/* clang-format off */
 
 /**
  * Computes 512-bit product of 256-bit and 256-bit numbers.
@@ -31,12 +30,10 @@
  */
 void (*Mul4x4)(uint64_t C[16], const uint64_t A[8], const uint64_t B[8]);
 
-static textstartup void Mul4x4Init()
+__attribute__((__constructor__(10))) static textstartup void Mul4x4Init()
 {
     Mul4x4 = X86_HAVE(ADX) && X86_HAVE(BMI2) ? Mul4x4Adx : Mul4x4Pure;
 }
-
-const void *const Mul4x4Ctor[] initarray = {Mul4x4Init};
 
 void Mul4x4Pure(uint64_t C[16], const uint64_t A[8], const uint64_t B[8])
 {

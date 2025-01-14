@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2020 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -18,29 +18,40 @@
 ╚─────────────────────────────────────────────────────────────────────────────*/
 #include "libc/assert.h"
 #include "libc/calls/calls.h"
+#include "libc/calls/createfileflags.internal.h"
 #include "libc/calls/internal.h"
-#include "libc/calls/struct/fd.internal.h"
 #include "libc/calls/struct/flock.h"
+#include "libc/calls/struct/sigset.internal.h"
 #include "libc/calls/syscall-nt.internal.h"
 #include "libc/calls/syscall_support-nt.internal.h"
 #include "libc/calls/wincrash.internal.h"
 #include "libc/errno.h"
-#include "libc/intrin/kmalloc.h"
+#include "libc/intrin/fds.h"
+#include "libc/intrin/kprintf.h"
 #include "libc/intrin/weaken.h"
 #include "libc/limits.h"
 #include "libc/log/backtrace.internal.h"
-#include "libc/macros.internal.h"
+#include "libc/macros.h"
+#include "libc/mem/leaks.h"
+#include "libc/mem/mem.h"
+#include "libc/nt/createfile.h"
+#include "libc/nt/enum/fileflagandattributes.h"
 #include "libc/nt/enum/filelockflags.h"
 #include "libc/nt/errors.h"
 #include "libc/nt/files.h"
 #include "libc/nt/runtime.h"
 #include "libc/nt/struct/byhandlefileinformation.h"
 #include "libc/nt/struct/overlapped.h"
+#include "libc/nt/winsock.h"
+#include "libc/sock/internal.h"
+#include "libc/stdckdint.h"
 #include "libc/str/str.h"
 #include "libc/sysv/consts/f.h"
 #include "libc/sysv/consts/fd.h"
+#include "libc/sysv/consts/fio.h"
 #include "libc/sysv/consts/o.h"
 #include "libc/sysv/errfuns.h"
+#include "libc/thread/posixthread.internal.h"
 #include "libc/thread/thread.h"
 
 struct FileLock {
@@ -57,7 +68,9 @@ struct FileLocks {
   struct FileLock *free;
 };
 
-static struct FileLocks g_locks;
+static struct FileLocks g_locks = {
+    .mu = PTHREAD_MUTEX_INITIALIZER,
+};
 
 static textwindows struct FileLock *NewFileLock(void) {
   struct FileLock *fl;
@@ -65,7 +78,7 @@ static textwindows struct FileLock *NewFileLock(void) {
     fl = g_locks.free;
     g_locks.free = fl->next;
   } else {
-    fl = kmalloc(sizeof(*fl));
+    unassert((fl = may_leak(_weaken(malloc)(sizeof(*fl)))));
   }
   bzero(fl, sizeof(*fl));
   fl->next = g_locks.list;
@@ -85,7 +98,7 @@ static textwindows bool OverlapsFileLock(struct FileLock *fl, int64_t off,
   EndA = off + (len - 1);
   BegB = fl->off;
   EndB = fl->off + (fl->len - 1);
-  return MAX(BegA, BegB) < MIN(EndA, EndB);
+  return MAX(BegA, BegB) <= MIN(EndA, EndB);
 }
 
 static textwindows bool EncompassesFileLock(struct FileLock *fl, int64_t off,
@@ -98,9 +111,9 @@ static textwindows bool EqualsFileLock(struct FileLock *fl, int64_t off,
   return fl->off == off && off + len == fl->off + fl->len;
 }
 
-_Hide textwindows void sys_fcntl_nt_lock_cleanup(int fd) {
+textwindows void sys_fcntl_nt_lock_cleanup(int fd) {
   struct FileLock *fl, *ft, **flp;
-  pthread_mutex_lock(&g_locks.mu);
+  _pthread_mutex_lock(&g_locks.mu);
   for (flp = &g_locks.list, fl = *flp; fl;) {
     if (fl->fd == fd) {
       *flp = fl->next;
@@ -112,16 +125,26 @@ _Hide textwindows void sys_fcntl_nt_lock_cleanup(int fd) {
       fl = *flp;
     }
   }
-  pthread_mutex_unlock(&g_locks.mu);
+  _pthread_mutex_unlock(&g_locks.mu);
+}
+
+static textwindows int64_t GetfileSize(int64_t handle) {
+  struct NtByHandleFileInformation wst;
+  if (!GetFileInformationByHandle(handle, &wst))
+    return __winerr();
+  return (wst.nFileSizeHigh + 0ull) << 32 | wst.nFileSizeLow;
 }
 
 static textwindows int sys_fcntl_nt_lock(struct Fd *f, int fd, int cmd,
                                          uintptr_t arg) {
-  int e;
+  uint32_t flags;
   struct flock *l;
-  uint32_t flags, err;
+  int64_t off, len, end;
   struct FileLock *fl, *ft, **flp;
-  int64_t pos, off, len, end, size;
+
+  if (!_weaken(malloc)) {
+    return enomem();
+  }
 
   l = (struct flock *)arg;
   len = l->l_len;
@@ -131,16 +154,15 @@ static textwindows int sys_fcntl_nt_lock(struct Fd *f, int fd, int cmd,
     case SEEK_SET:
       break;
     case SEEK_CUR:
-      pos = 0;
-      if (SetFilePointerEx(f->handle, 0, &pos, SEEK_CUR)) {
-        off = pos + off;
-      } else {
-        return __winerr();
-      }
+      off = f->cursor->shared->pointer + off;
       break;
-    case SEEK_END:
-      off = INT64_MAX - off;
+    case SEEK_END: {
+      int64_t size;
+      if ((size = GetfileSize(f->handle)) == -1)
+        return -1;
+      off = size - off;
       break;
+    }
     default:
       return einval();
   }
@@ -149,13 +171,12 @@ static textwindows int sys_fcntl_nt_lock(struct Fd *f, int fd, int cmd,
     len = INT64_MAX - off;
   }
 
-  if (off < 0 || len < 0 || __builtin_add_overflow(off, len, &end)) {
+  if (off < 0 || len < 0 || ckd_add(&end, off, len)) {
     return einval();
   }
 
   bool32 ok;
-  struct NtOverlapped ov = {.hEvent = f->handle,
-                            .Pointer = (void *)(uintptr_t)off};
+  struct NtOverlapped ov = {.hEvent = f->handle, .Pointer = off};
 
   if (l->l_type == F_RDLCK || l->l_type == F_WRLCK) {
 
@@ -164,7 +185,7 @@ static textwindows int sys_fcntl_nt_lock(struct Fd *f, int fd, int cmd,
       for (flp = &g_locks.list, fl = *flp; fl;) {
         if (fl->fd == fd) {
           if (EqualsFileLock(fl, off, len)) {
-            if (fl->exc == l->l_type == F_WRLCK) {
+            if (fl->exc == (l->l_type == F_WRLCK)) {
               // we already have this lock
               return 0;
             } else {
@@ -198,7 +219,7 @@ static textwindows int sys_fcntl_nt_lock(struct Fd *f, int fd, int cmd,
           l->l_whence = SEEK_SET;
           l->l_start = fl->off;
           l->l_len = fl->len;
-          l->l_type == fl->exc ? F_WRLCK : F_RDLCK;
+          l->l_type = fl->exc ? F_WRLCK : F_RDLCK;
           l->l_pid = getpid();
           return 0;
         }
@@ -236,13 +257,13 @@ static textwindows int sys_fcntl_nt_lock(struct Fd *f, int fd, int cmd,
   }
 
   if (l->l_type == F_UNLCK) {
-    if (cmd == F_GETLK) return einval();
+    if (cmd == F_GETLK)
+      return einval();
 
     // allow a big range to unlock many small ranges
     for (flp = &g_locks.list, fl = *flp; fl;) {
       if (fl->fd == fd && EncompassesFileLock(fl, off, len)) {
-        struct NtOverlapped ov = {.hEvent = f->handle,
-                                  .Pointer = (void *)(uintptr_t)fl->off};
+        struct NtOverlapped ov = {.hEvent = f->handle, .Pointer = fl->off};
         if (UnlockFileEx(f->handle, 0, fl->len, fl->len >> 32, &ov)) {
           *flp = fl->next;
           ft = fl->next;
@@ -274,14 +295,13 @@ static textwindows int sys_fcntl_nt_lock(struct Fd *f, int fd, int cmd,
             off + len >= fl->off &&  //
             off + len < fl->off + fl->len) {
           // cleave left side of lock
-          struct NtOverlapped ov = {.hEvent = f->handle,
-                                    .Pointer = (void *)(uintptr_t)fl->off};
+          struct NtOverlapped ov = {.hEvent = f->handle, .Pointer = fl->off};
           if (!UnlockFileEx(f->handle, 0, fl->len, fl->len >> 32, &ov)) {
             return -1;
           }
           fl->len = (fl->off + fl->len) - (off + len);
           fl->off = off + len;
-          ov.Pointer = (void *)(uintptr_t)fl->off;
+          ov.Pointer = fl->off;
           if (!LockFileEx(f->handle, kNtLockfileExclusiveLock, 0, fl->len,
                           fl->len >> 32, &ov)) {
             return -1;
@@ -302,42 +322,46 @@ static textwindows int sys_fcntl_nt_lock(struct Fd *f, int fd, int cmd,
 }
 
 static textwindows int sys_fcntl_nt_dupfd(int fd, int cmd, int start) {
-  if (start < 0) return einval();
-  return sys_dup_nt(fd, -1, (cmd == F_DUPFD_CLOEXEC ? O_CLOEXEC : 0), start);
+  if (start < 0)
+    return einval();
+  return sys_dup_nt(fd, -1, (cmd == F_DUPFD_CLOEXEC ? _O_CLOEXEC : 0), start);
 }
 
 textwindows int sys_fcntl_nt(int fd, int cmd, uintptr_t arg) {
   int rc;
-  uint32_t flags;
-  if (__isfdkind(fd, kFdFile) || __isfdkind(fd, kFdSocket)) {
+  BLOCK_SIGNALS;
+  if (__isfdkind(fd, kFdFile) ||     //
+      __isfdkind(fd, kFdSocket) ||   //
+      __isfdkind(fd, kFdConsole) ||  //
+      __isfdkind(fd, kFdDevNull) ||  //
+      __isfdkind(fd, kFdDevRandom)) {
     if (cmd == F_GETFL) {
-      rc = g_fds.p[fd].flags &
-           (O_ACCMODE | O_APPEND | O_ASYNC | O_DIRECT | O_NOATIME | O_NONBLOCK |
-            O_RANDOM | O_SEQUENTIAL);
+      rc = g_fds.p[fd].flags & (O_ACCMODE | _O_APPEND | _O_DIRECT |
+                                _O_NONBLOCK | _O_RANDOM | _O_SEQUENTIAL);
     } else if (cmd == F_SETFL) {
-      // O_APPEND doesn't appear to be tunable at cursory glance
-      // O_NONBLOCK might require we start doing all i/o in threads
-      // O_DSYNC / O_RSYNC / O_SYNC maybe if we fsync() everything
-      // O_DIRECT | O_RANDOM | O_SEQUENTIAL | O_NDELAY possible but
-      // not worth it.
-      rc = enosys();
+      rc = sys_fcntl_nt_setfl(fd, arg);
     } else if (cmd == F_GETFD) {
-      if (g_fds.p[fd].flags & O_CLOEXEC) {
+      if (g_fds.p[fd].flags & _O_CLOEXEC) {
         rc = FD_CLOEXEC;
       } else {
         rc = 0;
       }
     } else if (cmd == F_SETFD) {
       if (arg & FD_CLOEXEC) {
-        g_fds.p[fd].flags |= O_CLOEXEC;
+        g_fds.p[fd].flags |= _O_CLOEXEC;
       } else {
-        g_fds.p[fd].flags &= ~O_CLOEXEC;
+        g_fds.p[fd].flags &= ~_O_CLOEXEC;
       }
       rc = 0;
     } else if (cmd == F_SETLK || cmd == F_SETLKW || cmd == F_GETLK) {
-      pthread_mutex_lock(&g_locks.mu);
-      rc = sys_fcntl_nt_lock(g_fds.p + fd, fd, cmd, arg);
-      pthread_mutex_unlock(&g_locks.mu);
+      struct Fd *f = g_fds.p + fd;
+      if (f->cursor) {
+        _pthread_mutex_lock(&g_locks.mu);
+        rc = sys_fcntl_nt_lock(f, fd, cmd, arg);
+        _pthread_mutex_unlock(&g_locks.mu);
+      } else {
+        rc = ebadf();
+      }
     } else if (cmd == F_DUPFD || cmd == F_DUPFD_CLOEXEC) {
       rc = sys_fcntl_nt_dupfd(fd, cmd, arg);
     } else {
@@ -346,5 +370,6 @@ textwindows int sys_fcntl_nt(int fd, int cmd, uintptr_t arg) {
   } else {
     rc = ebadf();
   }
+  ALLOW_SIGNALS;
   return rc;
 }

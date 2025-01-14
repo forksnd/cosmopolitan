@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2020 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -17,11 +17,10 @@
 │ PERFORMANCE OF THIS SOFTWARE.                                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
 #include "libc/errno.h"
-#include "libc/fmt/fmt.h"
 #include "libc/log/log.h"
 #include "libc/stdio/stdio.h"
 #include "libc/str/str.h"
 
-noinstrument void _log_errno(const char *file, int line, const char *form) {
-  flogf(kLogWarn, file, line, NULL, PFLINK("%s → %s"), form, strerror(errno));
+dontinstrument void _log_errno(const char *file, int line, const char *form) {
+  flogf(kLogWarn, file, line, NULL, "%s → %s", form, strerror(errno));
 }

@@ -1,9 +1,10 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:4;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=4 sts=4 sw=4 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=4 sts=4 sw=4 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Python 3                                                                     │
 │ https://docs.python.org/3/license.html                                       │
 ╚─────────────────────────────────────────────────────────────────────────────*/
+#include "libc/dce.h"
 #include "libc/errno.h"
 #include "libc/mem/mem.h"
 #include "libc/nt/enum/formatmessageflags.h"
@@ -11,6 +12,7 @@
 #include "libc/nt/memory.h"
 #include "libc/nt/process.h"
 #include "libc/nt/runtime.h"
+#include "libc/runtime/runtime.h"
 #include "libc/x/x.h"
 #include "third_party/python/Include/abstract.h"
 #include "third_party/python/Include/dictobject.h"
@@ -25,7 +27,6 @@
 #include "third_party/python/Include/traceback.h"
 #include "third_party/python/Include/tupleobject.h"
 #include "third_party/python/Include/unicodeobject.h"
-/* clang-format off */
 
 _Py_IDENTIFIER(builtins);
 _Py_IDENTIFIER(stderr);
@@ -589,6 +590,10 @@ PyObject *PyErr_SetExcFromWindowsErrWithFilenameObjects(
     PyObject *message;
     PyObject *args, *v;
     uint32_t err = (uint32_t)ierr;
+    if (!IsWindows()) {
+        PyErr_SetString(PyExc_SystemError, "this is not windows");
+        return 0;
+    }
     if (err==0) err = GetLastError();
     len = FormatMessage(
         /* Error API error */

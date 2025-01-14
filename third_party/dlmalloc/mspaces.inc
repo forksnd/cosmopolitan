@@ -1,12 +1,11 @@
 #include "third_party/dlmalloc/dlmalloc.h"
-// clang-format off
 
 static mstate init_user_mstate(char* tbase, size_t tsize) {
   size_t msize = pad_request(sizeof(struct malloc_state));
   mchunkptr mn;
   mchunkptr msp = align_as_chunk(tbase);
   mstate m = (mstate)(chunk2mem(msp));
-  bzero(m, msize);
+  // bzero(m, msize);  // [jart] it is not needed
   (void)INITIAL_LOCK(&m->mutex);
   msp->head = (msize|INUSE_BITS);
   m->seg.base = m->least_addr = tbase;
@@ -33,7 +32,7 @@ mspace create_mspace(size_t capacity, int locked) {
     size_t rs = ((capacity == 0)? mparams.granularity :
                  (capacity + TOP_FOOT_SIZE + msize));
     size_t tsize = granularity_align(rs);
-    char* tbase = (char*)(dlmalloc_requires_more_vespene_gas(tsize));
+    char* tbase = (char*)dlmalloc_requires_more_vespene_gas(tsize);
     if (tbase != CMFAIL) {
       m = init_user_mstate(tbase, tsize);
       m->seg.sflags = USE_MMAP_BIT;
@@ -369,12 +368,15 @@ void* mspace_realloc(mspace msp, void* oldmem, size_t bytes) {
 #endif /* FOOTERS */
     if (!PREACTION(m)) {
       mchunkptr newp = try_realloc_chunk(m, oldp, nb, 1);
-      POSTACTION(m);
       if (newp != 0) {
+        /* [jart] fix realloc MT bug in DEBUG mode
+                  https://github.com/intel/linux-sgx/issues/534 */
         check_inuse_chunk(m, newp);
+        POSTACTION(m);
         mem = chunk2mem(newp);
       }
       else {
+        POSTACTION(m);
         mem = mspace_malloc(m, bytes);
         if (mem != 0) {
           size_t oc = chunksize(oldp) - overhead_for(oldp);
@@ -408,11 +410,13 @@ void* mspace_realloc_in_place(mspace msp, void* oldmem, size_t bytes) {
 #endif /* FOOTERS */
       if (!PREACTION(m)) {
         mchunkptr newp = try_realloc_chunk(m, oldp, nb, 0);
-        POSTACTION(m);
         if (newp == oldp) {
+          /* [jart] fix realloc_in_place MT bug in DEBUG mode
+                    https://github.com/intel/linux-sgx/issues/534 */
           check_inuse_chunk(m, newp);
           mem = oldmem;
         }
+        POSTACTION(m);
       }
     }
   }

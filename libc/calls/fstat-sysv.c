@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2020 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -17,16 +17,9 @@
 │ PERFORMANCE OF THIS SOFTWARE.                                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
 #include "libc/calls/struct/metastat.internal.h"
-#include "libc/calls/struct/stat.h"
+#include "libc/calls/struct/stat.internal.h"
 #include "libc/calls/syscall-sysv.internal.h"
-#include "libc/dce.h"
-#include "libc/intrin/asan.internal.h"
-#include "libc/sysv/errfuns.h"
 
-/**
- * Forms fstat() on System Five.
- * @asyncsignalsafe
- */
 int32_t sys_fstat(int32_t fd, struct stat *st) {
   void *p;
   union metastat ms;

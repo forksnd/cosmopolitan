@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2020 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -20,58 +20,43 @@
 #include "libc/calls/sig.internal.h"
 #include "libc/calls/syscall-sysv.internal.h"
 #include "libc/dce.h"
-#include "libc/intrin/strace.internal.h"
-#include "libc/runtime/internal.h"
+#include "libc/intrin/strace.h"
+#include "libc/runtime/syslib.internal.h"
 #include "libc/sysv/consts/sicode.h"
-#include "libc/sysv/consts/sig.h"
-#include "libc/thread/tls.h"
-#include "libc/thread/xnu.internal.h"
-
-static textwindows inline bool HasWorkingConsole(void) {
-  return !!(__ntconsolemode[0] | __ntconsolemode[1] | __ntconsolemode[2]);
-}
-
-static noubsan void RaiseSigFpe(void) {
-  volatile int x = 0;
-  x = 1 / x;
-}
+#include "libc/sysv/errfuns.h"
 
 /**
  * Sends signal to self.
  *
  * This is basically the same as:
  *
- *     tkill(gettid(), sig);
+ *     pthread_kill(pthread_self(), sig);
  *
  * Note `SIG_DFL` still results in process death for most signals.
  *
- * This function is not entirely equivalent to kill() or tkill(). For
- * example, we raise `SIGTRAP` and `SIGFPE` the natural way, since that
- * helps us support Windows. So if the raised signal has a signal
- * handler, then the reported `si_code` might not be `SI_TKILL`.
- *
- * On Windows, if a signal results in the termination of the process
- * then we use the convention `_Exit(128 + sig)` to notify the parent of
- * the signal number.
+ * POSIX defines raise() errors as returning non-zero and makes setting
+ * `errno` optional. Every platform we've tested in our support vector
+ * returns -1 with `errno` on error (like a normal system call).
  *
  * @param sig can be SIGALRM, SIGINT, SIGTERM, SIGKILL, etc.
- * @return 0 if signal was delivered and returned, or -1 w/ errno
+ * @return 0 on success, or -1 w/ errno
+ * @raise EINVAL if `sig` is invalid
  * @asyncsignalsafe
  */
 int raise(int sig) {
-  int rc, tid, event;
-  STRACE("raise(%G) → ...", sig);
-  if (sig == SIGTRAP) {
-    DebugBreak();
-    rc = 0;
-  } else if (sig == SIGFPE) {
-    RaiseSigFpe();
-    rc = 0;
-  } else if (!IsWindows() && !IsMetal()) {
-    rc = sys_tkill(gettid(), sig, 0);
+  int rc;
+  if (IsXnuSilicon()) {
+    rc = _sysret(__syslib->__raise(sig));
+  } else if (IsWindows()) {
+    if (0 <= sig && sig <= 64) {
+      __sig_raise(sig, SI_TKILL);
+      rc = 0;
+    } else {
+      rc = einval();
+    }
   } else {
-    rc = __sig_raise(sig, SI_TKILL);
+    rc = sys_tkill(gettid(), sig, 0);
   }
-  STRACE("...raise(%G) → %d% m", sig, rc);
+  STRACE("raise(%G) → %d% m", sig, rc);
   return rc;
 }

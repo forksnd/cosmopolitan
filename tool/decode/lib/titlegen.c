@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2020 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -16,10 +16,9 @@
 │ TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR             │
 │ PERFORMANCE OF THIS SOFTWARE.                                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
-#include "libc/fmt/fmt.h"
+#include "tool/decode/lib/titlegen.h"
 #include "libc/stdio/stdio.h"
 #include "libc/str/str.h"
-#include "tool/decode/lib/titlegen.h"
 
 const struct Modeline kModelineAsm = {
     " mode:asm; indent-tabs-mode:t; tab-width:8; coding:utf-8 ",
@@ -40,15 +39,18 @@ void showtitle(const char *brand, const char *tool, const char *title,
   }
   printf("/*");
   if (modeline) {
-    printf("-*-%-71s-*-│\n│vi:%-72s:vi│\n╞", modeline->emacs, modeline->vim);
-    for (unsigned i = 0; i < 78; ++i) printf("═");
+    printf("-*-%-71s-*-│\n│ vi:%-70s:vi │\n╞", modeline->emacs, modeline->vim);
+    for (unsigned i = 0; i < 78; ++i)
+      printf("═");
     printf("╡\n│ %-76s ", buf);
   } else {
-    for (unsigned i = 0; i < 75; ++i) printf("─");
+    for (unsigned i = 0; i < 75; ++i)
+      printf("─");
     printf("│─╗\n│ %-73s ─╬─", buf);
   }
   printf("│\n╚─");
-  for (unsigned i = 0; i < 75; ++i) printf("─");
+  for (unsigned i = 0; i < 75; ++i)
+    printf("─");
   printf("%s", modeline ? "─" : "│");
   if (description) {
     /* TODO(jart): paragraph fill */

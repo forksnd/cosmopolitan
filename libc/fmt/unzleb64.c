@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2020 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -28,7 +28,7 @@
        ░███▓▀                                                    ▀▓▓██▀▀░
         ░▀░                                                         */
 #include "libc/fmt/leb128.h"
-#include "libc/macros.internal.h"
+#include "libc/macros.h"
 
 /**
  * Decodes array to signed integer w/ zig-zag encoding.
@@ -46,7 +46,8 @@ int unzleb64(const char *p, size_t n, int64_t *o) {
   i = 0;
   u = 0;
   do {
-    if (i == n) return -1;
+    if (i == n)
+      return -1;
     c = p[i] & 255;
     t = c & 127;
     if (i < 10) {
@@ -55,6 +56,7 @@ int unzleb64(const char *p, size_t n, int64_t *o) {
     }
     ++i;
   } while (c & 128);
-  if (o) *o = (u >> 1) ^ -(u & 1);
+  if (o)
+    *o = (u >> 1) ^ -(u & 1);
   return i;
 }

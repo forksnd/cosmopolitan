@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2020 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -18,8 +18,8 @@
 ╚─────────────────────────────────────────────────────────────────────────────*/
 #include "libc/assert.h"
 #include "libc/math.h"
-#include "libc/mem/mem.h"
 #include "libc/mem/gc.h"
+#include "libc/mem/mem.h"
 #include "libc/x/x.h"
 #include "libc/x/xasprintf.h"
 #include "tool/viz/lib/formatstringtable.h"
@@ -45,7 +45,7 @@ void FormatMatrixShort(long yn, long xn, const short M[yn][xn], int emit(),
       yn, xn,
       formatter(yn, xn,
                 ConvertShortMatrixToStringTable(
-                    yn, xn, _gc(xcalloc(yn * xn, sizeof(char *))), M),
+                    yn, xn, gc(xcalloc(yn * xn, sizeof(char *))), M),
                 emit, arg, param1, param2, param3));
 }
 
@@ -53,7 +53,7 @@ char *StringifyMatrixShort(long yn, long xn, const short M[yn][xn],
                            StringTableFormatter formatter, const char *param1,
                            const char *param2, const char *param3) {
   struct StringBuilder *sb = NewStringBuilder();
-  FormatMatrixShort(yn, xn, M, StringBuilderAppend, sb, formatter, param1,
-                    param2, param3);
+  FormatMatrixShort(yn, xn, M, (void *)StringBuilderAppend, sb, formatter,
+                    param1, param2, param3);
   return FreeStringBuilder(sb);
 }

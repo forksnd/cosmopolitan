@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2021 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -16,8 +16,8 @@
 │ TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR             │
 │ PERFORMANCE OF THIS SOFTWARE.                                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
+#include "libc/mem/gc.h"
 #include "libc/mem/mem.h"
-#include "libc/mem/gc.internal.h"
 #include "libc/str/str.h"
 #include "libc/testlib/ezbench.h"
 #include "libc/testlib/hyperion.h"
@@ -30,10 +30,4 @@ TEST(memcasecmp, test) {
   EXPECT_EQ(+17, memcasecmp("yelloyello", "HELLOHELLO", 10));
   EXPECT_EQ(0, memcasecmp("\0ELLo\0ELLo", "\0ELLO\0ELLO", 10));
   EXPECT_NE(0, memcasecmp("\0ELLo\0ELLo", "\0ELL-\0ELL-", 10));
-}
-
-BENCH(memcasecmp, bench) {
-  volatile char *copy = gc(strdup(kHyperion));
-  EZBENCH2("memcasecmp", donothing,
-           EXPROPRIATE(memcasecmp(kHyperion, copy, kHyperionSize)));
 }

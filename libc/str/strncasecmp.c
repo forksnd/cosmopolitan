@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2020 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -17,7 +17,7 @@
 │ PERFORMANCE OF THIS SOFTWARE.                                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
 #include "libc/str/str.h"
-#include "libc/str/tab.internal.h"
+#include "libc/str/tab.h"
 
 /**
  * Compares NUL-terminated strings case-insensitively w/ limit.
@@ -30,10 +30,13 @@
 int strncasecmp(const char *a, const char *b, size_t n) {
   int x, y;
   size_t i = 0;
-  if (!n-- || a == b) return 0;
+  if (!n-- || a == b)
+    return 0;
   while ((x = kToLower[a[i] & 0xff]) == (y = kToLower[b[i] & 0xff]) && b[i] &&
          i < n) {
     ++i;
   }
   return x - y;
 }
+
+__weak_reference(strncasecmp, strncasecmp_l);

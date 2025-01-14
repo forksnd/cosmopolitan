@@ -1,4 +1,3 @@
-// clang-format off
 /*
  * Copyright (c) 2009-2011, Salvatore Sanfilippo <antirez at gmail dot com>
  * Copyright (c) 2010-2014, Pieter Noordhuis <pcnoordhuis at gmail dot com>
@@ -41,8 +40,7 @@
 #include "libc/sock/select.h"
 #include "libc/sysv/consts/clock.h"
 #include "libc/sysv/consts/itimer.h"
-#include "libc/time/struct/timezone.h"
-#include "libc/time/time.h" /* for struct timeval */
+#include "libc/time.h" /* for struct timeval */
 #include "libc/inttypes.h"
 #include "libc/limits.h"
 #include "libc/literal.h" /* uintXX_t, etc */

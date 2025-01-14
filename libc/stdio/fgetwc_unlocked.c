@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2020 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -16,6 +16,7 @@
 │ TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR             │
 │ PERFORMANCE OF THIS SOFTWARE.                                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
+#include "libc/stdio/internal.h"
 #include "libc/stdio/stdio.h"
 #include "libc/str/thompike.h"
 #include "libc/str/tpdecodecb.internal.h"
@@ -34,11 +35,13 @@ wint_t fgetwc_unlocked(FILE *f) {
   } else {
     return -1;
   }
-  if (b < 0300) return b;
+  if (b < 0300)
+    return b;
   n = ThomPikeLen(b);
   x = ThomPikeByte(b);
   while (--n) {
-    if ((c = fgetc_unlocked(f)) == -1) return -1;
+    if ((c = fgetc_unlocked(f)) == -1)
+      return -1;
     y = c;
     if (ThomPikeCont(y)) {
       x = ThomPikeMerge(x, y);
@@ -49,3 +52,5 @@ wint_t fgetwc_unlocked(FILE *f) {
   }
   return x;
 }
+
+__strong_reference(fgetwc_unlocked, getwc_unlocked);

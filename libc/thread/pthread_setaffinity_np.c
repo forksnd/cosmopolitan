@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2022 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -16,30 +16,29 @@
 │ TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR             │
 │ PERFORMANCE OF THIS SOFTWARE.                                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
+#include "libc/assert.h"
 #include "libc/calls/sched-sysv.internal.h"
 #include "libc/calls/struct/cpuset.h"
 #include "libc/calls/syscall_support-nt.internal.h"
 #include "libc/dce.h"
 #include "libc/errno.h"
 #include "libc/intrin/atomic.h"
-#include "libc/intrin/describeflags.internal.h"
-#include "libc/intrin/strace.internal.h"
+#include "libc/intrin/describeflags.h"
+#include "libc/intrin/strace.h"
 #include "libc/nt/enum/threadaccess.h"
 #include "libc/nt/runtime.h"
 #include "libc/nt/thread.h"
+#include "libc/str/str.h"
 #include "libc/sysv/errfuns.h"
 #include "libc/thread/posixthread.internal.h"
 
 static dontinline textwindows int sys_pthread_setaffinity_nt(
-    int tid, uint64_t size, const cpu_set_t *bitset) {
-  int rc;
-  int64_t h;
-  h = OpenThread(kNtThreadSetInformation | kNtThreadQueryInformation, false,
-                 tid);
-  if (!h) return __winerr();
-  rc = SetThreadAffinityMask(h, bitset->__bits[0]) ? 0 : __winerr();
-  CloseHandle(h);
-  return rc;
+    struct PosixThread *pt, uint64_t size, const cpu_set_t *bitset) {
+  if (SetThreadAffinityMask(_pthread_syshand(pt), bitset->__bits[0])) {
+    return 0;
+  } else {
+    return __winerr();
+  }
 }
 
 /**
@@ -54,24 +53,33 @@ static dontinline textwindows int sys_pthread_setaffinity_nt(
 errno_t pthread_setaffinity_np(pthread_t thread, size_t size,
                                const cpu_set_t *bitset) {
   int e, rc, tid;
-  if (!(rc = pthread_getunique_np(thread, &tid))) {
-    e = errno;
-    if (size != sizeof(cpu_set_t)) {
-      rc = einval();
-    } else if (IsWindows()) {
-      rc = sys_pthread_setaffinity_nt(tid, size, bitset);
-    } else if (IsFreebsd()) {
-      rc = sys_sched_setaffinity_freebsd(CPU_LEVEL_WHICH, CPU_WHICH_TID, tid,
-                                         32, bitset);
-    } else if (IsNetbsd()) {
-      rc = sys_sched_setaffinity_netbsd(tid, 0, 32, bitset);
-    } else {
-      rc = sys_sched_setaffinity(tid, size, bitset);
-    }
-    if (rc == -1) {
-      rc = errno;
-      errno = e;
-    }
+  cpu_set_t bs = {0};
+  struct PosixThread *pt;
+  unassert(thread);
+  unassert(bitset);
+  e = errno;
+  if (size < sizeof(cpu_set_t)) {
+    memcpy(&bs, bitset, size);
+    bitset = &bs;
+    size = sizeof(cpu_set_t);
+  }
+  pt = (struct PosixThread *)thread;
+  tid = _pthread_tid(pt);
+  if (size != sizeof(cpu_set_t)) {
+    rc = einval();
+  } else if (IsWindows()) {
+    rc = sys_pthread_setaffinity_nt(pt, size, bitset);
+  } else if (IsFreebsd()) {
+    rc = sys_sched_setaffinity_freebsd(CPU_LEVEL_WHICH, CPU_WHICH_TID, tid, 32,
+                                       bitset);
+  } else if (IsNetbsd()) {
+    rc = sys_sched_setaffinity_netbsd(tid, 0, 32, bitset);
+  } else {
+    rc = sys_sched_setaffinity(tid, size, bitset);
+  }
+  if (rc == -1) {
+    rc = errno;
+    errno = e;
   }
   STRACE("pthread_setaffinity_np(%d, %'zu, %p) → %s", tid, size, bitset,
          DescribeErrno(rc));

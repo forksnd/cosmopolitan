@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:4;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=4 sts=4 sw=4 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=4 sts=4 sw=4 fenc=utf-8                               :vi │
 ╚─────────────────────────────────────────────────────────────────────────────*/
 /* uncompr.c -- decompress a memory buffer
  * Copyright (C) 1995-2003, 2010, 2014, 2016 Jean-loup Gailly, Mark Adler
@@ -9,12 +9,6 @@
 #include "third_party/zlib/internal.h"
 #include "third_party/zlib/macros.internal.h"
 #include "third_party/zlib/zlib.h"
-
-asm(".ident\t\"\\n\\n\
-zlib (zlib License)\\n\
-Copyright 1995-2017 Jean-loup Gailly and Mark Adler\"");
-asm(".include \"libc/disclaimer.inc\"");
-// clang-format off
 
 /* @(#) $Id$ */
 

@@ -1,12 +1,13 @@
 #include "libc/nt/codegen.h"
-.imp	user32,__imp_GetDesktopWindow,GetDesktopWindow,1833
+.imp	user32,__imp_GetDesktopWindow,GetDesktopWindow
 
 	.text.windows
+	.ftrace1
 GetDesktopWindow:
+	.ftrace2
 #ifdef __x86_64__
 	push	%rbp
 	mov	%rsp,%rbp
-	.profilable
 	sub	$32,%rsp
 	call	*__imp_GetDesktopWindow(%rip)
 	leave

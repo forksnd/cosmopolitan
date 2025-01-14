@@ -1,4 +1,3 @@
-// clang-format off
 /*
 *   $Id: python.c 752 2010-02-27 17:52:46Z elliotth $
 *
@@ -14,6 +13,7 @@
 *   INCLUDE FILES
 */
 #include "libc/mem/mem.h"
+#include "libc/ctype.h"
 #include "third_party/ctags/general.h"  /* must always come first */
 
 #include "libc/mem/alg.h"

@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:4;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=4 sts=4 sw=4 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=4 sts=4 sw=4 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Python 3                                                                     │
 │ https://docs.python.org/3/license.html                                       │
@@ -8,6 +8,7 @@
 #include "libc/calls/calls.h"
 #include "libc/calls/weirdtypes.h"
 #include "libc/mem/mem.h"
+#include "libc/runtime/runtime.h"
 #include "libc/runtime/sysconf.h"
 #include "libc/sysv/consts/map.h"
 #include "libc/sysv/consts/msync.h"
@@ -29,7 +30,6 @@
 #include "third_party/python/Include/sliceobject.h"
 #include "third_party/python/Include/structmember.h"
 #include "third_party/python/Include/yoink.h"
-/* clang-format off */
 
 PYTHON_PROVIDE("mmap");
 PYTHON_PROVIDE("mmap.ACCESS_COPY");
@@ -1494,7 +1494,12 @@ PyInit_mmap(void)
     return module;
 }
 
-_Section(".rodata.pytab.1") const struct _inittab _PyImport_Inittab_mmap = {
+#ifdef __aarch64__
+_Section(".rodata.pytab.1 //")
+#else
+_Section(".rodata.pytab.1")
+#endif
+ const struct _inittab _PyImport_Inittab_mmap = {
     "mmap",
     PyInit_mmap,
 };

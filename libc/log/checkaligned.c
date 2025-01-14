@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2020 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -26,7 +26,8 @@
 void __check_fail_aligned(unsigned bytes, uint64_t ptr, const char *file,
                           int line, const char *fmt, ...) {
   fflush(stderr);
-  if (!IsTiny()) _memsummary(fileno(stderr));
+  if (!IsTiny())
+    _memsummary(fileno(stderr));
   kprintf("%s:%d: error: pointer not %d-byte aligned: %p\n", file, line, bytes,
           ptr);
   __die();

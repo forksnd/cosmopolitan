@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:t;c-basic-offset:8;tab-width:8;coding:utf-8   -*-│
-│vi: set et ft=c ts=8 tw=8 fenc=utf-8                                       :vi│
+│ vi: set noet ft=c ts=8 sw=8 fenc=utf-8                                   :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright (c) 1998, 2015 Todd C. Miller <millert@openbsd.org>                │
 │                                                                              │
@@ -19,11 +19,7 @@
 #include "libc/str/str.h"
 // clang-format off
 // $OpenBSD: strlcat.c,v 1.19 2019/01/25 00:19:25 millert Exp $
-
-asm(".ident\t\"\\n\\n\
-strlcat (ISC)\\n\
-Copyright (c) 1998, 2015 Todd C. Miller <millert@openbsd.org>\"");
-asm(".include \"libc/disclaimer.inc\"");
+__static_yoink("openbsd_strings_notice");
 
 /**
  * Appends string, the BSD way.
@@ -33,6 +29,9 @@ asm(".include \"libc/disclaimer.inc\"");
  * characters will be copied. Always NUL terminates (unless `dsize <=
  * strlen(dst)`). Returns `strlen(src) + MIN(dsize, strlen(initial
  * dst))`. If `retval >= dsize`, truncation occurred.
+ *
+ * @asyncsignalsafe
+ * @vforksafe
  */
 size_t
 strlcat(char *dst, const char *src, size_t dsize)

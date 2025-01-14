@@ -1,10 +1,8 @@
 #ifndef COSMOPOLITAN_LIBC_SYMBOLS_H_
 #define COSMOPOLITAN_LIBC_SYMBOLS_H_
-#include "libc/intrin/bits.h"
-#if !(__ASSEMBLER__ + __LINKER__ + 0)
 COSMOPOLITAN_C_START_
 
-#define SYMBOLS_MAGIC READ32LE("SYMT")
+#define SYMBOLS_MAGIC 0x544d5953 /* SYMT */
 #define SYMBOLS_ABI   1
 
 struct Symbol {
@@ -37,5 +35,4 @@ int __get_symbol(struct SymbolTable *, intptr_t);
 char *__get_symbol_name(struct SymbolTable *, int);
 
 COSMOPOLITAN_C_END_
-#endif /* !(__ASSEMBLER__ + __LINKER__ + 0) */
 #endif /* COSMOPOLITAN_LIBC_SYMBOLS_H_ */

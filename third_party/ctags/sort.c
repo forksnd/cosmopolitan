@@ -1,4 +1,3 @@
-// clang-format off
 /*
 *   $Id: sort.c 747 2009-11-06 02:33:37Z dhiebert $
 *
@@ -18,7 +17,7 @@
 
 #if defined (HAVE_STDLIB_H)
 #include "libc/calls/calls.h"
-#include "libc/calls/dprintf.h"
+#include "libc/stdio/dprintf.h"
 #include "libc/calls/termios.h"
 #include "libc/fmt/conv.h"
 #include "libc/limits.h"
@@ -26,23 +25,21 @@
 #include "libc/mem/mem.h"
 #include "libc/runtime/runtime.h"
 #include "libc/stdio/rand.h"
-#include "libc/stdio/temp.h"
+#include "libc/temp.h"
 #include "libc/str/str.h"
 #include "libc/sysv/consts/exit.h"
 #include "third_party/gdtoa/gdtoa.h"
-#include "third_party/getopt/getopt.h"
+#include "third_party/getopt/getopt.internal.h"
 #include "third_party/musl/crypt.h"
 #include "third_party/musl/rand48.h"  /* to declare malloc () */
 #endif
 #include "libc/mem/alg.h"
 #include "libc/str/str.h"
 #include "libc/calls/calls.h"
-#include "libc/calls/dprintf.h"
+#include "libc/stdio/dprintf.h"
 #include "libc/calls/weirdtypes.h"
-#include "libc/fmt/fmt.h"
-#include "libc/mem/fmt.h"
 #include "libc/stdio/stdio.h"
-#include "libc/stdio/temp.h"
+#include "libc/temp.h"
 #include "third_party/musl/tempnam.h"
 
 #include "third_party/ctags/debug.h"

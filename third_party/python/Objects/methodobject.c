@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:4;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=4 sts=4 sw=4 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=4 sts=4 sw=4 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Python 3                                                                     │
 │ https://docs.python.org/3/license.html                                       │
@@ -15,7 +15,6 @@
 #include "third_party/python/Include/objimpl.h"
 #include "third_party/python/Include/pyhash.h"
 #include "third_party/python/Include/structmember.h"
-/* clang-format off */
 
 /* Free list for method objects to safe malloc/free overhead
  * The m_self element is used to chain the objects.

@@ -1,7 +1,6 @@
 #ifndef NSYNC_WAITER_H_
 #define NSYNC_WAITER_H_
 #include "third_party/nsync/time.h"
-#if !(__ASSEMBLER__ + __LINKER__ + 0)
 COSMOPOLITAN_C_START_
 
 /* nsync_wait_n() allows the client to wait on multiple objects
@@ -103,7 +102,7 @@ struct nsync_waitable_s {
    mu/lock/unlock are used to acquire and release the relevant locks
    whan waiting on condition variables. */
 int nsync_wait_n(void *mu, void (*lock)(void *), void (*unlock)(void *),
-                 nsync_time abs_deadline, int count,
+                 int clock, nsync_time abs_deadline, int count,
                  struct nsync_waitable_s *waitable[]);
 
 /* A "struct nsync_waitable_s" implementation must implement these
@@ -134,5 +133,4 @@ extern const struct nsync_waitable_funcs_s nsync_counter_waitable_funcs;
 extern const struct nsync_waitable_funcs_s nsync_cv_waitable_funcs;
 
 COSMOPOLITAN_C_END_
-#endif /* !(__ASSEMBLER__ + __LINKER__ + 0) */
 #endif /* NSYNC_WAITER_H_ */

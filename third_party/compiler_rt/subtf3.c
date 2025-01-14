@@ -1,4 +1,3 @@
-/* clang-format off */
 //===-- lib/subtf3.c - Quad-precision subtraction -----------------*- C -*-===//
 //
 //                     The LLVM Compiler Infrastructure
@@ -13,7 +12,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-STATIC_YOINK("huge_compiler_rt_license");
+__static_yoink("huge_compiler_rt_license");
 
 #define QUAD_PRECISION
 #include "third_party/compiler_rt/fp_lib.inc"

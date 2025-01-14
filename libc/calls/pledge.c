@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2022 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -16,25 +16,29 @@
 │ TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR             │
 │ PERFORMANCE OF THIS SOFTWARE.                                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
+#include "libc/assert.h"
 #include "libc/calls/calls.h"
 #include "libc/calls/pledge.internal.h"
+#include "libc/calls/prctl.internal.h"
 #include "libc/calls/state.internal.h"
 #include "libc/calls/syscall-sysv.internal.h"
 #include "libc/dce.h"
 #include "libc/errno.h"
-#include "libc/intrin/promises.internal.h"
-#include "libc/intrin/strace.internal.h"
+#include "libc/intrin/promises.h"
+#include "libc/intrin/strace.h"
+#include "libc/intrin/weaken.h"
 #include "libc/nexgen32e/vendor.internal.h"
 #include "libc/runtime/runtime.h"
+#include "libc/runtime/symbols.internal.h"
+#include "libc/runtime/zipos.internal.h"
+#include "libc/sysv/consts/pr.h"
 #include "libc/sysv/errfuns.h"
-
-#ifdef __x86_64__
 
 /**
  * Permits system operations, e.g.
  *
  *     __pledge_mode = PLEDGE_PENALTY_KILL_PROCESS | PLEDGE_STDERR_LOGGING;
- *     if (pledge("stdio rfile tty", 0)) {
+ *     if (pledge("stdio rpath tty", 0)) {
  *       perror("pledge");
  *       exit(1);
  *     }
@@ -44,8 +48,10 @@
  * across execve() if permitted). Root access is not required. Support
  * is limited to Linux 2.6.23+ (c. RHEL6) and OpenBSD. If your kernel
  * isn't supported, then pledge() will return 0 and do nothing rather
- * than raising ENOSYS. We don't consider lack of system support to be
- * an error, because the specified operations will be permitted.
+ * than raising ENOSYS. This implementation doesn't consider lack of
+ * system support to be an error by default. To perform a functionality
+ * check, use `pledge(0,0)` which is a no-op that'll fail appropriately
+ * when the necessary system support isn't available for restrictions.
  *
  * The promises you give pledge() define which system calls are allowed.
  * Error messages are logged when sandbox violations occur, but how that
@@ -55,15 +61,7 @@
  * self-imposed security model. That works best when programs perform
  * permission-hungry operations (e.g. calling GetSymbolTable) towards
  * the beginning of execution, and then relinquish privilege afterwards
- * by calling pledge(). Here's an example of where that matters. Your
- * Cosmopolitan C Library needs to code morph your executable in memory
- * once you start using threads. But that's only possible to do if you
- * used the `prot_exec` promise. So the right thing to do here, is to
- * call __enable_threads() before calling pledge() to force it early.
- *
- *     __enable_threads();
- *     ShowCrashReports();
- *     pledge("...", 0);
+ * by calling pledge().
  *
  * By default exit() is allowed. This is useful for processes that
  * perform pure computation and interface with the parent via shared
@@ -145,6 +143,9 @@
  * - "inet" allows socket(AF_INET), listen, bind, connect, accept,
  *   accept4, getpeername, getsockname, setsockopt, getsockopt, sendto.
  *
+ * - "anet" allows socket(AF_INET), listen, bind, accept,
+ *   accept4, getpeername, getsockname, setsockopt, getsockopt, sendto.
+ *
  * - "unix" allows socket(AF_UNIX), listen, bind, connect, accept,
  *   accept4, getpeername, getsockname, setsockopt, getsockopt.
  *
@@ -164,12 +165,11 @@
  *   interpreted, and ape binaries, you'll usually want `rpath` and
  *   `prot_exec` too. With APE it's possible to work around this
  *   requirement, by "assimilating" your binaries beforehand. See the
- *   assimilate.com program and `--assimilate` flag which can be used to
+ *   assimilate program and `--assimilate` flag which can be used to
  *   turn APE binaries into static native binaries.
  *
  * - "prot_exec" allows mmap(PROT_EXEC) and mprotect(PROT_EXEC). This is
- *   needed to (1) code morph mutexes in __enable_threads(), and it's
- *   needed to (2) launch non-static or non-native executables, e.g.
+ *   needed to launch non-static or non-native executables, e.g.
  *   non-assimilated APE binaries, or dynamic-linked executables.
  *
  * - "unveil" allows unveil() to be called, as well as the underlying
@@ -177,13 +177,13 @@
  *   calls on Linux.
  *
  * - "vminfo" OpenBSD defines this for programs like `top`. On Linux,
- *   this is a placeholder group that lets tools like pledge.com check
+ *   this is a placeholder group that lets tools like pledge check
  *   `__promises` and automatically unveil() a subset of files top would
  *   need, e.g. /proc/stat, /proc/meminfo.
  *
  * - "tmppath" allows unlink, unlinkat, and lstat. This is mostly a
- *   placeholder group for pledge.com, which reads the `__promises`
- *   global to determine if /tmp and $TMPPATH should be unveiled.
+ *   placeholder group for pledge, which reads the `__promises` global
+ *   to determine if /tmp and $TMPPATH should be unveiled.
  *
  * `execpromises` only matters if "exec" is specified in `promises`. In
  * that case, this specifies the promises that'll apply once execve()
@@ -200,21 +200,21 @@
  * `__pledge_mode` is available to improve the experience of pledge() on
  * Linux. It should specify one of the following penalties:
  *
+ * - `PLEDGE_PENALTY_RETURN_EPERM` causes system calls to just return an
+ *   `EPERM` error instead of killing. This is the default on Linux.
+ *   This is a gentler solution that allows code to display a friendly
+ *   warning. Please note this may lead to weird behaviors if the
+ *   software being sandboxed is lazy about checking error results.
+ *
  * - `PLEDGE_PENALTY_KILL_THREAD` causes the violating thread to be
- *   killed. This is the default on Linux. It's effectively the same as
- *   killing the process, since redbean has no threads. The termination
- *   signal can't be caught and will be either `SIGSYS` or `SIGABRT`.
- *   Consider enabling stderr logging below so you'll know why your
- *   program failed. Otherwise check the system log.
+ *   killed. It's effectively the same as killing the process, since
+ *   redbean has no threads. The termination signal can't be caught and
+ *   will be either `SIGSYS` or `SIGABRT`. Consider enabling stderr
+ *   logging below so you'll know why your program failed. Otherwise
+ *   check the system log.
  *
  * - `PLEDGE_PENALTY_KILL_PROCESS` causes the process and all its
  *   threads to be killed. This is always the case on OpenBSD.
- *
- * - `PLEDGE_PENALTY_RETURN_EPERM` causes system calls to just return an
- *   `EPERM` error instead of killing. This is a gentler solution that
- *   allows code to display a friendly warning. Please note this may
- *   lead to weird behaviors if the software being sandboxed is lazy
- *   about checking error results.
  *
  * `mode` may optionally bitwise or the following flags:
  *
@@ -232,32 +232,76 @@
  *   option might not be a good idea if you're pledging `exec` because
  *   subprocesses can't inherit the `SIGSYS` handler this installs.
  *
+ * If you experience crashes during startup when execve'ing a cosmo
+ * binary that's had permissions like rpath pledged away, then try doing
+ * this before calling execve. This prevents special startup checks.
+ *
+ *     putenv("COMDBG=program.dbg");
+ *
+ * If having pledge() security is mission critical, then add this code
+ * to the start of your main() function to ensure your program fails
+ * with an error if it isn't available.
+ *
+ *     if (pledge(0, 0)) {
+ *       fprintf(stderr, "error: OS doesn't support pledge() security\n");
+ *       exit(1);
+ *     }
+ *
  * @return 0 on success, or -1 w/ errno
+ * @raise ENOSYS if `pledge(0, 0)` was used and security is not possible
  * @raise EINVAL if `execpromises` on Linux isn't a subset of `promises`
  * @raise EINVAL if `promises` allows exec and `execpromises` is null
- * @threadsafe
  * @vforksafe
  */
 int pledge(const char *promises, const char *execpromises) {
   int e, rc;
   unsigned long ipromises, iexecpromises;
-  if (IsGenuineBlink()) {
-    rc = 0;  // blink doesn't support seccomp
-  } else if (!ParsePromises(promises, &ipromises) &&
-             !ParsePromises(execpromises, &iexecpromises)) {
+  if (_weaken(GetSymbolTable))
+    _weaken(GetSymbolTable)();
+  if (!promises) {
+    // OpenBSD says NULL argument means it doesn't change, i.e.
+    // pledge(0,0) on OpenBSD does nothing. The Cosmopolitan Libc
+    // implementation defines pledge(0,0) as a no-op feature check.
+    // Cosmo pledge() is currently implemented to succeed silently if
+    // the necessary kernel features aren't supported by the host. Apps
+    // may use pledge(0,0) to perform a support check, to determine if
+    // pledge() will be able to impose the restrictions it advertises
+    // within the host environment.
+    if (execpromises)
+      return einval();
+    if (IsGenuineBlink())
+      return enosys();
+    if (IsOpenbsd())
+      return sys_pledge(0, 0);
+    if (!IsLinux())
+      return enosys();
+    rc = sys_prctl(PR_GET_SECCOMP, 0, 0, 0, 0);
+    if (rc == 0 || rc == 2)
+      return 0;  // 2 means we're already filtered
+    unassert(rc < 0);
+    errno = -rc;
+    return -1;
+  } else if (!IsTiny() && IsGenuineBlink()) {
+    rc = 0;  // blink doesn't support seccomp; avoid noisy log warnings
+  } else if (!ParsePromises(promises, &ipromises, __promises) &&
+             !ParsePromises(execpromises, &iexecpromises, __execpromises)) {
     if (IsLinux()) {
       // copy exec and execnative from promises to execpromises
       iexecpromises = ~(~iexecpromises | (~ipromises & (1ul << PROMISE_EXEC)));
       // if bits are missing in execpromises that exist in promises
       // then execpromises wouldn't be a monotonic access reduction
       // this check only matters when exec / execnative are allowed
-      if ((ipromises & ~iexecpromises) &&
-          (~ipromises & (1ul << PROMISE_EXEC))) {
+      bool notsubset = ((ipromises & ~iexecpromises) &&
+                        (~ipromises & (1ul << PROMISE_EXEC)));
+      if (notsubset && execpromises) {
         STRACE("execpromises must be a subset of promises");
         rc = einval();
       } else {
+        if (notsubset)
+          iexecpromises = ipromises;
         rc = sys_pledge_linux(ipromises, __pledge_mode);
-        if (rc > -4096u) errno = -rc, rc = -1;
+        if (rc > -4096u)
+          errno = -rc, rc = -1;
       }
     } else {
       e = errno;
@@ -278,5 +322,3 @@ int pledge(const char *promises, const char *execpromises) {
   STRACE("pledge(%#s, %#s) → %d% m", promises, execpromises, rc);
   return rc;
 }
-
-#endif /* __x86_64__ */

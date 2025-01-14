@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:t;c-basic-offset:8;tab-width:8;coding:utf-8   -*-│
-│vi: set et ft=c ts=8 tw=8 fenc=utf-8                                       :vi│
+│ vi: set noet ft=c ts=8 sw=8 fenc=utf-8                                   :vi │
 ╚──────────────────────────────────────────────────────────────────────────────╝
 │                                                                              │
 │  Musl Libc                                                                   │
@@ -27,12 +27,8 @@
 ╚─────────────────────────────────────────────────────────────────────────────*/
 #include "libc/math.h"
 #include "libc/tinymath/complex.internal.h"
-
-asm(".ident\t\"\\n\\n\
-Double-precision math functions (MIT License)\\n\
-Copyright 2018 ARM Limited\"");
-asm(".include \"libc/disclaimer.inc\"");
-// clang-format off
+__static_yoink("freebsd_libm_notice");
+__static_yoink("fdlibm_notice");
 
 /* origin: FreeBSD /usr/src/lib/msun/src/e_jn.c */
 /*
@@ -72,6 +68,9 @@ asm(".include \"libc/disclaimer.inc\"");
 
 static const double invsqrtpi = 5.64189583547756279280e-01; /* 0x3FE20DD7, 0x50429B6D */
 
+/**
+ * Returns Bessel function of 𝑥 of first kind of order 𝑛.
+ */
 double jn(int n, double x)
 {
 	uint32_t ix, lx;
@@ -245,7 +244,9 @@ double jn(int n, double x)
 	return sign ? -b : b;
 }
 
-
+/**
+ * Returns Bessel function of 𝑥 of second kind of order 𝑛.
+ */
 double yn(int n, double x)
 {
 	uint32_t ix, lx, ib;

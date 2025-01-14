@@ -1,13 +1,12 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:4;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=4 sts=4 sw=4 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=4 sts=4 sw=4 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Python 3                                                                     │
 │ https://docs.python.org/3/license.html                                       │
 ╚─────────────────────────────────────────────────────────────────────────────*/
-#include "libc/intrin/bits.h"
+#include "third_party/python/Modules/bextra.h"
 #include "third_party/python/Modules/unicodedata.h"
 #include "third_party/python/Modules/unicodedata_unidata.h"
-/* clang-format off */
 
 void
 _PyUnicode_GetDecompRecord(PyObject *self,
@@ -31,7 +30,7 @@ _PyUnicode_GetDecompRecord(PyObject *self,
     }
     /* high byte is number of hex bytes (usually one or two), low byte
        is prefix code (from*/
-    decomp = _bextra(_PyUnicode_Decomp, *index, _PyUnicode_DecompBits);
+    decomp = BitFieldExtract(_PyUnicode_Decomp, *index, _PyUnicode_DecompBits);
     *count = decomp >> 8;
     *prefix = decomp & 255;
     (*index)++;

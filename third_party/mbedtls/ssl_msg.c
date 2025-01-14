@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:4;tab-width:4;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright The Mbed TLS Contributors                                          │
 │                                                                              │
@@ -27,14 +27,8 @@
 #include "third_party/mbedtls/ssl.h"
 #include "third_party/mbedtls/ssl_internal.h"
 #include "third_party/mbedtls/ssl_invasive.h"
+__static_yoink("mbedtls_notice");
 
-asm(".ident\t\"\\n\\n\
-Mbed TLS (Apache 2.0)\\n\
-Copyright ARM Limited\\n\
-Copyright Mbed TLS Contributors\"");
-asm(".include \"libc/disclaimer.inc\"");
-
-/* clang-format off */
 /*
  *  Generic SSL/TLS messaging layer functions
  *  (record layer + retransmission state machine)
@@ -1212,7 +1206,11 @@ static void mbedtls_ssl_cf_memcpy_if_eq( unsigned char *dst,
         __builtin_memcpy( &x, dst + i, 8 );
         __builtin_memcpy( &y, src + i, 8 );
         x = ( x & ~-equal ) | ( y & -equal );
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wstringop-overflow"
+        // TODO(jart): What is this mysterious confusing GCC warning?
         __builtin_memcpy( dst + i, &x, 8 );
+#pragma GCC diagnostic pop
     }
     for( ; i < len; i++ )
         dst[i] = ( src[i] & mask ) | ( dst[i] & ~mask );
@@ -1253,8 +1251,6 @@ MBEDTLS_STATIC_TESTABLE int mbedtls_ssl_cf_hmac(
     const unsigned char * const okey = ikey + block_size;
     const size_t hash_size = mbedtls_md_get_size( ctx->md_info );
 
-    unsigned char aux_out[MBEDTLS_MD_MAX_SIZE];
-    size_t offset;
     int ret = MBEDTLS_ERR_THIS_CORRUPTION;
 
 #define MD_CHK( func_call ) \
@@ -5060,7 +5056,7 @@ int mbedtls_ssl_handle_message_type( mbedtls_ssl_context *ssl )
         if( ssl->in_msglen != 1 )
         {
             MBEDTLS_SSL_DEBUG_MSG( 1, ( "invalid CCS message, len: %" MBEDTLS_PRINTF_SIZET,
-                           ssl->in_msglen ) );
+                                        ssl->in_msglen ) );
             return( MBEDTLS_ERR_SSL_INVALID_RECORD );
         }
 
@@ -5096,7 +5092,7 @@ int mbedtls_ssl_handle_message_type( mbedtls_ssl_context *ssl )
                to be packed in a single message, but Mbed TLS doesn't
                currently support this. */
             MBEDTLS_SSL_DEBUG_MSG( 1, ( "invalid alert message, len: %" MBEDTLS_PRINTF_SIZET,
-                           ssl->in_msglen ) );
+                                        ssl->in_msglen ) );
             return( MBEDTLS_ERR_SSL_INVALID_RECORD );
         }
 

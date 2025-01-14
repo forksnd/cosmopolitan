@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:4;tab-width:4;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright The Mbed TLS Contributors                                          │
 │                                                                              │
@@ -15,9 +15,9 @@
 │ See the License for the specific language governing permissions and          │
 │ limitations under the License.                                               │
 ╚─────────────────────────────────────────────────────────────────────────────*/
+#include "third_party/mbedtls/sha256.h"
 #include "libc/dce.h"
-#include "libc/intrin/asan.internal.h"
-#include "libc/macros.internal.h"
+#include "libc/macros.h"
 #include "libc/nexgen32e/nexgen32e.h"
 #include "libc/nexgen32e/sha.h"
 #include "libc/nexgen32e/x86feature.h"
@@ -26,14 +26,7 @@
 #include "third_party/mbedtls/endian.h"
 #include "third_party/mbedtls/error.h"
 #include "third_party/mbedtls/md.h"
-#include "third_party/mbedtls/sha256.h"
-
-asm(".ident\t\"\\n\\n\
-Mbed TLS (Apache 2.0)\\n\
-Copyright ARM Limited\\n\
-Copyright Mbed TLS Contributors\"");
-asm(".include \"libc/disclaimer.inc\"");
-/* clang-format off */
+__static_yoink("mbedtls_notice");
 
 /**
  * @fileoverview FIPS-180-2 compliant SHA-256 implementation
@@ -172,26 +165,19 @@ int mbedtls_internal_sha256_process( mbedtls_sha256_context *ctx,
     SHA256_VALIDATE_RET( ctx != NULL );
     SHA256_VALIDATE_RET( (const unsigned char *)data != NULL );
 
-    if( !IsTiny() || X86_NEED( SHA ) )
+    if( X86_HAVE( SHA ) &&
+        X86_HAVE( SSE2 ) &&
+        X86_HAVE( SSSE3 ) )
     {
-        if( X86_HAVE( SHA ) &&
-            X86_HAVE( SSE2 ) &&
-            X86_HAVE( SSSE3 ) )
-        {
-            if( IsAsan() )
-                __asan_verify( data, 64 );
-            sha256_transform_ni( ctx->state, data, 1 );
-            return( 0 );
-        }
-        if( X86_HAVE( BMI2 ) &&
-            X86_HAVE( AVX  ) &&
-            X86_HAVE( AVX2 ) )
-        {
-            if( IsAsan() )
-                __asan_verify( data, 64 );
-            sha256_transform_rorx( ctx->state, data, 1 );
-            return( 0 );
-        }
+        sha256_transform_ni( ctx->state, data, 1 );
+        return( 0 );
+    }
+    if( X86_HAVE( BMI2 ) &&
+        X86_HAVE( AVX  ) &&
+        X86_HAVE( AVX2 ) )
+    {
+        sha256_transform_rorx( ctx->state, data, 1 );
+        return( 0 );
     }
 
     for( i = 0; i < 8; i++ )
@@ -311,24 +297,18 @@ int mbedtls_sha256_update_ret( mbedtls_sha256_context *ctx,
 
     if( ilen >= 64 )
     {
-        if( !IsTiny() &&
-            X86_HAVE( SHA ) &&
+        if( X86_HAVE( SHA ) &&
             X86_HAVE( SSE2 ) &&
             X86_HAVE( SSSE3 ) )
         {
-            if( IsAsan() )
-                __asan_verify( input, ilen );
             sha256_transform_ni( ctx->state, input, ilen / 64 );
             input += ROUNDDOWN( ilen, 64 );
             ilen  -= ROUNDDOWN( ilen, 64 );
         }
-        else if( !IsTiny() &&
-                 X86_HAVE( BMI  ) &&
+        else if( X86_HAVE( BMI  ) &&
                  X86_HAVE( BMI2 ) &&
                  X86_HAVE( AVX2 ) )
         {
-            if( IsAsan() )
-                __asan_verify( input, ilen );
             sha256_transform_rorx( ctx->state, input, ilen / 64 );
             input += ROUNDDOWN( ilen, 64 );
             ilen  -= ROUNDDOWN( ilen, 64 );
@@ -476,12 +456,12 @@ exit:
     return( ret );
 }
 
-noinstrument int mbedtls_sha256_ret_224( const void *input, size_t ilen, unsigned char *output )
+dontinstrument int mbedtls_sha256_ret_224( const void *input, size_t ilen, unsigned char *output )
 {
     return mbedtls_sha256_ret( input, ilen, output, true );
 }
 
-noinstrument int mbedtls_sha256_ret_256( const void *input, size_t ilen, unsigned char *output )
+dontinstrument int mbedtls_sha256_ret_256( const void *input, size_t ilen, unsigned char *output )
 {
     return mbedtls_sha256_ret( input, ilen, output, false );
 }

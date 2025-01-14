@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2022 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -16,31 +16,60 @@
 │ TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR             │
 │ PERFORMANCE OF THIS SOFTWARE.                                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
+#include "libc/assert.h"
 #include "libc/atomic.h"
 #include "libc/calls/calls.h"
 #include "libc/calls/struct/sched_param.h"
 #include "libc/calls/struct/sigaction.h"
+#include "libc/calls/struct/siginfo.h"
+#include "libc/calls/struct/sigset.h"
+#include "libc/cosmo.h"
 #include "libc/dce.h"
 #include "libc/errno.h"
-#include "libc/macros.internal.h"
+#include "libc/intrin/kprintf.h"
+#include "libc/limits.h"
+#include "libc/macros.h"
 #include "libc/mem/gc.h"
 #include "libc/mem/mem.h"
 #include "libc/nexgen32e/nexgen32e.h"
 #include "libc/nexgen32e/vendor.internal.h"
 #include "libc/runtime/runtime.h"
 #include "libc/runtime/stack.h"
+#include "libc/runtime/sysconf.h"
+#include "libc/stdio/rand.h"
 #include "libc/sysv/consts/prot.h"
 #include "libc/sysv/consts/sa.h"
 #include "libc/sysv/consts/sched.h"
 #include "libc/sysv/consts/sig.h"
+#include "libc/sysv/consts/ss.h"
+#include "libc/testlib/benchmark.h"
 #include "libc/testlib/ezbench.h"
+#include "libc/testlib/manystack.h"
 #include "libc/testlib/subprocess.h"
 #include "libc/testlib/testlib.h"
+#include "libc/thread/posixthread.internal.h"
 #include "libc/thread/thread.h"
 #include "libc/thread/thread2.h"
 
-void OnUsr1(int sig, struct siginfo *si, void *vctx) {
-  struct ucontext *ctx = vctx;
+// test ability of user to override pthread mutex api
+int pthread_mutex_lock(pthread_mutex_t *mutex) {
+  abort();
+}
+int pthread_mutex_unlock(pthread_mutex_t *mutex) {
+  abort();
+}
+int pthread_mutex_trylock(pthread_mutex_t *mutex) {
+  abort();
+}
+int pthread_mutex_wipe_np(pthread_mutex_t *mutex) {
+  abort();
+}
+
+void OnUsr1(int sig, siginfo_t *si, void *vctx) {
+}
+
+void SetUpOnce(void) {
+  cosmo_stack_setmaxstacks((_rand64() & 7) - 1);
 }
 
 void SetUp(void) {
@@ -83,7 +112,7 @@ TEST(pthread_create, testCreateExitJoin) {
 }
 
 static void *CheckSchedule(void *arg) {
-  int rc, policy;
+  int policy;
   struct sched_param prio;
   ASSERT_EQ(0, pthread_getschedparam(pthread_self(), &policy, &prio));
   ASSERT_EQ(SCHED_OTHER, policy);
@@ -127,7 +156,7 @@ TEST(pthread_create, testBigStack) {
 }
 
 static void *CheckStack2(void *arg) {
-  char buf[57244];
+  char buf[262144 - 32768 * 2];
   TriggerSignal();
   CheckLargeStackAllocation(buf, sizeof(buf));
   return 0;
@@ -137,8 +166,8 @@ TEST(pthread_create, testBiggerGuardSize) {
   pthread_t id;
   pthread_attr_t attr;
   ASSERT_EQ(0, pthread_attr_init(&attr));
-  ASSERT_EQ(0, pthread_attr_setstacksize(&attr, 65536));
-  ASSERT_EQ(0, pthread_attr_setguardsize(&attr, 8192));
+  ASSERT_EQ(0, pthread_attr_setstacksize(&attr, 262144));
+  ASSERT_EQ(0, pthread_attr_setguardsize(&attr, 32768));
   ASSERT_EQ(0, pthread_create(&id, &attr, CheckStack2, 0));
   ASSERT_EQ(0, pthread_attr_destroy(&attr));
   ASSERT_EQ(0, pthread_join(id, 0));
@@ -156,7 +185,8 @@ TEST(pthread_create, testCustomStack_withReallySmallSize) {
   ASSERT_EQ(0, pthread_create(&id, &attr, Increment, 0));
   ASSERT_EQ(0, pthread_attr_destroy(&attr));
   ASSERT_EQ(0, pthread_join(id, 0));
-  // we still own the stack memory
+  free(stk);
+  stk = malloc(siz);
   ASSERT_EQ(0, pthread_attr_init(&attr));
   ASSERT_EQ(0, pthread_attr_setstack(&attr, stk, siz));
   ASSERT_EQ(0, pthread_create(&id, &attr, Increment, 0));
@@ -168,8 +198,8 @@ TEST(pthread_create, testCustomStack_withReallySmallSize) {
 void *JoinMainWorker(void *arg) {
   void *rc;
   pthread_t main_thread = (pthread_t)arg;
-  _gc(malloc(32));
-  _gc(malloc(32));
+  gc(malloc(32));
+  gc(malloc(32));
   ASSERT_EQ(0, pthread_join(main_thread, &rc));
   ASSERT_EQ(123, (intptr_t)rc);
   return 0;
@@ -177,8 +207,8 @@ void *JoinMainWorker(void *arg) {
 
 TEST(pthread_join, mainThread) {
   pthread_t id;
-  _gc(malloc(32));
-  _gc(malloc(32));
+  gc(malloc(32));
+  gc(malloc(32));
   SPAWN(fork);
   ASSERT_EQ(0, pthread_create(&id, 0, JoinMainWorker, (void *)pthread_self()));
   pthread_exit((void *)123);
@@ -187,8 +217,8 @@ TEST(pthread_join, mainThread) {
 
 TEST(pthread_join, mainThreadDelayed) {
   pthread_t id;
-  _gc(malloc(32));
-  _gc(malloc(32));
+  gc(malloc(32));
+  gc(malloc(32));
   SPAWN(fork);
   ASSERT_EQ(0, pthread_create(&id, 0, JoinMainWorker, (void *)pthread_self()));
   usleep(10000);
@@ -272,11 +302,60 @@ static void CreateDetached(void) {
   ASSERT_EQ(0, pthread_attr_destroy(&attr));
 }
 
-BENCH(pthread_create, bench) {
-  EZBENCH2("CreateJoin", donothing, CreateJoin());
-  EZBENCH2("CreateDetach", donothing, CreateDetach());
-  EZBENCH2("CreateDetached", donothing, CreateDetached());
-  while (!pthread_orphan_np()) {
-    pthread_decimate_np();
+#define LAUNCHES  10
+#define LAUNCHERS 10
+
+errno_t pthread_create2(pthread_t *thread, const pthread_attr_t *attr,
+                        void *(*start_routine)(void *), void *arg) {
+  for (int i = 1;; i <<= 1) {
+    errno_t err = pthread_create(thread, attr, start_routine, arg);
+    if (err != EAGAIN)
+      return err;
+    usleep(i);
   }
+}
+
+static void *CreateDetachedParallelThreads(void *arg) {
+  for (int i = 0; i < LAUNCHES; ++i)
+    CreateDetached();
+  return 0;
+}
+
+static void CreateDetachedParallel(void) {
+  pthread_t th[LAUNCHERS];
+  for (int i = 0; i < LAUNCHERS; ++i)
+    ASSERT_EQ(0, pthread_create2(&th[i], 0, CreateDetachedParallelThreads, 0));
+  for (int i = 0; i < LAUNCHERS; ++i)
+    ASSERT_EQ(0, pthread_join(th[i], 0));
+}
+
+static void *CreateJoinParallelThreads(void *arg) {
+  for (int i = 0; i < LAUNCHES; ++i)
+    CreateJoin();
+  return 0;
+}
+
+static void CreateJoinParallel(void) {
+  pthread_t th[LAUNCHERS];
+  for (int i = 0; i < LAUNCHERS; ++i)
+    ASSERT_EQ(0, pthread_create2(&th[i], 0, CreateJoinParallelThreads, 0));
+  for (int i = 0; i < LAUNCHERS; ++i)
+    ASSERT_EQ(0, pthread_join(th[i], 0));
+}
+
+TEST(pthread_create, bench) {
+  kprintf("cosmo_stack_getmaxstacks() = %d\n", cosmo_stack_getmaxstacks());
+  pthread_t msh = manystack_start();
+  BENCHMARK(100, 1, CreateJoin());
+  BENCHMARK(100, 1, CreateDetach());
+  usleep(10000);
+  pthread_decimate_np();
+  BENCHMARK(100, 1, CreateDetached());
+  usleep(10000);
+  pthread_decimate_np();
+  BENCHMARK(1, LAUNCHERS + LAUNCHERS * LAUNCHES, CreateJoinParallel());
+  BENCHMARK(1, LAUNCHERS + LAUNCHERS * LAUNCHES, CreateDetachedParallel());
+  manystack_stop(msh);
+  while (!pthread_orphan_np())
+    pthread_decimate_np();
 }

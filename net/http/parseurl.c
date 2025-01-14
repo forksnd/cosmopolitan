@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2021 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -20,7 +20,7 @@
 #include "libc/limits.h"
 #include "libc/mem/mem.h"
 #include "libc/str/str.h"
-#include "libc/str/tab.internal.h"
+#include "libc/str/tab.h"
 #include "libc/x/x.h"
 #include "net/http/escape.h"
 #include "net/http/url.h"
@@ -33,7 +33,7 @@ struct UrlParser {
 
 static void EmitLatin1(char **p, int c) {
   (*p)[0] = 0300 | c >> 6;
-  (*p)[1] = 0200 | c & 077;
+  (*p)[1] = 0200 | (c & 077);
   *p += 2;
 }
 
@@ -149,7 +149,7 @@ static void ParseAuthority(struct UrlParser *u, struct Url *h) {
       if (c) {
         h->user.p = u->q;
         h->user.n = c - 1 - u->q;
-        h->pass.p = c;
+        h->pass.p = (char *)c;
         h->pass.n = u->p - c;
         c = NULL;
         t = 1;
@@ -169,7 +169,7 @@ static void ParseAuthority(struct UrlParser *u, struct Url *h) {
   if (t == 2) {
     h->host.p = u->q;
     h->host.n = c - 1 - u->q;
-    h->port.p = c;
+    h->port.p = (char *)c;
     h->port.n = u->p - c;
     c = NULL;
   } else {
@@ -204,7 +204,8 @@ static void ParsePath(struct UrlParser *u, struct UrlView *h) {
 
 static void ParseQuery(struct UrlParser *u, struct UrlParams *h) {
   bool t = false;
-  if (!h->p) h->p = malloc(0);
+  if (!h->p)
+    h->p = malloc(0);
   while (u->i < u->n) {
     u->c = u->s[u->i++] & 255;
     if (u->c == '#') {
@@ -285,7 +286,8 @@ static void ParseFragment(struct UrlParser *u, struct UrlView *h) {
 char *ParseUrl(const char *s, size_t n, struct Url *h, int f) {
   char *m;
   struct UrlParser u;
-  if (n == -1) n = s ? strlen(s) : 0;
+  if (n == -1)
+    n = s ? strlen(s) : 0;
   u.i = 0;
   u.c = 0;
   u.s = s;
@@ -294,10 +296,14 @@ char *ParseUrl(const char *s, size_t n, struct Url *h, int f) {
   bzero(h, sizeof(*h));
   if ((m = malloc((f & kUrlLatin1) ? u.n * 2 : u.n))) {
     u.q = u.p = m;
-    if (ParseScheme(&u, h)) ParseAuthority(&u, h);
-    if (u.c != '#' && u.c != '?') ParsePath(&u, &h->path);
-    if (u.c == '?') ParseQuery(&u, &h->params);
-    if (u.c == '#') ParseFragment(&u, &h->fragment);
+    if (ParseScheme(&u, h))
+      ParseAuthority(&u, h);
+    if (u.c != '#' && u.c != '?')
+      ParsePath(&u, &h->path);
+    if (u.c == '?')
+      ParseQuery(&u, &h->params);
+    if (u.c == '#')
+      ParseFragment(&u, &h->fragment);
   }
   return m;
 }
@@ -325,7 +331,8 @@ char *ParseUrl(const char *s, size_t n, struct Url *h, int f) {
 char *ParseParams(const char *s, size_t n, struct UrlParams *h) {
   char *m;
   struct UrlParser u;
-  if (n == -1) n = s ? strlen(s) : 0;
+  if (n == -1)
+    n = s ? strlen(s) : 0;
   u.i = 0;
   u.s = s;
   u.n = n;
@@ -365,7 +372,8 @@ char *ParseParams(const char *s, size_t n, struct UrlParams *h) {
 char *ParseHost(const char *s, size_t n, struct Url *h) {
   char *m;
   struct UrlParser u;
-  if (n == -1) n = s ? strlen(s) : 0;
+  if (n == -1)
+    n = s ? strlen(s) : 0;
   u.i = 0;
   u.c = 0;
   u.s = s;

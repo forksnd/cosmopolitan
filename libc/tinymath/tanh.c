@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:t;c-basic-offset:8;tab-width:8;coding:utf-8   -*-│
-│vi: set et ft=c ts=8 tw=8 fenc=utf-8                                       :vi│
+│ vi: set noet ft=c ts=8 sw=8 fenc=utf-8                                   :vi │
 ╚──────────────────────────────────────────────────────────────────────────────╝
 │                                                                              │
 │  Musl Libc                                                                   │
@@ -27,19 +27,11 @@
 ╚─────────────────────────────────────────────────────────────────────────────*/
 #include "libc/math.h"
 #include "libc/tinymath/feval.internal.h"
+__static_yoink("musl_libc_notice");
 
-asm(".ident\t\"\\n\\n\
-Musl libc (MIT License)\\n\
-Copyright 2005-2014 Rich Felker, et. al.\"");
-asm(".include \"libc/disclaimer.inc\"");
-/* clang-format off */
 
 /**
  * Returns hyperbolic tangent of 𝑥.
- *
- *     tanh(x) = (exp(x) - exp(-x))/(exp(x) + exp(-x))
- *             = (exp(2*x) - 1)/(exp(2*x) - 1 + 2)
- *             = (1 - exp(-2*x))/(exp(-2*x) - 1 + 2)
  */
 double tanh(double x)
 {
@@ -80,3 +72,7 @@ double tanh(double x)
 	}
 	return sign ? -t : t;
 }
+
+#if LDBL_MANT_DIG == 53 && LDBL_MAX_EXP == 1024
+__weak_reference(tanh, tanhl);
+#endif

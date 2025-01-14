@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ This is free and unencumbered software released into the public domain.      │
 │                                                                              │
@@ -25,7 +25,11 @@
 │ OTHER DEALINGS IN THE SOFTWARE.                                              │
 ╚─────────────────────────────────────────────────────────────────────────────*/
 #include "libc/dce.h"
+#include "libc/intrin/kprintf.h"
+#include "libc/mem/alloca.h"
 #include "libc/runtime/pc.internal.h"
+#include "libc/runtime/runtime.h"
+#include "libc/runtime/stack.h"
 #include "libc/str/str.h"
 #include "libc/vga/vga.internal.h"
 
@@ -35,7 +39,7 @@ struct Tty _vga_tty;
 
 void _vga_reinit(struct Tty *tty, unsigned short starty, unsigned short startx,
                  unsigned init_flags) {
-  struct mman *mm = (struct mman *)(BANE + 0x0500);
+  struct mman *mm = __get_mm();
   unsigned char vid_type = mm->pc_video_type;
   unsigned short height = mm->pc_video_height, width = mm->pc_video_width,
                  stride = mm->pc_video_stride;
@@ -53,9 +57,8 @@ void _vga_reinit(struct Tty *tty, unsigned short starty, unsigned short startx,
     chr_ht = VGA_ASSUME_CHAR_HEIGHT_PX;
   chr_wid = VGA_ASSUME_CHAR_WIDTH_PX;
   /* Make sure the video buffer is mapped into virtual memory. */
-  __invert_memory_area(mm, __get_pml4t(), vid_buf_phy, vid_buf_sz,
-                       PAGE_RW | PAGE_XD);
-  __ref_pages(mm, __get_pml4t(), vid_buf_phy, vid_buf_sz);
+  __invert_and_perm_ref_memory_area(mm, __get_pml4t(), vid_buf_phy, vid_buf_sz,
+                                    PAGE_RW | PAGE_XD);
   /*
    * Initialize our tty structure from the current screen geometry, screen
    * contents, cursor position, & character dimensions.
@@ -66,11 +69,55 @@ void _vga_reinit(struct Tty *tty, unsigned short starty, unsigned short startx,
 
 textstartup void _vga_init(void) {
   if (IsMetal()) {
-    struct mman *mm = (struct mman *)(BANE + 0x0500);
+    struct mman *mm = __get_mm();
     unsigned short starty = mm->pc_video_curs_info.y,
                    startx = mm->pc_video_curs_info.x;
     _vga_reinit(&_vga_tty, starty, startx, 0);
   }
 }
+
+#if !IsTiny()
+/**
+ * Non-emergency console vprintf(), useful for dumping debugging or
+ * informational messages at program startup.
+ *
+ * @see uprintf()
+ */
+void uvprintf(const char *fmt, va_list v) {
+  if (!IsMetal()) {
+    kvprintf(fmt, v);
+  } else {
+    long size = __get_safe_size(8000, 3000);
+    char *buf = alloca(size);
+    CheckLargeStackAllocation(buf, size);
+    size_t count = kvsnprintf(buf, size, fmt, v);
+    if (count >= size)
+      count = size - 1;
+    _TtyWrite(&_vga_tty, buf, count);
+    _klog_serial(buf, count);
+  }
+}
+
+/**
+ * Non-emergency console printf(), useful for dumping debugging or
+ * informational messages at program startup.
+ *
+ * uprintf() is similar to kprintf(), but on bare metal with VGA support, it
+ * uses the normal, fast graphical console, rather than initializing an
+ * emergency console.  This makes uprintf() faster — on bare metal — at the
+ * expense of being less crash-proof.
+ *
+ * (The uprintf() function name comes from the FreeBSD kernel.)
+ *
+ * @see kprintf()
+ * @see https://man.freebsd.org/cgi/man.cgi?query=uprintf&sektion=9&n=1
+ */
+void uprintf(const char *fmt, ...) {
+  va_list v;
+  va_start(v, fmt);
+  uvprintf(fmt, v);
+  va_end(v);
+}
+#endif /* !IsTiny() */
 
 #endif /* __x86_64__ */

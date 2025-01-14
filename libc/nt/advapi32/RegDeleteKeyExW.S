@@ -1,12 +1,13 @@
 #include "libc/nt/codegen.h"
-.imp	advapi32,__imp_RegDeleteKeyExW,RegDeleteKeyExW,0
+.imp	advapi32,__imp_RegDeleteKeyExW,RegDeleteKeyExW
 
 	.text.windows
+	.ftrace1
 RegDeleteKeyEx:
+	.ftrace2
 #ifdef __x86_64__
 	push	%rbp
 	mov	%rsp,%rbp
-	.profilable
 	mov	__imp_RegDeleteKeyExW(%rip),%rax
 	jmp	__sysv2nt
 #elif defined(__aarch64__)

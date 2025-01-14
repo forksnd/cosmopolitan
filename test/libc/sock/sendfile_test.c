@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2022 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -17,12 +17,12 @@
 │ PERFORMANCE OF THIS SOFTWARE.                                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
 #include "libc/calls/calls.h"
+#include "libc/calls/internal.h"
 #include "libc/calls/struct/sigaction.h"
 #include "libc/dce.h"
 #include "libc/errno.h"
-#include "libc/intrin/kprintf.h"
 #include "libc/limits.h"
-#include "libc/mem/gc.internal.h"
+#include "libc/mem/gc.h"
 #include "libc/mem/mem.h"
 #include "libc/runtime/internal.h"
 #include "libc/runtime/runtime.h"
@@ -39,11 +39,12 @@
 #include "libc/testlib/testlib.h"
 #include "libc/x/x.h"
 
-char testlib_enable_tmp_setup_teardown;
-
 void SetUpOnce(void) {
-  if (IsNetbsd()) exit(0);
-  if (IsOpenbsd()) exit(0);
+  if (IsNetbsd())
+    exit(0);  // no sendfile support
+  if (IsOpenbsd())
+    exit(0);  // no sendfile support
+  testlib_enable_tmp_setup_teardown();
   ASSERT_SYS(0, 0, pledge("stdio rpath wpath cpath proc inet", 0));
 }
 
@@ -55,7 +56,6 @@ int64_t GetFileOffset(int fd) {
 
 TEST(sendfile, testSeeking) {
   char buf[1024];
-  int rc, ws, fds[2];
   int64_t inoffset = 0;
   uint32_t addrsize = sizeof(struct sockaddr_in);
   struct sockaddr_in addr = {
@@ -95,13 +95,13 @@ TEST(sendfile, testSeeking) {
   ASSERT_SYS(0, 500, read(3, buf + 12, 700));
   ASSERT_EQ(0, memcmp(buf, kHyperion, 512));
   ASSERT_SYS(0, 0, close(3));
+  int ws;
   ASSERT_NE(-1, wait(&ws));
   ASSERT_TRUE(WIFEXITED(ws));
   ASSERT_EQ(0, WEXITSTATUS(ws));
 }
 
 TEST(sendfile, testPositioning) {
-  int ws, fds[2];
   char buf[1024];
   uint32_t addrsize = sizeof(struct sockaddr_in);
   struct sockaddr_in addr = {
@@ -127,9 +127,8 @@ TEST(sendfile, testPositioning) {
     ASSERT_TRUE(errno == EINVAL || errno == EPIPE);
     errno = 0;
     // XXX: WSL1 clobbers file offset on failure!
-    if (!IsWsl1()) {
+    if (!__iswsl1())
       ASSERT_EQ(12, GetFileOffset(5));
-    }
     _Exit(0);
   }
   ASSERT_SYS(0, 0, close(3));
@@ -140,6 +139,7 @@ TEST(sendfile, testPositioning) {
   ASSERT_SYS(0, 0, read(3, buf, 12));
   ASSERT_EQ(0, memcmp(buf, kHyperion, 12));
   ASSERT_SYS(0, 0, close(3));
+  int ws;
   ASSERT_NE(-1, wait(&ws));
   ASSERT_TRUE(WIFEXITED(ws));
   ASSERT_EQ(0, WEXITSTATUS(ws));

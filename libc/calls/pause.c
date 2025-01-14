@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2020 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -20,7 +20,7 @@
 #include "libc/calls/cp.internal.h"
 #include "libc/calls/syscall_support-nt.internal.h"
 #include "libc/dce.h"
-#include "libc/intrin/strace.internal.h"
+#include "libc/intrin/strace.h"
 #include "libc/sock/internal.h"
 
 /**
@@ -37,15 +37,17 @@
  *
  * However this has a tinier footprint and better logging.
  *
- * @return -1 w/ errno set to EINTR
- * @cancellationpoint
+ * @return -1 w/ errno
+ * @raise ECANCELED if this thread was canceled in masked mode
+ * @raise EINTR if interrupted by a signal
+ * @cancelationpoint
  * @see sigsuspend()
  * @norestart
  */
 int pause(void) {
   int rc;
   STRACE("pause() → [...]");
-  BEGIN_CANCELLATION_POINT;
+  BEGIN_CANCELATION_POINT;
 
   if (!IsWindows()) {
     // We'll polyfill pause() using select() with a null timeout, which
@@ -61,12 +63,16 @@ int pause(void) {
     //      function shall block until interrupted by a signal." ──Quoth
     //      IEEE 1003.1-2017 §functions/select
     //
+#ifdef __aarch64__
+    rc = sys_pselect(0, 0, 0, 0, 0, 0);
+#else
     rc = sys_select(0, 0, 0, 0, 0);
+#endif
   } else {
     rc = sys_pause_nt();
   }
 
-  END_CANCELLATION_POINT;
+  END_CANCELATION_POINT;
   STRACE("[...] pause → %d% m", rc);
   return rc;
 }

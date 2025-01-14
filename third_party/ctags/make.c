@@ -1,4 +1,3 @@
-// clang-format off
 /*
 *   $Id: make.c 751 2010-02-27 17:41:57Z elliotth $
 *
@@ -13,6 +12,7 @@
 /*
 *   INCLUDE FILES
 */
+#include "libc/ctype.h"
 #include "third_party/ctags/general.h"  /* must always come first */
 
 #include "libc/mem/alg.h"

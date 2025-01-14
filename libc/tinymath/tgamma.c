@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:t;c-basic-offset:8;tab-width:8;coding:utf-8   -*-│
-│vi: set et ft=c ts=8 tw=8 fenc=utf-8                                       :vi│
+│ vi: set noet ft=c ts=8 sw=8 fenc=utf-8                                   :vi │
 ╚──────────────────────────────────────────────────────────────────────────────╝
 │                                                                              │
 │  Musl Libc                                                                   │
@@ -28,12 +28,8 @@
 #include "libc/math.h"
 #include "libc/tinymath/feval.internal.h"
 #include "libc/tinymath/kernel.internal.h"
+__static_yoink("musl_libc_notice");
 
-asm(".ident\t\"\\n\\n\
-Musl libc (MIT License)\\n\
-Copyright 2005-2014 Rich Felker, et. al.\"");
-asm(".include \"libc/disclaimer.inc\"");
-/* clang-format off */
 
 /*
 "A Precision Approximation of the Gamma Function" - Cornelius Lanczos (1964)
@@ -141,6 +137,9 @@ static double S(double x)
 	return num/den;
 }
 
+/**
+ * Calculates gamma function of 𝑥.
+ */
 double tgamma(double x)
 {
 	union {double f; uint64_t i;} u = {x};
@@ -205,3 +204,7 @@ double tgamma(double x)
 	y = r * z * z;
 	return y;
 }
+
+#if LDBL_MANT_DIG == 53 && LDBL_MAX_EXP == 1024
+__weak_reference(tgamma, tgammal);
+#endif

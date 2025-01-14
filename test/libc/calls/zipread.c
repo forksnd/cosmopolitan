@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2023 Gavin Arthur Hayes                                            │
 │                                                                              │
@@ -20,7 +20,7 @@
 #include "libc/str/str.h"
 #include "libc/sysv/consts/o.h"
 
-STATIC_YOINK("zip_uri_support");
+__static_yoink("zipos");
 
 int main(int argc, char *argv[]) {
   int fd = open("/zip/life.elf", O_RDONLY);

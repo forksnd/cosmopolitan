@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:t;c-basic-offset:8;tab-width:8;coding:utf-8   -*-│
-│vi: set et ft=c ts=8 tw=8 fenc=utf-8                                       :vi│
+│ vi: set noet ft=c ts=8 sw=8 fenc=utf-8                                   :vi │
 ╚──────────────────────────────────────────────────────────────────────────────╝
 │                                                                              │
 │  Musl Libc                                                                   │
@@ -30,17 +30,12 @@
 #include "libc/tinymath/kernel.internal.h"
 #include "libc/tinymath/ldshape.internal.h"
 
-asm(".ident\t\"\\n\\n\
-FreeBSD libm (BSD-2 License)\\n\
-Copyright (c) 2005-2011, Bruce D. Evans, Steven G. Kargl, David Schultz.\"");
-asm(".ident\t\"\\n\\n\
-fdlibm (fdlibm license)\\n\
-Copyright (C) 1993 by Sun Microsystems, Inc. All rights reserved.\"");
-asm(".ident\t\"\\n\\n\
-Musl libc (MIT License)\\n\
-Copyright 2005-2014 Rich Felker, et. al.\"");
-asm(".include \"libc/disclaimer.inc\"");
-// clang-format off
+__static_yoink("musl_libc_notice");
+__static_yoink("fdlibm_notice");
+__static_yoink("freebsd_libm_notice");
+
+#if !(LDBL_MANT_DIG == 53 && LDBL_MAX_EXP == 1024)
+
 
 /* origin: FreeBSD /usr/src/lib/msun/ld80/e_rem_pio2.c */
 /*
@@ -200,3 +195,5 @@ int __rem_pio2l(long double x, long double *y)
 #else
 #error "architecture unsupported"
 #endif
+
+#endif /* long double is long */

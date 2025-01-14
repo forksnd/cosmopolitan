@@ -85,6 +85,10 @@
 #define EM_RISCV     243
 #define EM_BPF       247
 
+/* the ape flag, "lol cat 5" */
+#define EF_APE_MODERN      0x101ca75
+#define EF_APE_MODERN_MASK 0x1ffffff
+
 #define GRP_COMDAT 1
 #define STN_UNDEF  0
 
@@ -187,11 +191,13 @@
 #define R_PPC_ADDR32 1
 #define R_PPC_ADDR24 2
 #define R_PPC_ADDR16 3
+#define R_PPC_REL32  26
 
 #define R_PPC64_NONE   R_PPC_NONE
 #define R_PPC64_ADDR32 R_PPC_ADDR32
 #define R_PPC64_ADDR24 R_PPC_ADDR24
 #define R_PPC64_ADDR16 R_PPC_ADDR16
+#define R_PPC64_REL32  R_PPC_REL32
 
 #define R_RISCV_NONE     0
 #define R_RISCV_32       1
@@ -450,12 +456,12 @@
 #define DF_P1_GROUPPERM 0x00000002
 
 #define ELF64_ST_BIND(val)        (((unsigned char)(val)) >> 4)
-#define ELF64_ST_TYPE(val)        ((val)&0xf)
-#define ELF64_ST_INFO(bind, type) (((bind) << 4) + ((type)&0xf))
-#define ELF64_ST_VISIBILITY(o)    ((o)&0x03)
+#define ELF64_ST_TYPE(val)        ((val) & 0xf)
+#define ELF64_ST_INFO(bind, type) (((bind) << 4) + ((type) & 0xf))
+#define ELF64_ST_VISIBILITY(o)    ((o) & 0x03)
 
 #define ELF64_R_SYM(i)          ((i) >> 32)
-#define ELF64_R_TYPE(i)         ((i)&0xffffffff)
+#define ELF64_R_TYPE(i)         ((i) & 0xffffffff)
 #define ELF64_R_INFO(sym, type) ((((Elf64_Xword)(sym)) << 32) + (type))
 
 #define ELF64_M_SYM(info)       ((info) >> 8)

@@ -1,12 +1,13 @@
 #include "libc/nt/codegen.h"
-.imp	user32,__imp_GetWindow,GetWindow,1976
+.imp	user32,__imp_GetWindow,GetWindow
 
 	.text.windows
+	.ftrace1
 GetWindow:
+	.ftrace2
 #ifdef __x86_64__
 	push	%rbp
 	mov	%rsp,%rbp
-	.profilable
 	mov	__imp_GetWindow(%rip),%rax
 	jmp	__sysv2nt
 #elif defined(__aarch64__)

@@ -1,5 +1,6 @@
 #ifndef COSMOPOLITAN_LIBC_SYSV_CONSTS_NRLINUX_H_
 #define COSMOPOLITAN_LIBC_SYSV_CONSTS_NRLINUX_H_
+#ifdef _COSMO_SOURCE
 
 #ifdef __x86_64__
 
@@ -360,6 +361,8 @@
 #define __NR_linux_stat                    0x004f
 #define __NR_linux_fstat                   0x0050
 #define __NR_linux_ppoll                   0x0049
+#define __NR_linux_brk                     0x00d6
+#define __NR_linux_sigreturn               0x008b
 #define __NR_linux_lseek                   0x003e
 #define __NR_linux_mmap                    0x00de
 #define __NR_linux_msync                   0x00e3
@@ -654,4 +657,5 @@
 
 #endif /* __x86_64__ */
 
+#endif /* _COSMO_SOURCE */
 #endif /* COSMOPOLITAN_LIBC_SYSV_CONSTS_NRLINUX_H_ */

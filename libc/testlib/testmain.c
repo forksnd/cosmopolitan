@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2020 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -16,44 +16,45 @@
 │ TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR             │
 │ PERFORMANCE OF THIS SOFTWARE.                                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
+#include "libc/assert.h"
 #include "libc/calls/calls.h"
+#include "libc/calls/struct/cpuset.h"
 #include "libc/calls/struct/rlimit.h"
 #include "libc/calls/struct/sigaction.h"
+#include "libc/calls/struct/siginfo.h"
 #include "libc/calls/struct/sigset.h"
 #include "libc/calls/syscall-sysv.internal.h"
 #include "libc/dce.h"
 #include "libc/errno.h"
-#include "libc/intrin/asan.internal.h"
-#include "libc/intrin/bits.h"
-#include "libc/intrin/safemacros.internal.h"
-#include "libc/intrin/strace.internal.h"
+#include "libc/intrin/dll.h"
+#include "libc/intrin/getenv.h"
+#include "libc/intrin/safemacros.h"
+#include "libc/intrin/strace.h"
+#include "libc/intrin/ubsan.h"
 #include "libc/intrin/weaken.h"
-#include "libc/log/check.h"
-#include "libc/log/color.internal.h"
-#include "libc/log/libfatal.internal.h"
+#include "libc/limits.h"
 #include "libc/log/log.h"
-#include "libc/macros.internal.h"
+#include "libc/macros.h"
+#include "libc/mem/leaks.h"
 #include "libc/mem/mem.h"
-#include "libc/nexgen32e/vendor.internal.h"
-#include "libc/nexgen32e/x86feature.h"
-#include "libc/runtime/internal.h"
-#include "libc/runtime/memtrack.internal.h"
+#include "libc/nexgen32e/nexgen32e.h"
 #include "libc/runtime/runtime.h"
 #include "libc/runtime/symbols.internal.h"
-#include "libc/runtime/sysconf.h"
-#include "libc/sock/sock.h"
-#include "libc/sock/struct/pollfd.h"
-#include "libc/stdio/stdio.h"
-#include "libc/sysv/consts/ex.h"
-#include "libc/sysv/consts/exit.h"
+#include "libc/stdio/rand.h"
+#include "libc/str/str.h"
 #include "libc/sysv/consts/f.h"
+#include "libc/sysv/consts/map.h"
 #include "libc/sysv/consts/o.h"
-#include "libc/sysv/consts/poll.h"
+#include "libc/sysv/consts/prot.h"
 #include "libc/sysv/consts/rlimit.h"
 #include "libc/sysv/consts/sig.h"
+#include "libc/testlib/aspect.internal.h"
 #include "libc/testlib/testlib.h"
-#include "third_party/dlmalloc/dlmalloc.h"
-#include "third_party/getopt/getopt.h"
+#include "libc/thread/posixthread.internal.h"
+#include "libc/thread/tls.h"
+#include "third_party/getopt/getopt.internal.h"
+
+#pragma weak main
 
 #define USAGE \
   " [FLAGS]\n\
@@ -64,21 +65,15 @@ Flags:\n\
   -h         show this information\n\
 \n"
 
-STATIC_YOINK("__die");
-STATIC_YOINK("GetSymbolByAddr");
-STATIC_YOINK("testlib_quota_handlers");
-STATIC_YOINK("stack_usage_logging");
-
 static bool runbenchmarks_;
 
-void PrintUsage(int rc, FILE *f) {
-  fputs("Usage: ", f);
-  fputs(firstnonnull(program_invocation_name, "unknown"), f);
-  fputs(USAGE, f);
+static void PrintUsage(int rc, int fd) {
+  tinyprint(fd, "Usage: ", firstnonnull(program_invocation_name, "unknown"),
+            USAGE, NULL);
   exit(rc);
 }
 
-void GetOpts(int argc, char *argv[]) {
+static void GetOpts(int argc, char *argv[]) {
   int opt;
   while ((opt = getopt(argc, argv, "?hbv")) != -1) {
     switch (opt) {
@@ -90,107 +85,150 @@ void GetOpts(int argc, char *argv[]) {
         break;
       case '?':
       case 'h':
-        PrintUsage(EXIT_SUCCESS, stdout);
+        PrintUsage(0, 1);
       default:
-        PrintUsage(EX_USAGE, stderr);
+        PrintUsage(1, 2);
     }
   }
 }
 
-static void EmptySignalMask(void) {
-  sigset_t ss;
-  sigemptyset(&ss);
-  sigprocmask(SIG_SETMASK, &ss, 0);
+static int rando(void) {
+  return _rand64() & INT_MAX;
 }
 
-static void FixIrregularFds(void) {
-  int e, i, fd, maxfds;
-  struct rlimit rlim;
-  struct pollfd *pfds;
-  for (i = 0; i < 3; ++i) {
-    if (fcntl(i, F_GETFL) == -1) {
-      errno = 0;
-      fd = open("/dev/null", O_RDWR);
-      CHECK_NE(-1, fd);
-      if (fd != i) {
-        close(fd);
+static void limit_process_to_single_cpu(void) {
+  extern int disable_limit_process_to_single_cpu;
+  if (_weaken(disable_limit_process_to_single_cpu))
+    return;
+  if (!(IsLinux() || IsFreebsd() || IsNetbsd() || IsWindows()))
+    return;
+  if (IsFreebsd() && getuid())
+    return;
+  cpu_set_t legal;
+  if (sched_getaffinity(0, sizeof(cpu_set_t), &legal) == -1) {
+    perror("sched_setaffinity failed");
+    exit(1);
+  }
+  int count = CPU_COUNT(&legal);
+  cpu_set_t newset;
+  CPU_ZERO(&newset);
+  bool done = false;
+  while (!done) {
+    for (int i = 0; i < CPU_SETSIZE; ++i) {
+      if (CPU_ISSET(i, &legal) && !(rando() % count)) {
+        CPU_SET(rando() % count, &newset);
+        done = true;
+        break;
       }
     }
   }
-  e = errno;
-  if (!closefrom(3)) return;
-  errno = e;
-  if (IsWindows()) {
-    maxfds = 64;
-  } else {
-    maxfds = 256;
-    if (!getrlimit(RLIMIT_NOFILE, &rlim)) {
-      maxfds = MIN(maxfds, (uint64_t)rlim.rlim_cur);
-    }
-  }
-  pfds = malloc(maxfds * sizeof(struct pollfd));
-  for (i = 0; i < maxfds; ++i) {
-    pfds[i].fd = i + 3;
-    pfds[i].events = POLLIN;
-  }
-  if (poll(pfds, maxfds, 0) != -1) {
-    for (i = 0; i < maxfds; ++i) {
-      if (pfds[i].revents & POLLNVAL) continue;
-      CHECK_EQ(0, close(pfds[i].fd));
-    }
-  }
-  free(pfds);
-}
-
-static void SetLimit(int resource, uint64_t soft, uint64_t hard) {
-  struct rlimit old;
-  struct rlimit lim = {soft, hard};
-  if (resource == 127) return;
-  if (setrlimit(resource, &lim) == -1) {
-    if (!getrlimit(resource, &old)) {
-      lim.rlim_max = MIN(hard, old.rlim_max);
-      lim.rlim_cur = MIN(soft, lim.rlim_max);
-      setrlimit(resource, &lim);
-    }
+  if (sched_setaffinity(0, sizeof(cpu_set_t), &newset) == -1) {
+    perror("sched_setaffinity failed");
+    exit(1);
   }
 }
-
-#pragma weak main
 
 /**
  * Generic test program main function.
  */
-noasan int main(int argc, char *argv[]) {
-  unsigned cpus;
-  const char *comdbg;
+int main(int argc, char *argv[]) {
+  int fd;
+  struct Dll *e;
+  struct TestAspect *a;
+
+  // some settings
+  __ubsan_strict = true;
   __log_level = kLogInfo;
+
+  if (errno) {
+    tinyprint(2, "error: the errno variable was contaminated by constructors\n",
+              NULL);
+    return 1;
+  }
+
+  // // this sometimes helps tease out mt bugs
+  // limit_process_to_single_cpu();
+
+  // test huge pointers by enabling pml5t
+  if (rando() % 2) {
+    errno_t e = errno;
+    mmap((char *)0x80000000000000, 1, PROT_NONE,  //
+         MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+    errno = e;
+  }
+
   GetOpts(argc, argv);
+
+  int oe = errno;
+  for (fd = 3; fd < 100; ++fd)
+    close(fd);
+  errno = oe;
+
+#ifndef TINY
   setenv("GDB", "", true);
   GetSymbolTable();
-
-  // normalize this process
-  FixIrregularFds();
-  EmptySignalMask();
+#endif
   ShowCrashReports();
 
-  // now get down to business
-  g_testlib_shoulddebugbreak = IsDebuggerPresent(false);
-  if (!IsWindows()) sys_getpid();  // make strace easier to read
+  // global setup
+  errno = 0;
+  STRACE("");
+  STRACE("# setting up once");
+  if (!IsWindows())
+    sys_getpid();
   testlib_clearxmmregisters();
+  if (_weaken(SetUpOnce)) {
+    _weaken(SetUpOnce)();
+  }
+  for (e = dll_first(testlib_aspects); e; e = dll_next(testlib_aspects, e)) {
+    a = TESTASPECT_CONTAINER(e);
+    if (a->once && a->setup) {
+      a->setup(0);
+    }
+  }
+
+  // run tests
+  CheckStackIsAligned();
   testlib_runalltests();
+
+  // run benchmarks
   if (!g_testlib_failed && runbenchmarks_ &&
       _weaken(testlib_runallbenchmarks)) {
     _weaken(testlib_runallbenchmarks)();
-    if (IsAsan() && !g_testlib_failed) {
-      CheckForMemoryLeaks();
-    }
-    if (!g_testlib_failed && IsRunningUnderMake()) {
-      return 254;  // compile.com considers this 0 and propagates output
-    }
-  } else if (IsAsan() && !g_testlib_failed) {
-    CheckForMemoryLeaks();
   }
 
+  // global teardown
+  STRACE("");
+  STRACE("# tearing down once");
+  for (e = dll_last(testlib_aspects); e; e = dll_prev(testlib_aspects, e)) {
+    a = TESTASPECT_CONTAINER(e);
+    if (a->once && a->teardown) {
+      a->teardown(0);
+    }
+  }
+  if (_weaken(TearDownOnce))
+    _weaken(TearDownOnce)();
+
+  // make sure threads are in a good state
+  if (_weaken(_pthread_decimate))
+    _weaken(_pthread_decimate)(kPosixThreadZombie);
+  if (_weaken(pthread_orphan_np) && !_weaken(pthread_orphan_np)()) {
+    tinyprint(2, "error: tests ended with threads still active\n", NULL);
+    _Exit(1);
+  }
+
+  // check for memory leaks
+  AssertNoLocksAreHeld();
+  if (!g_testlib_failed)
+    CheckForMemoryLeaks();
+
   // we're done!
-  exit(min(255, g_testlib_failed));
+  int status = MIN(255, g_testlib_failed);
+  if (!status && IsRunningUnderMake()) {
+    return 254;  // compile considers this 0 and propagates output
+  } else if (!status && _weaken(pthread_exit)) {
+    _weaken(pthread_exit)(0);
+  } else {
+    return status;
+  }
 }

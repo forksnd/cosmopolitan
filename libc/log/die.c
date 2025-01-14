@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2020 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -16,50 +16,42 @@
 │ TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR             │
 │ PERFORMANCE OF THIS SOFTWARE.                                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
-#include "libc/atomic.h"
 #include "libc/calls/calls.h"
-#include "libc/calls/state.internal.h"
-#include "libc/calls/syscall-sysv.internal.h"
-#include "libc/dce.h"
-#include "libc/intrin/atomic.h"
+#include "libc/errno.h"
+#include "libc/intrin/describebacktrace.h"
 #include "libc/intrin/kprintf.h"
 #include "libc/log/backtrace.internal.h"
 #include "libc/log/internal.h"
-#include "libc/log/libfatal.internal.h"
-#include "libc/log/log.h"
-#include "libc/runtime/internal.h"
 #include "libc/runtime/runtime.h"
-#include "libc/thread/thread.h"
-
-#if SupportsMetal()
-STATIC_YOINK("_idt");
-#endif
+#include "libc/runtime/symbols.internal.h"
+#include "libc/str/str.h"
 
 /**
- * Aborts process after printing a backtrace.
+ * Exits process with crash report.
  *
- * If a debugger is present then this will trigger a breakpoint.
+ * The `cosmoaddr2line` command may be copied and pasted into the shell
+ * to obtain further details such as function calls and source lines in
+ * the backtrace. Unlike abort() this function doesn't depend on signal
+ * handling infrastructure. If tcsetattr() was called earlier to change
+ * terminal settings, then they'll be restored automatically. Your exit
+ * handlers won't be called. The `KPRINTF_LOG` environment variable may
+ * configure the output location of these reports, defaulting to stderr
+ * which is duplicated at startup, in case the program closes the file.
+ *
+ * @see __minicrash() for signal handlers, e.g. handling abort()
+ * @asyncsignalsafe
+ * @vforksafe
  */
 relegated wontreturn void __die(void) {
-  /* asan runtime depends on this function */
-  int me, owner;
-  static atomic_int once;
-  owner = 0;
-  me = sys_gettid();
-  pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, 0);
-  if (__vforked ||
-      atomic_compare_exchange_strong_explicit(
-          &once, &owner, me, memory_order_relaxed, memory_order_relaxed)) {
-    __restore_tty();
-    if (IsDebuggerPresent(false)) {
-      DebugBreak();
-    }
-    ShowBacktrace(2, __builtin_frame_address(0));
-    _Exitr(77);
-  } else if (owner == me) {
-    kprintf("die failed while dying\n");
-    _Exitr(78);
-  } else {
-    _Exit1(79);
-  }
+  char host[128];
+  __restore_tty();
+  strcpy(host, "unknown");
+  gethostname(host, sizeof(host));
+  kprintf("%serror: %s on %s pid %d tid %d has perished%s\n"
+          "cosmoaddr2line %s %s\n",
+          __nocolor ? "" : "\e[1;31m", program_invocation_short_name, host,
+          getpid(), gettid(), __nocolor ? "" : "\e[0m", FindDebugBinary(),
+          DescribeBacktrace(__builtin_frame_address(0)));
+  ShowBacktrace(2, __builtin_frame_address(0));
+  _Exit(77);
 }

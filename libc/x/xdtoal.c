@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2020 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -20,14 +20,25 @@
 #include "libc/mem/mem.h"
 #include "libc/x/x.h"
 #include "third_party/gdtoa/gdtoa.h"
+#if !(LDBL_MANT_DIG == 53 && LDBL_MAX_EXP == 1024)
 
 /**
- * Converts double to string the easy way.
+ * Converts long double to string the easy way.
  *
  * @return string that needs to be free'd
  */
 char *xdtoal(long double d) {
-  char *p = xmalloc(32);
+  char *p;
+#if LDBL_MANT_DIG == 113
+  p = xmalloc(64);
+  g_Qfmt_p(p, &d, 16, 64, NIK(2, 0, 0));
+#elif LDBL_MANT_DIG == 64
+  p = xmalloc(32);
   g_xfmt_p(p, &d, 16, 32, NIK(2, 0, 0));
+#else
+#error "unsupported long double"
+#endif
   return p;
 }
+
+#endif /* long double is long */

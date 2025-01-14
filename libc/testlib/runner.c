@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2020 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -30,14 +30,9 @@
  */
 void testlib_runalltests(void) {
   if ((intptr_t)__testcase_end > (intptr_t)__testcase_start) {
-    if (testlib_countfixtures(__combo_start, __combo_end)) {
-      testlib_runcombos(__testcase_start, __testcase_end, __combo_start,
-                        __combo_end);
-    } else {
-      testlib_runtestcases(__testcase_start, __testcase_end, NULL);
-      testlib_runfixtures(__testcase_start, __testcase_end, __fixture_start,
-                          __fixture_end);
-      testlib_finish();
-    }
+    testlib_runtestcases(__testcase_start, __testcase_end, NULL);
+    testlib_runfixtures(__testcase_start, __testcase_end, __fixture_start,
+                        __fixture_end);
+    testlib_finish();
   }
 }

@@ -15,7 +15,6 @@
 #include "third_party/python/Include/pymem.h"
 #include "third_party/python/Include/structmember.h"
 #include "third_party/python/Include/yoink.h"
-/* clang-format off */
 
 PYTHON_PROVIDE("_collections");
 PYTHON_PROVIDE("_collections.OrderedDict");
@@ -2455,7 +2454,12 @@ PyInit__collections(void)
     return m;
 }
 
-_Section(".rodata.pytab.1") const struct _inittab _PyImport_Inittab__collections = {
+#ifdef __aarch64__
+_Section(".rodata.pytab.1 //")
+#else
+_Section(".rodata.pytab.1")
+#endif
+ const struct _inittab _PyImport_Inittab__collections = {
     "_collections",
     PyInit__collections,
 };

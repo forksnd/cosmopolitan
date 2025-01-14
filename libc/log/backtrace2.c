@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2020 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -24,8 +24,10 @@
 #include "libc/dce.h"
 #include "libc/errno.h"
 #include "libc/fmt/itoa.h"
+#include "libc/intrin/describebacktrace.h"
+#include "libc/intrin/iscall.h"
 #include "libc/intrin/kprintf.h"
-#include "libc/intrin/promises.internal.h"
+#include "libc/intrin/promises.h"
 #include "libc/intrin/weaken.h"
 #include "libc/log/backtrace.internal.h"
 #include "libc/log/color.internal.h"
@@ -49,11 +51,14 @@ static int PrintBacktraceUsingAddr2line(int fd, const struct StackFrame *bp) {
   ssize_t got;
   intptr_t addr;
   size_t i, j, gi;
+  char *p1, *p2, *p3;
   int ws, pid, pipefds[2];
   struct Garbages *garbage;
   const struct StackFrame *frame;
-  char *debugbin, *p1, *p2, *p3, *addr2line;
+  const char *debugbin, *addr2line;
   char buf[kBacktraceBufSize], *argv[kBacktraceMaxFrames];
+
+  (void)gi;
 
   // DWARF is a weak standard. Platforms that use LLVM or old GNU
   // usually can't be counted upon to print backtraces correctly.
@@ -63,7 +68,7 @@ static int PrintBacktraceUsingAddr2line(int fd, const struct StackFrame *bp) {
   }
 
   if (!PLEDGED(STDIO) || !PLEDGED(EXEC) || !PLEDGED(EXEC)) {
-    ShowHint("won't print addr2line backtrace because pledge");
+    ShowHint("pledge() sandboxing makes backtraces not as good");
     return -1;
   }
 
@@ -95,7 +100,7 @@ static int PrintBacktraceUsingAddr2line(int fd, const struct StackFrame *bp) {
   argv[i++] = "addr2line";
   argv[i++] = "-a"; /* filter out w/ shell script wrapper for old versions */
   argv[i++] = "-pCife";
-  argv[i++] = debugbin;
+  argv[i++] = (char *)debugbin;
   garbage = __tls_enabled ? __get_tls()->tib_garbages : 0;
   gi = garbage ? garbage->i : 0;
   for (frame = bp; frame && i < kBacktraceMaxFrames - 1; frame = frame->next) {
@@ -103,34 +108,39 @@ static int PrintBacktraceUsingAddr2line(int fd, const struct StackFrame *bp) {
       return -1;
     }
     addr = frame->addr;
-    if (addr == (uintptr_t)_weaken(__gc)) {
+#ifdef __x86_64__
+    if (gi && addr == (uintptr_t)_weaken(__gc)) {
       do {
         --gi;
       } while ((addr = garbage->p[gi].ret) == (uintptr_t)_weaken(__gc));
     }
+    if (!kisdangerous((const unsigned char *)addr))
+      addr -= __is_call((const unsigned char *)addr);
+#endif
     argv[i++] = buf + j;
     buf[j++] = '0';
     buf[j++] = 'x';
-    j += uint64toarray_radix16(addr - 1, buf + j) + 1;
+    j += uint64toarray_radix16(addr, buf + j) + 1;
   }
   argv[i++] = NULL;
   if (sys_pipe2(pipefds, O_CLOEXEC) == -1) {
     return -1;
   }
-  if ((pid = __sys_fork().ax) == -1) {
+  if ((pid = sys_fork()) == -1) {
     sys_close(pipefds[0]);
     sys_close(pipefds[1]);
     return -1;
   }
   if (!pid) {
-    sys_dup2(pipefds[1], 1);
+    sys_dup2(pipefds[1], 1, 0);
     sys_execve(addr2line, argv, environ);
     _Exit(127);
   }
   sys_close(pipefds[1]);
   for (;;) {
     got = sys_read(pipefds[0], buf, kBacktraceBufSize);
-    if (!got) break;
+    if (!got)
+      break;
     if (got == -1 && errno == EINTR) {
       errno = 0;
       continue;
@@ -145,19 +155,21 @@ static int PrintBacktraceUsingAddr2line(int fd, const struct StackFrame *bp) {
       if ((p2 = memmem(p1, got, " (discriminator ",
                        strlen(" (discriminator ") - 1)) &&
           (p3 = memchr(p2, '\n', got - (p2 - p1)))) {
-        if (p3 > p2 && p3[-1] == '\r') --p3;
-        sys_write(2, p1, p2 - p1);
+        if (p3 > p2 && p3[-1] == '\r')
+          --p3;
+        klog(p1, p2 - p1);
         got -= p3 - p1;
         p1 += p3 - p1;
       } else {
-        sys_write(2, p1, got);
+        klog(p1, got);
         break;
       }
     }
   }
   sys_close(pipefds[0]);
   while (sys_wait4(pid, &ws, 0, 0) == -1) {
-    if (errno == EINTR) continue;
+    if (errno == EINTR)
+      continue;
     return -1;
   }
   if (WIFEXITED(ws) && !WEXITSTATUS(ws)) {
@@ -181,12 +193,13 @@ static int PrintBacktrace(int fd, const struct StackFrame *bp) {
 }
 
 void ShowBacktrace(int fd, const struct StackFrame *bp) {
-  BLOCK_CANCELLATIONS;
+  BLOCK_CANCELATION;
 #ifdef __FNO_OMIT_FRAME_POINTER__
   /* asan runtime depends on this function */
   ftrace_enabled(-1);
   strace_enabled(-1);
-  if (!bp) bp = __builtin_frame_address(0);
+  if (!bp)
+    bp = __builtin_frame_address(0);
   PrintBacktrace(fd, bp);
   strace_enabled(+1);
   ftrace_enabled(+1);
@@ -195,5 +208,5 @@ void ShowBacktrace(int fd, const struct StackFrame *bp) {
                     "\t-D__FNO_OMIT_FRAME_POINTER__\n"
                     "\t-fno-omit-frame-pointer\n");
 #endif
-  ALLOW_CANCELLATIONS;
+  ALLOW_CANCELATION;
 }

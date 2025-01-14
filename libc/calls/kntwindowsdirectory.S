@@ -1,5 +1,5 @@
 /*-*- mode:unix-assembly; indent-tabs-mode:t; tab-width:8; coding:utf-8     -*-│
-│vi: set et ft=asm ts=8 tw=8 fenc=utf-8                                     :vi│
+│ vi: set noet ft=asm ts=8 sw=8 fenc=utf-8                                 :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2020 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -17,7 +17,7 @@
 │ PERFORMANCE OF THIS SOFTWARE.                                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
 #include "libc/dce.h"
-#include "libc/macros.internal.h"
+#include "libc/macros.h"
 
 #define BYTES 64
 
@@ -32,10 +32,12 @@ kNtWindowsDirectory:
 
 	.init.start 300,_init_kNtWindowsDirectory
 #if SupportsWindows()
+	testb	IsWindows()
+	jz	1f
 	pushpop	BYTES,%rdx
 	mov	__imp_GetWindowsDirectoryA(%rip),%rax
 	call	__getntsyspath
-#else
-	add	$BYTES,%rdi
+	jmp	2f
 #endif
-	.init.end 300,_init_kNtWindowsDirectory
+1:	add	$BYTES,%rdi
+2:	.init.end 300,_init_kNtWindowsDirectory

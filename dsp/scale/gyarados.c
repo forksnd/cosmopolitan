@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2020 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -25,9 +25,9 @@
 #include "libc/limits.h"
 #include "libc/log/check.h"
 #include "libc/log/log.h"
-#include "libc/macros.internal.h"
+#include "libc/macros.h"
 #include "libc/math.h"
-#include "libc/mem/gc.internal.h"
+#include "libc/mem/gc.h"
 #include "libc/mem/mem.h"
 #include "libc/str/str.h"
 #include "libc/testlib/testlib.h"
@@ -77,12 +77,12 @@ static struct SamplingSolution *NewSamplingSolution(long n, long s) {
 static bool IsNormalized(int n, double A[n]) {
   int i;
   double x;
-  for (x = i = 0; i < n; ++i) x += A[i];
+  for (x = i = 0; i < n; ++i)
+    x += A[i];
   return fabs(x - 1) < 1e-4;
 }
 
 void FreeSamplingSolution(struct SamplingSolution *ss) {
-  long i;
   if (ss) {
     free(ss->indices);
     free(ss->weights);
@@ -93,12 +93,14 @@ void FreeSamplingSolution(struct SamplingSolution *ss) {
 struct SamplingSolution *ComputeSamplingSolution(long dn, long sn, double dar,
                                                  double off, double par) {
   double *fweights;
-  double sum, hw, w, x, f;
+  double sum, hw, x, f;
   short *weights, *indices;
   struct SamplingSolution *res;
   long j, i, k, n, min, max, s, N[6];
-  if (!dar) dar = sn, dar /= dn;
-  if (!off) off = (dar - 1) / 2;
+  if (!dar)
+    dar = sn, dar /= dn;
+  if (!off)
+    off = (dar - 1) / 2;
   f = dar < 1 ? 1 / dar : dar;
   s = 3 * f + 4;
   fweights = gc(xcalloc(s + /*xxx*/ 2, sizeof(double)));
@@ -115,8 +117,10 @@ struct SamplingSolution *ComputeSamplingSolution(long dn, long sn, double dar,
     for (k = 0, j = min; j <= max; ++j) {
       fweights[k++] = ComputeWeight((j - x) / (f / par));
     }
-    for (sum = k = 0; k < n; ++k) sum += fweights[k];
-    for (j = 0; j < n; ++j) fweights[j] *= 1 / sum;
+    for (sum = k = 0; k < n; ++k)
+      sum += fweights[k];
+    for (j = 0; j < n; ++j)
+      fweights[j] *= 1 / sum;
     DCHECK(IsNormalized(n, fweights));
     for (j = 0; j < n; ++j) {
       indices[i * s + j] = MIN(sn - 1, MAX(0, min + j));
@@ -145,14 +149,13 @@ static int Sharpen(int ax, int bx, int cx) {
 
 static void GyaradosImpl(long dyw, long dxw, int dst[dyw][dxw], long syw,
                          long sxw, const int src[syw][sxw], long dyn, long dxn,
-                         long syn, long sxn, int tmp0[restrict dyn][sxn],
-                         int tmp1[restrict dyn][sxn],
-                         int tmp2[restrict dyn][dxn], long yfn, long xfn,
-                         const short fyi[dyn][yfn], const short fyw[dyn][yfn],
-                         const short fxi[dxn][xfn], const short fxw[dxn][xfn],
-                         bool sharpen) {
-  long i, j;
-  int eax, dy, dx, sy, sx;
+                         long syn, long sxn, int tmp0[dyn][sxn],
+                         int tmp1[dyn][sxn], int tmp2[dyn][dxn], long yfn,
+                         long xfn, const short fyi[dyn][yfn],
+                         const short fyw[dyn][yfn], const short fxi[dxn][xfn],
+                         const short fxw[dxn][xfn], bool sharpen) {
+  long i;
+  int eax, dy, dx, sx;
   for (sx = 0; sx < sxn; ++sx) {
     for (dy = 0; dy < dyn; ++dy) {
       for (eax = i = 0; i < yfn; ++i) {
@@ -161,12 +164,19 @@ static void GyaradosImpl(long dyw, long dxw, int dst[dyw][dxw], long syw,
       tmp0[dy][sx] = QRS(M, eax);
     }
   }
-  for (dy = 0; dy < dyn; ++dy) {
-    for (sx = 0; sx < sxn; ++sx) {
-      tmp1[dy][sx] = sharpen ? Sharpen(tmp0[MIN(dyn - 1, MAX(0, dy - 1))][sx],
-                                       tmp0[dy][sx],
-                                       tmp0[MIN(dyn - 1, MAX(0, dy + 1))][sx])
-                             : tmp0[dy][sx];
+  if (sharpen) {
+    for (dy = 0; dy < dyn; ++dy) {
+      for (sx = 0; sx < sxn; ++sx) {
+        tmp1[dy][sx] =
+            Sharpen(tmp0[MIN(dyn - 1, MAX(0, dy - 1))][sx], tmp0[dy][sx],
+                    tmp0[MIN(dyn - 1, MAX(0, dy + 1))][sx]);
+      }
+    }
+  } else {
+    for (dy = 0; dy < dyn; ++dy) {
+      for (sx = 0; sx < sxn; ++sx) {
+        tmp1[dy][sx] = tmp0[dy][sx];
+      }
     }
   }
   for (dx = 0; dx < dxn; ++dx) {
@@ -177,12 +187,19 @@ static void GyaradosImpl(long dyw, long dxw, int dst[dyw][dxw], long syw,
       tmp2[dy][dx] = QRS(M, eax);
     }
   }
-  for (dx = 0; dx < dxn; ++dx) {
-    for (dy = 0; dy < dyn; ++dy) {
-      dst[dy][dx] = sharpen ? Sharpen(tmp2[dy][MIN(dxn - 1, MAX(0, dx - 1))],
-                                      tmp2[dy][dx],
-                                      tmp2[dy][MIN(dxn - 1, MAX(0, dx + 1))])
-                            : tmp2[dy][dx];
+  if (sharpen) {
+    for (dx = 0; dx < dxn; ++dx) {
+      for (dy = 0; dy < dyn; ++dy) {
+        dst[dy][dx] =
+            Sharpen(tmp2[dy][MIN(dxn - 1, MAX(0, dx - 1))], tmp2[dy][dx],
+                    tmp2[dy][MIN(dxn - 1, MAX(0, dx + 1))]);
+      }
+    }
+  } else {
+    for (dx = 0; dx < dxn; ++dx) {
+      for (dy = 0; dy < dyn; ++dy) {
+        dst[dy][dx] = tmp2[dy][dx];
+      }
     }
   }
 }
@@ -203,8 +220,8 @@ void *Gyarados(long dyw, long dxw, int dst[dyw][dxw], long syw, long sxw,
       CHECK_LE(sxn, sxw);
       CHECK_LE(dyn, dyw);
       CHECK_LE(dxn, dxw);
-      CHECK_LT(_bsrl(syn) + _bsrl(sxn), 32);
-      CHECK_LT(_bsrl(dyn) + _bsrl(dxn), 32);
+      CHECK_LT(bsrl(syn) + bsrl(sxn), 32);
+      CHECK_LT(bsrl(dyn) + bsrl(dxn), 32);
       CHECK_LE(dyw, 0x7fff);
       CHECK_LE(dxw, 0x7fff);
       CHECK_LE(syw, 0x7fff);

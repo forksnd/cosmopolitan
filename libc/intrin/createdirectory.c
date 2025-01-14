@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2022 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -17,8 +17,8 @@
 │ PERFORMANCE OF THIS SOFTWARE.                                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
 #include "libc/calls/syscall_support-nt.internal.h"
-#include "libc/intrin/describeflags.internal.h"
-#include "libc/intrin/strace.internal.h"
+#include "libc/intrin/describeflags.h"
+#include "libc/intrin/strace.h"
 #include "libc/nt/files.h"
 #include "libc/nt/thunk/msabi.h"
 
@@ -30,13 +30,13 @@ __msabi extern typeof(CreateDirectory) *const __imp_CreateDirectoryW;
  * @return handle, or -1 on failure
  * @note this wrapper takes care of ABI, STRACE(), and __winerr()
  */
-textwindows bool32
-CreateDirectory(const char16_t *lpPathName,
-                struct NtSecurityAttributes *lpSecurityAttributes) {
+textwindows bool32 CreateDirectory(const char16_t *lpPathName,
+                                   const struct NtSecurityAttributes *lpSec) {
   bool32 ok;
-  ok = __imp_CreateDirectoryW(lpPathName, lpSecurityAttributes);
-  if (!ok) __winerr();
+  ok = __imp_CreateDirectoryW(lpPathName, lpSec);
+  if (!ok)
+    __winerr();
   NTTRACE("CreateDirectory(%#hs, %s) → %hhhd% m", lpPathName,
-          DescribeNtSecurityAttributes(lpSecurityAttributes), ok);
+          DescribeNtSecurityAttributes(lpSec), ok);
   return ok;
 }

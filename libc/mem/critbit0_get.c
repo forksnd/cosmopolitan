@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2020 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -31,11 +31,13 @@ char *critbit0_get(struct critbit0 *t, const char *u) {
   const unsigned char *ubytes = (void *)u;
   const size_t ulen = strlen(u);
   unsigned char *p = t->root;
-  if (!p) return 0;
+  if (!p)
+    return 0;
   while (1 & (intptr_t)p) {
     struct CritbitNode *q = (void *)(p - 1);
     unsigned char c = 0;
-    if (q->byte < ulen) c = ubytes[q->byte];
+    if (q->byte < ulen)
+      c = ubytes[q->byte];
     const int direction = (1 + (q->otherbits | c)) >> 8;
     p = q->child[direction];
   }

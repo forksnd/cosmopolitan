@@ -1,12 +1,13 @@
 #include "libc/nt/codegen.h"
-.imp	kernel32,__imp_MultiByteToWideChar,MultiByteToWideChar,0
+.imp	kernel32,__imp_MultiByteToWideChar,MultiByteToWideChar
 
 	.text.windows
+	.ftrace1
 MultiByteToWideChar:
+	.ftrace2
 #ifdef __x86_64__
 	push	%rbp
 	mov	%rsp,%rbp
-	.profilable
 	mov	__imp_MultiByteToWideChar(%rip),%rax
 	jmp	__sysv2nt6
 #elif defined(__aarch64__)

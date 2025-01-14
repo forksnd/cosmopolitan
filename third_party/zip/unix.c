@@ -1,4 +1,3 @@
-// clang-format off
 /*
   unix/unix.c - Zip 3
 
@@ -20,8 +19,7 @@
 #include "libc/sysv/consts/clock.h"
 #include "libc/sysv/consts/sched.h"
 #include "libc/sysv/consts/timer.h"
-#include "libc/time/struct/tm.h"
-#include "libc/time/time.h"
+#include "libc/time.h"
 
 #if defined(MINIX) || defined(__mpexl)
 #  ifdef S_IWRITE
@@ -61,8 +59,7 @@
 /* Library functions not in (most) header files */
 
 #ifdef _POSIX_VERSION
-#include "libc/time/struct/utimbuf.h"
-#include "libc/time/time.h"
+#include "libc/utime.h"
 #else
    int utime OF((char *, time_t *));
 #endif
@@ -702,11 +699,10 @@ char *d;                /* directory to delete */
 
 #if defined(__NetBSD__) || defined(__FreeBSD__) || defined(__386BSD__) || \
     defined(__OpenBSD__) || defined(__bsdi__)
-#include "libc/intrin/newbie.h"
 #include "libc/calls/calls.h"
 #include "libc/calls/struct/rlimit.h"
 #include "libc/calls/struct/rusage.h"
-#include "libc/calls/sysparam.h"
+#include "libc/stdio/sysparam.h"
 #include "libc/calls/weirdtypes.h"
 #include "libc/limits.h"
 #include "libc/sysv/consts/endian.h"

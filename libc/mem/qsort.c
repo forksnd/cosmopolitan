@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:t;c-basic-offset:8;tab-width:8;coding:utf-8   -*-│
-│vi: set et ft=c ts=8 tw=8 fenc=utf-8                                       :vi│
+│ vi: set noet ft=c ts=8 sw=8 fenc=utf-8                                   :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright (c) 1991, 1993                                                     │
 │      The Regents of the University of California.  All rights reserved.      │
@@ -28,15 +28,11 @@
 │ OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF       │
 │ SUCH DAMAGE.                                                                 │
 ╚─────────────────────────────────────────────────────────────────────────────*/
-#include "libc/macros.internal.h"
+#include "libc/macros.h"
 #include "libc/mem/alg.h"
 #include "libc/str/str.h"
+__static_yoink("openbsd_sorting_notice");
 // clang-format off
-
-asm(".ident\t\"\\n\\n\
-OpenBSD Sorting (BSD-3)\\n\
-Copyright 1993 The Regents of the University of California\"");
-asm(".include \"libc/disclaimer.inc\"");
 
 #define SWAPTYPE_BYTEV	1
 #define SWAPTYPE_INTV	2
@@ -63,7 +59,7 @@ static inline void	 swapfunc(char *, char *, size_t, int);
 		TYPE	t = *pi;			\
 		*pi++ = *pj;				\
 		*pj++ = t;				\
-        } while (--i > 0);				\
+	} while (--i > 0);				\
 }
 
 static inline void
@@ -110,7 +106,7 @@ med3(char *a, char *b, char *c, CMPPAR)
 {
 	return CMP(a, b) < 0 ?
 	       (CMP(b, c) < 0 ? b : (CMP(a, c) < 0 ? c : a ))
-              :(CMP(b, c) > 0 ? b : (CMP(a, c) < 0 ? a : c ));
+	      :(CMP(b, c) > 0 ? b : (CMP(a, c) < 0 ? a : c ));
 }
 
 static void

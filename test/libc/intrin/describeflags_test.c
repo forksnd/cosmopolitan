@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2022 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -16,8 +16,8 @@
 │ TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR             │
 │ PERFORMANCE OF THIS SOFTWARE.                                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
-#include "libc/intrin/describeflags.internal.h"
-#include "libc/macros.internal.h"
+#include "libc/intrin/describeflags.h"
+#include "libc/macros.h"
 #include "libc/testlib/testlib.h"
 
 static const struct DescribeFlags kFlags[] = {
@@ -27,7 +27,7 @@ static const struct DescribeFlags kFlags[] = {
 
 const char *DescribeIt(uint32_t x) {
   static char s[64];
-  return DescribeFlags(s, ARRAYLEN(s), kFlags, ARRAYLEN(kFlags), "x", x);
+  return _DescribeFlags(s, ARRAYLEN(s), kFlags, ARRAYLEN(kFlags), "x", x);
 }
 
 TEST(describeflags, test) {

@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2022 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -17,26 +17,30 @@
 │ PERFORMANCE OF THIS SOFTWARE.                                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
 #include "libc/errno.h"
+#include "libc/intrin/kprintf.h"
 #include "libc/nt/enum/fileflagandattributes.h"
 #include "libc/nt/errors.h"
 #include "libc/nt/files.h"
 #include "libc/str/str.h"
 
+static int IsAlpha(int c) {
+  return ('A' <= c && c <= 'Z') || ('a' <= c && c <= 'z');
+}
+
 static textwindows bool SubpathExistsThatsNotDirectory(char16_t *path) {
-  int e;
   char16_t *p;
   uint32_t attrs;
-  e = errno;
   while ((p = strrchr16(path, '\\'))) {
+    if (p == path)
+      // don't bother checking GetFileAttributes(u"\\")
+      break;
+    if (p == path + 2 && IsAlpha(path[0]) && path[1] == ':')
+      // don't bother checking GetFileAttributes(u"C:\\")
+      break;
     *p = u'\0';
-    if ((attrs = GetFileAttributes(path)) != -1u) {
-      if (attrs & kNtFileAttributeDirectory) {
-        return false;
-      } else {
-        return true;
-      }
-    } else {
-      errno = e;
+    if ((attrs = GetFileAttributes(path)) != -1u &&
+        !(attrs & kNtFileAttributeDirectory)) {
+      return true;
     }
   }
   return false;
@@ -44,10 +48,14 @@ static textwindows bool SubpathExistsThatsNotDirectory(char16_t *path) {
 
 textwindows dontinline int64_t __fix_enotdir3(int64_t rc, char16_t *path1,
                                               char16_t *path2) {
-  if (rc == -1 && errno == kNtErrorPathNotFound) {
-    if ((!path1 || !SubpathExistsThatsNotDirectory(path1)) &&
-        (!path2 || !SubpathExistsThatsNotDirectory(path2))) {
-      errno = kNtErrorFileNotFound;
+  if (rc == -1 && (errno == kNtErrorPathNotFound ||  // Windows returns ENOTDIR
+                   errno == kNtErrorInvalidName)) {  // e.g. has trailing slash
+    bool isdir = false;
+    if ((!path1 || !(isdir |= SubpathExistsThatsNotDirectory(path1))) &&
+        (!path2 || !(isdir |= SubpathExistsThatsNotDirectory(path2)))) {
+      errno = kNtErrorFileNotFound;  // ENOENT
+    } else if (isdir) {
+      errno = kNtErrorPathNotFound;  // ENOTDIR
     }
   }
   return rc;

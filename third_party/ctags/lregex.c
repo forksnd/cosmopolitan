@@ -1,4 +1,3 @@
-// clang-format off
 /*
 *   $Id: lregex.c 747 2009-11-06 02:33:37Z dhiebert $
 *
@@ -17,6 +16,7 @@
 /*
 *   INCLUDE FILES
 */
+#include "libc/ctype.h"
 #include "third_party/ctags/general.h"  /* must always come first */
 
 #include "libc/mem/alg.h"

@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2021 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -33,7 +33,8 @@ wchar_t *wcsncat(wchar_t *d, const wchar_t *s, size_t n) {
   size_t i;
   wchar_t *r = d;
   d += wcslen(d);
-  for (i = 0; i < n && s[i]; ++i) d[i] = s[i];
+  for (i = 0; i < n && s[i]; ++i)
+    d[i] = s[i];
   d[i] = 0;
   return r;
 }

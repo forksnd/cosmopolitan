@@ -1,12 +1,13 @@
 #include "libc/nt/codegen.h"
-.imp	kernel32,__imp_WriteConsoleOutputAttribute,WriteConsoleOutputAttribute,0
+.imp	kernel32,__imp_WriteConsoleOutputAttribute,WriteConsoleOutputAttribute
 
 	.text.windows
+	.ftrace1
 WriteConsoleOutputAttribute:
+	.ftrace2
 #ifdef __x86_64__
 	push	%rbp
 	mov	%rsp,%rbp
-	.profilable
 	mov	__imp_WriteConsoleOutputAttribute(%rip),%rax
 	jmp	__sysv2nt6
 #elif defined(__aarch64__)

@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2020 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -19,8 +19,10 @@
 #include "libc/calls/calls.h"
 #include "libc/calls/state.internal.h"
 #include "libc/calls/syscall-sysv.internal.h"
+#include "libc/dce.h"
 #include "libc/intrin/atomic.h"
 #include "libc/intrin/likely.h"
+#include "libc/sysv/errfuns.h"
 #include "libc/thread/tls.h"
 
 /**
@@ -32,16 +34,18 @@
  *
  * @return thread id greater than zero or -1 w/ errno
  * @asyncsignalsafe
- * @threadsafe
  * @vforksafe
  */
 int gettid(void) {
   int tid;
   if (VERY_LIKELY(__tls_enabled && !__vforked)) {
-    tid = atomic_load_explicit(&__get_tls()->tib_tid, memory_order_acquire);
-    if (VERY_LIKELY(tid > 0)) {
+    tid = atomic_load_explicit(&__get_tls()->tib_ptid, memory_order_relaxed);
+    if (VERY_LIKELY(tid > 0))
       return tid;
-    }
   }
-  return sys_gettid();
+  if (IsXnuSilicon()) {
+    return enosys();  // can only happen if we can't access thread local storage
+  } else {
+    return sys_gettid();
+  }
 }

@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2020 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -21,7 +21,7 @@
 #include "libc/assert.h"
 #include "libc/limits.h"
 #include "libc/log/log.h"
-#include "libc/macros.internal.h"
+#include "libc/macros.h"
 #include "libc/math.h"
 #include "libc/str/str.h"
 
@@ -97,9 +97,9 @@ static int uncube(int x) {
   return x < 48 ? 0 : x < 115 ? 1 : (x - 35) / 40;
 }
 
-static textstartup void rgb2ansi_init(void) {
-  uint8_t c, y;
-  uint32_t i, j;
+__attribute__((__constructor__)) static textstartup void rgb2ansi_init(void) {
+  uint8_t c;
+  uint32_t i;
   memcpy(g_ansi2rgb_, &kCgaPalette, sizeof(kCgaPalette));
   for (i = 16; i < 232; ++i) {
     g_ansi2rgb_[i].r = kXtermCube[((i - 020) / 044) % 06];
@@ -114,5 +114,3 @@ static textstartup void rgb2ansi_init(void) {
     g_ansi2rgb_[i].xt = i;
   }
 }
-
-const void *const rgb2ansi_init_ctor[] initarray = {rgb2ansi_init};

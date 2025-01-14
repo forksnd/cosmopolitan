@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2022 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -21,8 +21,7 @@
 #include "libc/dce.h"
 #include "libc/sysv/consts/sig.h"
 
-privileged void __siginfo2cosmo(struct siginfo *si,
-                                const union siginfo_meta *m) {
+privileged void __siginfo2cosmo(siginfo_t *si, const union siginfo_meta *m) {
   void *si_addr;
   int32_t si_signo;
   int32_t si_errno;
@@ -85,7 +84,15 @@ privileged void __siginfo2cosmo(struct siginfo *si,
     notpossible;
   }
 
-  *si = (struct siginfo){0};
+  // Turn BUS_OBJERR into BUS_ADRERR for consistency with Linux.
+  // See test/libc/calls/sigbus_test.c
+  if (IsFreebsd() || IsOpenbsd()) {
+    if (si_signo == 10 && si_code == 3) {
+      si_code = 2;
+    }
+  }
+
+  *si = (siginfo_t){0};
   si->si_signo = si_signo;
   si->si_errno = si_errno;
   si->si_code = si_code;
@@ -96,6 +103,10 @@ privileged void __siginfo2cosmo(struct siginfo *si,
       si_signo == SIGBUS ||   //
       si_signo == SIGTRAP) {
     si->si_addr = si_addr;
+  } else if (si_signo == SIGCHLD) {
+    si->si_status = si_status;
+    si->si_pid = si_pid;
+    si->si_uid = si_uid;
   } else if (si_signo == SIGALRM) {
     si->si_timerid = si_timerid;
     si->si_overrun = si_overrun;

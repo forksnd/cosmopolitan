@@ -1,7 +1,7 @@
 #ifndef COSMOPOLITAN_THIRD_PARTY_MBEDTLS_PLATFORM_H_
 #define COSMOPOLITAN_THIRD_PARTY_MBEDTLS_PLATFORM_H_
 #include "libc/assert.h"
-#include "libc/fmt/fmt.h"
+#include "libc/calls/calls.h"
 #include "libc/intrin/likely.h"
 #include "libc/mem/mem.h"
 #include "libc/runtime/runtime.h"
@@ -28,7 +28,7 @@ COSMOPOLITAN_C_START_
 #define MBEDTLS_PARAM_FAILED(cond) \
   mbedtls_param_failed(#cond, __FILE__, __LINE__)
 #else
-#define MBEDTLS_PARAM_FAILED(cond) unreachable
+#define MBEDTLS_PARAM_FAILED(cond) __builtin_unreachable()
 #endif
 
 #define MBEDTLS_INTERNAL_VALIDATE_RET(cond, ret) \
@@ -51,7 +51,7 @@ COSMOPOLITAN_C_START_
 #define MBEDTLS_ASSERT(EXPR) \
   ((void)((EXPR) || (__assert_fail(#EXPR, __FILE__, __LINE__), 0)))
 #else
-#define MBEDTLS_ASSERT(EXPR) _unassert(EXPR)
+#define MBEDTLS_ASSERT(EXPR) unassert(EXPR)
 #endif
 
 typedef struct mbedtls_platform_context {

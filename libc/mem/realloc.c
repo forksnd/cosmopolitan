@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2023 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -16,11 +16,10 @@
 │ TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR             │
 │ PERFORMANCE OF THIS SOFTWARE.                                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
-#include "libc/mem/hook.internal.h"
 #include "libc/mem/mem.h"
 #include "third_party/dlmalloc/dlmalloc.h"
 
-void *(*hook_realloc)(void *, size_t) = dlrealloc;
+__static_yoink("free");
 
 /**
  * Allocates / resizes / frees memory, e.g.
@@ -29,8 +28,12 @@ void *(*hook_realloc)(void *, size_t) = dlrealloc;
  * does chunk p up to the minimum of (n, p's size) bytes, or null if no
  * space is available.
  *
- * If p is NULL, realloc is equivalent to malloc.
- * If p is not NULL and n is 0, realloc is equivalent to free.
+ * If p is NULL, then realloc() is equivalent to malloc().
+ *
+ * If p is not NULL and n is 0, then realloc() shrinks the allocation to
+ * zero bytes. The allocation isn't freed and still continues to be a
+ * uniquely allocated piece of memory. However it should be assumed that
+ * zero bytes can be accessed, since that's enforced by `MODE=asan`.
  *
  * The returned pointer may or may not be the same as p. The algorithm
  * prefers extending p in most cases when possible, otherwise it employs
@@ -54,11 +57,8 @@ void *(*hook_realloc)(void *, size_t) = dlrealloc;
  * @param p is address of current allocation or NULL
  * @param n is number of bytes needed
  * @return rax is result, or NULL w/ errno w/o free(p)
- * @note realloc(p=0, n=0) → malloc(32)
- * @note realloc(p≠0, n=0) → free(p)
  * @see dlrealloc()
- * @threadsafe
  */
 void *realloc(void *p, size_t n) {
-  return hook_realloc(p, n);
+  return dlrealloc(p, n);
 }

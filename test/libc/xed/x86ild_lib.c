@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2020 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -17,15 +17,15 @@
 │ PERFORMANCE OF THIS SOFTWARE.                                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
 #include "libc/fmt/bing.internal.h"
-#include "libc/macros.internal.h"
-#include "libc/mem/gc.internal.h"
+#include "libc/macros.h"
+#include "libc/mem/gc.h"
 #include "libc/str/str.h"
 #include "libc/testlib/testlib.h"
 #include "libc/x/x.h"
 #include "test/libc/xed/lib.h"
 #include "third_party/xed/x86.h"
 
-dontdiscard uint8_t *unbingx86op(const char16_t *codez) {
+__wur uint8_t *unbingx86op(const char16_t *codez) {
   size_t len;
   len = strlen16(codez);
   return unbingbuf(xmalloc(ROUNDUP(len, 16)), len, codez, 0x90);

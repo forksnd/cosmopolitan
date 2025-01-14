@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2020 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -16,25 +16,24 @@
 │ TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR             │
 │ PERFORMANCE OF THIS SOFTWARE.                                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
+#include "tool/build/lib/buffer.h"
 #include "libc/calls/calls.h"
 #include "libc/errno.h"
-#include "libc/fmt/fmt.h"
-#include "libc/intrin/tpenc.h"
-#include "libc/macros.internal.h"
+#include "libc/macros.h"
 #include "libc/mem/arraylist2.internal.h"
-#include "libc/mem/fmt.h"
 #include "libc/mem/mem.h"
+#include "libc/stdio/stdio.h"
 #include "libc/str/str.h"
-#include "tool/build/lib/buffer.h"
 
 /* TODO(jart): replace with new append*() library */
 
-void AppendData(struct Buffer *b, char *data, unsigned len) {
+void AppendData(struct Buffer *b, const char *data, size_t len) {
   char *p;
   unsigned n;
   if (b->i + len + 1 > b->n) {
     n = MAX(b->i + len + 1, MAX(16, b->n + (b->n >> 1)));
-    if (!(p = realloc(b->p, n))) return;
+    if (!(p = realloc(b->p, n)))
+      return;
     b->p = p;
     b->n = n;
   }
@@ -55,7 +54,7 @@ void AppendWide(struct Buffer *b, wint_t wc) {
   uint64_t wb;
   char buf[8];
   i = 0;
-  wb = _tpenc(wc);
+  wb = tpenc(wc);
   do {
     buf[i++] = wb & 0xFF;
     wb >>= 8;
@@ -65,7 +64,6 @@ void AppendWide(struct Buffer *b, wint_t wc) {
 
 int AppendFmt(struct Buffer *b, const char *fmt, ...) {
   int n;
-  char *p;
   va_list va, vb;
   va_start(va, fmt);
   va_copy(vb, va);

@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2022 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -20,16 +20,13 @@
 #include "libc/calls/struct/sigset.h"
 #include "libc/runtime/runtime.h"
 #include "libc/sysv/consts/sig.h"
-#ifdef __x86_64__
 
 // kudos rich felker for the brilliant design
-_Hide int __sigsetjmp_tail(sigjmp_buf jb, int rc) {
+int __sigsetjmp_tail(sigjmp_buf jb, int rc) {
   _Static_assert(
       sizeof(sigjmp_buf) == sizeof(jmp_buf) + 8 + 8 + sizeof(sigset_t),
       "please recompute sigjmp_buf w.r.t. sigset_t");
   void *p = (char *)jb + sizeof(jmp_buf) + 8 + 8;
-  _npassert(!sigprocmask(SIG_SETMASK, rc ? p : 0, rc ? 0 : p));
+  sigprocmask(SIG_SETMASK, rc ? p : 0, rc ? 0 : p);
   return rc;
 }
-
-#endif /* __x86_64__ */

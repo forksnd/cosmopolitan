@@ -1,12 +1,13 @@
 #include "libc/nt/codegen.h"
-.imp	advapi32,__imp_RegOpenUserClassesRoot,RegOpenUserClassesRoot,0
+.imp	advapi32,__imp_RegOpenUserClassesRoot,RegOpenUserClassesRoot
 
 	.text.windows
+	.ftrace1
 RegOpenUserClassesRoot:
+	.ftrace2
 #ifdef __x86_64__
 	push	%rbp
 	mov	%rsp,%rbp
-	.profilable
 	mov	__imp_RegOpenUserClassesRoot(%rip),%rax
 	jmp	__sysv2nt
 #elif defined(__aarch64__)

@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2021 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -34,19 +34,17 @@ struct appendz appendz(char *p) {
   struct appendz z;
   if (p) {
     z.n = malloc_usable_size(p);
-    _unassert(z.n >= W * 2 && !(z.n & (W - 1)));
+    unassert(z.n >= W * 2 && !(z.n & (W - 1)));
     z.i = *(size_t *)(p + z.n - W);
     if (!IsTiny() && W == 8) {
-      /*
-       * This check should fail if an append*() function was passed a
-       * pointer that was allocated manually by malloc(). Append ptrs
-       * can be free()'d safely, but they need to be allocated by the
-       * append library, because we write a special value to the end.
-       */
-      _unassert((z.i >> 48) == APPEND_COOKIE);
+      // This check should fail if an append*() function was passed a
+      // pointer that was allocated manually by malloc(). Append ptrs
+      // can be free()'d safely, but they need to be allocated by the
+      // append library, because we write a special value to the end.
+      unassert((z.i >> 48) == APPEND_COOKIE);
       z.i &= 0x0000ffffffffffff;
     }
-    _unassert(z.n >= z.i);
+    unassert(z.n >= z.i);
   } else {
     z.i = 0;
     z.n = 0;

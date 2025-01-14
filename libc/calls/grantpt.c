@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2020 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -16,13 +16,16 @@
 │ TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR             │
 │ PERFORMANCE OF THIS SOFTWARE.                                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
+#include "libc/calls/internal.h"
+#include "libc/intrin/fds.h"
 #include "libc/calls/syscall-sysv.internal.h"
 #include "libc/calls/syscall_support-sysv.internal.h"
 #include "libc/calls/termios.h"
 #include "libc/dce.h"
-#include "libc/intrin/strace.internal.h"
+#include "libc/intrin/strace.h"
+#include "libc/sysv/errfuns.h"
 
-extern const unsigned TIOCPTYGRANT;
+#define TIOCPTYGRANT 0x20007454
 
 /**
  * Grants access to subordinate pseudoteletypewriter.
@@ -34,7 +37,9 @@ extern const unsigned TIOCPTYGRANT;
  */
 int grantpt(int fd) {
   int rc;
-  if (IsXnu()) {
+  if (fd < g_fds.n && g_fds.p[fd].kind == kFdZip) {
+    rc = enotty();
+  } else if (IsXnu()) {
     rc = sys_ioctl(fd, TIOCPTYGRANT);
   } else {
     rc = _isptmaster(fd);

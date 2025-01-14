@@ -1,4 +1,3 @@
-/* clang-format off */
 //===-- lib/negsf2.c - single-precision negation ------------------*- C -*-===//
 //
 //                     The LLVM Compiler Infrastructure
@@ -12,7 +11,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-STATIC_YOINK("huge_compiler_rt_license");
+__static_yoink("huge_compiler_rt_license");
 
 #define SINGLE_PRECISION
 #include "third_party/compiler_rt/fp_lib.inc"

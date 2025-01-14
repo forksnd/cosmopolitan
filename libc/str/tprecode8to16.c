@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2020 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -16,32 +16,60 @@
 │ TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR             │
 │ PERFORMANCE OF THIS SOFTWARE.                                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
-#include "libc/intrin/pcmpgtb.h"
-#include "libc/intrin/pmovmskb.h"
-#include "libc/intrin/punpckhbw.h"
-#include "libc/intrin/punpcklbw.h"
+#include <arm_neon.h>
+#include <stdint.h>
+#include <string.h>
+#include "libc/dce.h"
 #include "libc/str/str.h"
 #include "libc/str/thompike.h"
 #include "libc/str/utf16.h"
+#include "third_party/aarch64/arm_neon.internal.h"
+#include "third_party/intel/emmintrin.internal.h"
 
-/* 34x speedup for ascii */
-static inline noasan axdx_t tprecode8to16_sse2(char16_t *dst, size_t dstsize,
-                                               const char *src, axdx_t r) {
-  uint8_t v1[16], v2[16], vz[16];
-  __builtin_memset(vz, 0, 16);
+#if !IsModeDbg()
+#if defined(__x86_64__)
+
+static inline axdx_t tprecode8to16_sse2(char16_t *dst, size_t dstsize,
+                                        const char *src, axdx_t r) {
+  __m128i v1, v2, vz;
+  vz = _mm_setzero_si128();
   while (r.ax + 16 < dstsize) {
-    __builtin_memcpy(v1, src + r.dx, 16);
-    pcmpgtb((int8_t *)v2, (int8_t *)v1, (int8_t *)vz);
-    if (pmovmskb(v2) != 0xFFFF) break;
-    punpcklbw(v2, v1, vz);
-    punpckhbw(v1, v1, vz);
-    __builtin_memcpy(dst + r.ax + 0, v2, 16);
-    __builtin_memcpy(dst + r.ax + 8, v1, 16);
+    v1 = _mm_loadu_si128((__m128i *)(src + r.dx));
+    v2 = _mm_cmpgt_epi8(v1, vz);
+    if (_mm_movemask_epi8(v2) != 0xFFFF)
+      break;
+    __m128i lo = _mm_unpacklo_epi8(v1, vz);
+    __m128i hi = _mm_unpackhi_epi8(v1, vz);
+    _mm_storeu_si128((__m128i *)(dst + r.ax), lo);
+    _mm_storeu_si128((__m128i *)(dst + r.ax + 8), hi);
     r.ax += 16;
     r.dx += 16;
   }
   return r;
 }
+
+#elif defined(__aarch64__)
+
+static inline axdx_t tprecode8to16_neon(char16_t *dst, size_t dstsize,
+                                        const char *src, axdx_t r) {
+  uint8x16_t v1;
+  while (r.ax + 16 < dstsize) {
+    v1 = vld1q_u8((const uint8_t *)(src + r.dx));
+    uint8x16_t cmp = vcgtq_u8(v1, vdupq_n_u8(0));
+    if (vaddvq_u8(cmp) != 16 * 0xFF)
+      break;
+    uint16x8_t lo = vmovl_u8(vget_low_u8(v1));
+    uint16x8_t hi = vmovl_u8(vget_high_u8(v1));
+    vst1q_u16((uint16_t *)(dst + r.ax), lo);
+    vst1q_u16((uint16_t *)(dst + r.ax + 8), hi);
+    r.ax += 16;
+    r.dx += 16;
+  }
+  return r;
+}
+
+#endif
+#endif
 
 /**
  * Transcodes UTF-8 to UTF-16.
@@ -54,24 +82,33 @@ static inline noasan axdx_t tprecode8to16_sse2(char16_t *dst, size_t dstsize,
  * @param src is NUL-terminated UTF-8 input string
  * @return ax shorts written excluding nul
  * @return dx index of character after nul word in src
+ * @asyncsignalsafe
  */
 axdx_t tprecode8to16(char16_t *dst, size_t dstsize, const char *src) {
   axdx_t r;
   unsigned w;
-  int x, y, a, b, i, n;
+  int x, a, b, i, n;
   r.ax = 0;
   r.dx = 0;
   for (;;) {
-    if (!IsTiny() && !((uintptr_t)(src + r.dx) & 15)) {
+#if !IsModeDbg()
+#if defined(__x86_64__)
+    if (!((uintptr_t)(src + r.dx) & 15))
       r = tprecode8to16_sse2(dst, dstsize, src, r);
-    }
+#elif defined(__aarch64__)
+    if (!((uintptr_t)(src + r.dx) & 15))
+      r = tprecode8to16_neon(dst, dstsize, src, r);
+#endif
+#endif
     x = src[r.dx++] & 0377;
     if (x >= 0300) {
       a = ThomPikeByte(x);
       n = ThomPikeLen(x) - 1;
       for (i = 0;;) {
-        if (!(b = src[r.dx + i] & 0377)) break;
-        if (!ThomPikeCont(b)) break;
+        if (!(b = src[r.dx + i] & 0377))
+          break;
+        if (!ThomPikeCont(b))
+          break;
         a = ThomPikeMerge(a, b);
         if (++i == n) {
           r.dx += i;
@@ -80,7 +117,8 @@ axdx_t tprecode8to16(char16_t *dst, size_t dstsize, const char *src) {
         }
       }
     }
-    if (!x) break;
+    if (!x)
+      break;
     w = EncodeUtf16(x);
     while (w && r.ax + 1 < dstsize) {
       dst[r.ax++] = w;

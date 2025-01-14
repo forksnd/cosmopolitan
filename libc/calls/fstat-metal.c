@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2021 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -23,7 +23,8 @@
 #include "libc/sysv/errfuns.h"
 
 int sys_fstat_metal(int fd, struct stat *st) {
-  if (fd < 0) return einval();
+  if (fd < 0)
+    return einval();
   if (fd < g_fds.n && g_fds.p[fd].kind == kFdSerial) {
     bzero(st, sizeof(*st));
     st->st_dev = g_fds.p[fd].handle;

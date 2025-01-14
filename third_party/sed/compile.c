@@ -1,4 +1,3 @@
-// clang-format off
 /*	$NetBSD: compile.c,v 1.48 2019/10/05 20:23:55 christos Exp $	*/
 
 /*-
@@ -47,8 +46,9 @@
 #include "libc/calls/weirdtypes.h"
 #include "libc/sysv/consts/s.h"
 #include "libc/sysv/consts/utime.h"
-#include "libc/mem/gc.internal.h"
-#include "libc/time/time.h"
+#include "libc/mem/gc.h"
+#include "libc/ctype.h"
+#include "libc/time.h"
 
 #include "libc/str/str.h"
 #include "libc/log/bsd.h"
@@ -62,22 +62,20 @@
 #include "libc/sysv/consts/_posix.h"
 #include "third_party/regex/regex.h"
 #include "libc/calls/calls.h"
-#include "libc/fmt/fmt.h"
-#include "libc/stdio/lock.internal.h"
 #include "libc/stdio/stdio.h"
-#include "libc/stdio/temp.h"
+#include "libc/temp.h"
 #include "libc/mem/alg.h"
 #include "libc/fmt/conv.h"
 #include "libc/mem/mem.h"
 #include "libc/stdio/rand.h"
 #include "libc/runtime/runtime.h"
-#include "libc/stdio/temp.h"
+#include "libc/temp.h"
 #include "libc/sysv/consts/exit.h"
 #include "third_party/gdtoa/gdtoa.h"
 #include "libc/mem/alg.h"
 #include "libc/str/str.h"
 #include "libc/str/str.h"
-#include "libc/time/time.h"
+#include "libc/time.h"
 
 #include "third_party/sed/defs.h"
 #include "third_party/sed/extern.h"
@@ -164,7 +162,7 @@ compile(void)
 	fixuplabel(prog, NULL);
 	uselabel();
 	if (appendnum > 0)
-		appends = xmalloc(sizeof(struct s_appends) * appendnum);
+		appends_ = xmalloc(sizeof(struct s_appends) * appendnum);
 	g_match = xmalloc((maxnsub + 1) * sizeof(regmatch_t));
 }
 

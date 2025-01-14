@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2021 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -17,7 +17,7 @@
 │ PERFORMANCE OF THIS SOFTWARE.                                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
 #include "libc/str/str.h"
-#include "libc/str/tab.internal.h"
+#include "libc/str/tab.h"
 #include "net/http/http.h"
 
 /**
@@ -25,10 +25,13 @@
  */
 bool IsMimeType(const char *t, size_t n, const char *s) {
   size_t i;
-  if (n == -1) n = t ? strlen(t) : 0;
+  if (n == -1)
+    n = t ? strlen(t) : 0;
   for (i = 0; i < n; ++i) {
-    if (!s[i]) return !kHttpToken[t[i] & 0xFF];
-    if (kToLower[s[i] & 0xFF] != kToLower[t[i] & 0xFF]) return false;
+    if (!s[i])
+      return !kHttpToken[t[i] & 0xFF];
+    if (kToLower[s[i] & 0xFF] != kToLower[t[i] & 0xFF])
+      return false;
   }
   return !s[i];
 }

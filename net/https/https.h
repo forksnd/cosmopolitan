@@ -1,13 +1,12 @@
 #ifndef COSMOPOLITAN_NET_HTTPS_HTTPS_H_
 #define COSMOPOLITAN_NET_HTTPS_HTTPS_H_
-#include "libc/time/struct/tm.h"
+#include "libc/time.h"
 #include "third_party/mbedtls/ctr_drbg.h"
 #include "third_party/mbedtls/ecp.h"
 #include "third_party/mbedtls/md.h"
 #include "third_party/mbedtls/pk.h"
 #include "third_party/mbedtls/ssl_ciphersuites.h"
 #include "third_party/mbedtls/x509_crt.h"
-#if !(__ASSEMBLER__ + __LINKER__ + 0)
 COSMOPOLITAN_C_START_
 
 struct Cert {
@@ -24,7 +23,7 @@ void FormatSslTime(char[restrict hasatleast 16], struct tm *);
 void ChooseCertificateLifetime(char[16], char[16]);
 void LogCertificate(const char *, mbedtls_x509_crt *);
 bool IsSelfSigned(mbedtls_x509_crt *);
-char *FormatX509Name(mbedtls_x509_name *);
+char *FormatX509Name(const mbedtls_x509_name *);
 void TlsDie(const char *, int) wontreturn;
 bool ChainCertificate(mbedtls_x509_crt *, mbedtls_x509_crt *);
 bool CertHasIp(const mbedtls_x509_crt *, uint32_t);
@@ -40,5 +39,4 @@ struct Cert FinishCertificate(struct Cert *, mbedtls_x509write_cert *,
                               mbedtls_pk_context *);
 
 COSMOPOLITAN_C_END_
-#endif /* !(__ASSEMBLER__ + __LINKER__ + 0) */
 #endif /* COSMOPOLITAN_NET_HTTPS_HTTPS_H_ */

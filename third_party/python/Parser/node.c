@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:4;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=4 sts=4 sw=4 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=4 sts=4 sw=4 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Python 3                                                                     │
 │ https://docs.python.org/3/license.html                                       │
@@ -9,7 +9,6 @@
 #include "third_party/python/Include/errcode.h"
 #include "third_party/python/Include/node.h"
 #include "third_party/python/Include/objimpl.h"
-/* clang-format off */
 
 node *
 PyNode_New(int type)
@@ -32,7 +31,7 @@ fancy_roundup(int x)
     /* Round up to the closest power of 2 >= n. */
     int r;
     assert(x > 128);
-    r = 1u << (_bsr(x - 1) + 1); /* hacker's delight */
+    r = 1u << (bsr(x - 1) + 1); /* hacker's delight */
     return r > 0 ? r : -1;
 }
 

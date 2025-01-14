@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2021 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -33,7 +33,8 @@ char16_t *strncat16(char16_t *d, const char16_t *s, size_t n) {
   size_t i;
   char16_t *r = d;
   d += strlen16(d);
-  for (i = 0; i < n && s[i]; ++i) d[i] = s[i];
+  for (i = 0; i < n && s[i]; ++i)
+    d[i] = s[i];
   d[i] = 0;
   return r;
 }

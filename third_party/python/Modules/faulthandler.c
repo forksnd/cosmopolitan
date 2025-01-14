@@ -1,11 +1,12 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:4;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=4 sts=4 sw=4 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=4 sts=4 sw=4 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Python 3                                                                     │
 │ https://docs.python.org/3/license.html                                       │
 ╚─────────────────────────────────────────────────────────────────────────────*/
 #include "libc/calls/calls.h"
 #include "libc/calls/struct/sigaction.h"
+#include "libc/calls/struct/sigaltstack.h"
 #include "libc/errno.h"
 #include "libc/sysv/consts/rlimit.h"
 #include "libc/sysv/consts/sa.h"
@@ -30,7 +31,6 @@
 #include "third_party/python/Include/traceback.h"
 #include "third_party/python/Include/yoink.h"
 #include "third_party/python/pyconfig.h"
-/* clang-format off */
 
 PYTHON_PROVIDE("faulthandler");
 PYTHON_PROVIDE("faulthandler._fatal_error");
@@ -102,7 +102,7 @@ static struct {
     PY_TIMEOUT_T timeout_us;   /* timeout in microseconds */
     int repeat;
     PyInterpreterState *interp;
-    int exit;
+    int exit_;
     char *header;
     size_t header_len;
     /* The main thread always holds this lock. It is only released when
@@ -622,7 +622,7 @@ faulthandler_thread(void *unused)
         errmsg = _Py_DumpTracebackThreads(thread.fd, thread.interp, NULL);
         ok = (errmsg == NULL);
 
-        if (thread.exit)
+        if (thread.exit_)
             _exit(1);
     } while (ok && thread.repeat);
 
@@ -729,7 +729,7 @@ faulthandler_dump_traceback_later(PyObject *self,
     thread.timeout_us = timeout_us;
     thread.repeat = repeat;
     thread.interp = tstate->interp;
-    thread.exit = exit;
+    thread.exit_ = exit;
     thread.header = header;
     thread.header_len = header_len;
 
@@ -1434,7 +1434,12 @@ void _PyFaulthandler_Fini(void)
 #endif
 }
 
-_Section(".rodata.pytab.1") const struct _inittab _PyImport_Inittab_faulthandler = {
+#ifdef __aarch64__
+_Section(".rodata.pytab.1 //")
+#else
+_Section(".rodata.pytab.1")
+#endif
+ const struct _inittab _PyImport_Inittab_faulthandler = {
     "faulthandler",
     PyInit_faulthandler,
 };

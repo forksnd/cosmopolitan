@@ -1,10 +1,9 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:4;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=4 sts=4 sw=4 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=4 sts=4 sw=4 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Python 3                                                                     │
 │ https://docs.python.org/3/license.html                                       │
 ╚─────────────────────────────────────────────────────────────────────────────*/
-/* clang-format off */
 /*
  * _codecs_jp.c: Codecs collection for Japanese encodings
  *
@@ -703,7 +702,12 @@ END_CODECS_LIST
 
 I_AM_A_MODULE_FOR(jp)
 
-_Section(".rodata.pytab.1") const struct _inittab _PyImport_Inittab__codecs_jp = {
+#ifdef __aarch64__
+_Section(".rodata.pytab.1 //")
+#else
+_Section(".rodata.pytab.1")
+#endif
+ const struct _inittab _PyImport_Inittab__codecs_jp = {
     "_codecs_jp",
     PyInit__codecs_jp,
 };

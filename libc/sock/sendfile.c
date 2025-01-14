@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2020 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -17,77 +17,67 @@
 │ PERFORMANCE OF THIS SOFTWARE.                                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
 #include "libc/assert.h"
+#include "libc/atomic.h"
 #include "libc/calls/calls.h"
 #include "libc/calls/internal.h"
-#include "libc/calls/sig.internal.h"
+#include "libc/calls/struct/sigset.internal.h"
 #include "libc/calls/syscall-sysv.internal.h"
-#include "libc/calls/syscall_support-nt.internal.h"
+#include "libc/cosmo.h"
 #include "libc/dce.h"
 #include "libc/errno.h"
-#include "libc/intrin/asan.internal.h"
-#include "libc/intrin/describeflags.internal.h"
-#include "libc/intrin/safemacros.internal.h"
-#include "libc/intrin/strace.internal.h"
-#include "libc/macros.internal.h"
-#include "libc/nt/enum/filetype.h"
-#include "libc/nt/enum/wait.h"
+#include "libc/intrin/describeflags.h"
+#include "libc/intrin/strace.h"
+#include "libc/nt/enum/wsaid.h"
 #include "libc/nt/errors.h"
+#include "libc/nt/events.h"
 #include "libc/nt/files.h"
 #include "libc/nt/struct/byhandlefileinformation.h"
+#include "libc/nt/struct/guid.h"
+#include "libc/nt/struct/overlapped.h"
+#include "libc/nt/thunk/msabi.h"
 #include "libc/nt/winsock.h"
 #include "libc/sock/internal.h"
 #include "libc/sock/sendfile.internal.h"
-#include "libc/str/str.h"
+#include "libc/sock/syscall_fd.internal.h"
+#include "libc/sock/wsaid.internal.h"
+#include "libc/stdio/sysparam.h"
 #include "libc/sysv/errfuns.h"
 
-// sendfile() isn't specified as raising eintr
-static textwindows int SendfileBlock(int64_t handle,
-                                     struct NtOverlapped *overlapped) {
-  int rc;
-  uint32_t i, got, flags = 0;
-  if (WSAGetLastError() != kNtErrorIoPending &&
-      WSAGetLastError() != WSAEINPROGRESS) {
-    NTTRACE("TransmitFile failed %lm");
-    return __winsockerr();
-  }
-  for (;;) {
-    i = WSAWaitForMultipleEvents(1, &overlapped->hEvent, true,
-                                 __SIG_POLLING_INTERVAL_MS, true);
-    if (i == kNtWaitFailed) {
-      NTTRACE("WSAWaitForMultipleEvents failed %lm");
-      return __winsockerr();
-    } else if (i == kNtWaitTimeout || i == kNtWaitIoCompletion) {
-      if (_check_interrupts(true, g_fds.p)) return -1;
-#if _NTTRACE
-      POLLTRACE("WSAWaitForMultipleEvents...");
-#endif
-    } else {
-      break;
-    }
-  }
-  if (!WSAGetOverlappedResult(handle, overlapped, &got, false, &flags)) {
-    NTTRACE("WSAGetOverlappedResult failed %lm");
-    return __winsockerr();
-  }
-  return got;
+static struct {
+  atomic_uint once;
+  errno_t err;
+  bool32 (*__msabi lpTransmitFile)(
+      int64_t hSocket, int64_t hFile, uint32_t opt_nNumberOfBytesToWrite,
+      uint32_t opt_nNumberOfBytesPerSend,
+      struct NtOverlapped *opt_inout_lpOverlapped,
+      const struct NtTransmitFileBuffers *opt_lpTransmitBuffers,
+      uint32_t dwReserved);
+} g_transmitfile;
+
+static void transmitfile_init(void) {
+  static struct NtGuid TransmitfileGuid = WSAID_TRANSMITFILE;
+  g_transmitfile.lpTransmitFile = __get_wsaid(&TransmitfileGuid);
 }
 
-static dontinline textwindows ssize_t sys_sendfile_nt(
+textwindows dontinline static ssize_t sys_sendfile_nt(
     int outfd, int infd, int64_t *opt_in_out_inoffset, uint32_t uptobytes) {
   ssize_t rc;
-  int64_t ih, oh, pos, eof, offset;
+  uint32_t flags = 0;
+  bool locked = false;
+  int64_t ih, oh, eof, offset;
   struct NtByHandleFileInformation wst;
-  if (!__isfdkind(infd, kFdFile)) return ebadf();
-  if (!__isfdkind(outfd, kFdSocket)) return ebadf();
+  if (!__isfdkind(infd, kFdFile) || !g_fds.p[infd].cursor)
+    return ebadf();
+  if (!__isfdkind(outfd, kFdSocket))
+    return ebadf();
   ih = g_fds.p[infd].handle;
   oh = g_fds.p[outfd].handle;
-  if (!SetFilePointerEx(ih, 0, &pos, SEEK_CUR)) {
-    return __winerr();
-  }
   if (opt_in_out_inoffset) {
     offset = *opt_in_out_inoffset;
   } else {
-    offset = pos;
+    locked = true;
+    __cursor_lock(g_fds.p[infd].cursor);
+    offset = g_fds.p[infd].cursor->shared->pointer;
   }
   if (GetFileInformationByHandle(ih, &wst)) {
     // TransmitFile() returns EINVAL if `uptobytes` goes past EOF.
@@ -96,25 +86,31 @@ static dontinline textwindows ssize_t sys_sendfile_nt(
       uptobytes = eof - offset;
     }
   } else {
+    if (locked)
+      __cursor_unlock(g_fds.p[infd].cursor);
     return ebadf();
   }
-  struct NtOverlapped ov = {
-      .Pointer = (void *)(intptr_t)offset,
-      .hEvent = WSACreateEvent(),
-  };
-  if (TransmitFile(oh, ih, uptobytes, 0, &ov, 0, 0)) {
-    rc = uptobytes;
-  } else {
-    rc = SendfileBlock(oh, &ov);
-  }
-  if (rc != -1) {
-    if (opt_in_out_inoffset) {
-      *opt_in_out_inoffset = offset + rc;
-      _npassert(SetFilePointerEx(ih, pos, 0, SEEK_SET));
+  struct NtOverlapped ov = {.hEvent = WSACreateEvent(), .Pointer = offset};
+  cosmo_once(&g_transmitfile.once, transmitfile_init);
+  if (ov.hEvent &&
+      (g_transmitfile.lpTransmitFile(oh, ih, uptobytes, 0, &ov, 0, 0) ||
+       WSAGetLastError() == kNtErrorIoPending ||
+       WSAGetLastError() == WSAEINPROGRESS)) {
+    if (WSAGetOverlappedResult(oh, &ov, &uptobytes, true, &flags)) {
+      rc = uptobytes;
+      if (opt_in_out_inoffset) {
+        *opt_in_out_inoffset = offset + rc;
+      } else {
+        g_fds.p[infd].cursor->shared->pointer = offset + rc;
+      }
     } else {
-      _npassert(SetFilePointerEx(ih, offset + rc, 0, SEEK_SET));
+      rc = __winsockerr();
     }
+  } else {
+    rc = __winsockerr();
   }
+  if (locked)
+    __cursor_unlock(g_fds.p[infd].cursor);
   WSACloseEvent(ov.hEvent);
   return rc;
 }
@@ -131,17 +127,20 @@ static ssize_t sys_sendfile_bsd(int outfd, int infd,
   }
   if (IsFreebsd()) {
     rc = sys_sendfile_freebsd(infd, outfd, offset, uptobytes, 0, &sbytes, 0);
-    if (rc == -1 && errno == ENOBUFS) errno = ENOMEM;
+    if (rc == -1 && errno == ENOBUFS)
+      errno = ENOMEM;
   } else {
     sbytes = uptobytes;
     rc = sys_sendfile_xnu(infd, outfd, offset, &sbytes, 0, 0);
   }
-  if (rc == -1 && errno == ENOTSOCK) errno = EBADF;
+  if (rc == -1 && errno == ENOTSOCK)
+    errno = EBADF;
   if (rc != -1) {
     if (opt_in_out_inoffset) {
       *opt_in_out_inoffset += sbytes;
     } else {
-      _npassert(lseek(infd, offset + sbytes, SEEK_SET) == offset + sbytes);
+      unassert(sys_lseek(infd, offset + sbytes, SEEK_SET, 0) ==
+               offset + sbytes);
     }
     return sbytes;
   } else {
@@ -189,15 +188,14 @@ ssize_t sendfile(int outfd, int infd, int64_t *opt_in_out_inoffset,
   // less error prone, since Linux may EINVAL if greater than INT64_MAX
   uptobytes = MIN(uptobytes, 0x7ffff000);
 
-  if (IsAsan() && opt_in_out_inoffset &&
-      !__asan_is_valid(opt_in_out_inoffset, 8)) {
-    rc = efault();
-  } else if (IsLinux()) {
+  if (IsLinux()) {
     rc = sys_sendfile(outfd, infd, opt_in_out_inoffset, uptobytes);
   } else if (IsFreebsd() || IsXnu()) {
     rc = sys_sendfile_bsd(outfd, infd, opt_in_out_inoffset, uptobytes);
   } else if (IsWindows()) {
+    BLOCK_SIGNALS;
     rc = sys_sendfile_nt(outfd, infd, opt_in_out_inoffset, uptobytes);
+    ALLOW_SIGNALS;
   } else {
     rc = enosys();
   }
@@ -206,3 +204,5 @@ ssize_t sendfile(int outfd, int infd, int64_t *opt_in_out_inoffset,
          DescribeInOutInt64(rc, opt_in_out_inoffset), uptobytes, rc);
   return rc;
 }
+
+__weak_reference(sendfile, sendfile64);

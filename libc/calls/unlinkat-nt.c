@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2020 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -33,48 +33,7 @@
 #include "libc/nt/synchronization.h"
 #include "libc/str/str.h"
 #include "libc/sysv/consts/at.h"
-
-/**
- * Performs synchronization on directory of pathname.
- *
- * This code is intended to help prevent subsequent i/o operations
- * from failing for no reason at all. For example a unit test that
- * repeatedly opens and unlinks the same filename.
- */
-static textwindows int SyncDirectory(int df, char16_t path[PATH_MAX], int n) {
-  int rc;
-  int64_t fh;
-  char16_t *p;
-  if ((p = memrchr16(path, '\\', n))) {
-    if (p - path == 2 && path[1] == ':') return 0;  // XXX: avoid syncing volume
-    *p = 0;
-  } else {
-    if (df != AT_FDCWD) {
-      if (FlushFileBuffers(df)) {
-        return 0;
-      } else {
-        return -1;
-      }
-    }
-    path[0] = '.';
-    path[1] = 0;
-  }
-  if ((fh = CreateFile(
-           path, kNtFileGenericWrite,
-           kNtFileShareRead | kNtFileShareWrite | kNtFileShareDelete, 0,
-           kNtOpenExisting, kNtFileAttributeNormal | kNtFileFlagBackupSemantics,
-           0)) != -1) {
-    if (FlushFileBuffers(fh)) {
-      rc = 0;
-    } else {
-      rc = -1;
-    }
-    CloseHandle(fh);
-  } else {
-    rc = -1;
-  }
-  return rc;
-}
+#include "libc/sysv/errfuns.h"
 
 static textwindows bool IsDirectorySymlink(const char16_t *path) {
   int e;
@@ -96,28 +55,23 @@ static textwindows bool IsDirectorySymlink(const char16_t *path) {
 }
 
 static textwindows int sys_rmdir_nt(const char16_t *path) {
-  int e, ms;
-  e = errno;
+  int ms;
   for (ms = 1;; ms *= 2) {
-    if (RemoveDirectory(path)) {
+    if (RemoveDirectory(path))
       return 0;
-    }
-    /*
-     * Files can linger, for absolutely no reason.
-     * Possibly some Windows Defender bug on Win7.
-     * Sleep for up to one second w/ expo backoff.
-     * Alternative is use Microsoft internal APIs.
-     * Never could have imagined it'd be this bad.
-     */
-    if (GetLastError() == kNtErrorDirNotEmpty && ms <= 2048) {
-      errno = e;
+    // Files can linger, for absolutely no reason.
+    // Possibly some Windows Defender bug on Win7.
+    // Sleep for up to one second w/ expo backoff.
+    // Alternative is use Microsoft internal APIs.
+    // Never could have imagined it'd be this bad.
+    if (GetLastError() == kNtErrorDirNotEmpty && ms <= 1024) {
       Sleep(ms);
       continue;
     } else {
       break;
     }
   }
-  return -1;
+  return __winerr();
 }
 
 static textwindows int sys_unlink_nt(const char16_t *path) {
@@ -130,19 +84,45 @@ static textwindows int sys_unlink_nt(const char16_t *path) {
   }
 }
 
-textwindows int sys_unlinkat_nt(int dirfd, const char *path, int flags) {
-  int n, rc;
-  char16_t path16[PATH_MAX];
-  if ((n = __mkntpathat(dirfd, path, 0, path16)) == -1) {
-    rc = -1;
-  } else if (flags & AT_REMOVEDIR) {
-    rc = sys_rmdir_nt(path16);
+textwindows int sys_unlinkat_nt_impl(const char16_t *path, int flags) {
+  if (flags & AT_REMOVEDIR) {
+    return sys_rmdir_nt(path);
   } else {
-    rc = sys_unlink_nt(path16);
-    if (rc != -1) {
-      // TODO(jart): prove that it helps first
-      // rc = SyncDirectory(dirfd, path16, n);
+    return sys_unlink_nt(path);
+  }
+}
+
+textwindows int sys_unlinkat_nt(int dirfd, const char *path, int flags) {
+  char16_t path16[PATH_MAX];
+
+  // check validity of flags
+  if (flags & ~AT_REMOVEDIR) {
+    return einval();
+  }
+
+  // translate unix to windows path
+  int n;
+  if ((n = __mkntpathat(dirfd, path, 0, path16)) == -1) {
+    return -1;
+  }
+
+  // optimistic first attempt
+  int e = errno;
+  int rc = sys_unlinkat_nt_impl(path16, flags);
+
+  // reactively ensure unlink() deletes read-only files
+  if (rc == -1 && errno == kNtErrorAccessDenied) {
+    uint32_t attr;
+    if ((attr = GetFileAttributes(path16)) != -1u &&
+        (attr & kNtFileAttributeReadonly) &&
+        SetFileAttributes(path16, attr & ~kNtFileAttributeReadonly)) {
+      errno = e;
+      rc = sys_unlinkat_nt_impl(path16, flags);
+    } else {
+      errno = kNtErrorAccessDenied;
     }
   }
+
+  // return status
   return __fix_enotdir(rc, path16);
 }

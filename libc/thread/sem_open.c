@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2022 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -17,29 +17,33 @@
 │ PERFORMANCE OF THIS SOFTWARE.                                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
 #include "libc/assert.h"
+#include "libc/atomic.h"
 #include "libc/calls/blockcancel.internal.h"
 #include "libc/calls/calls.h"
 #include "libc/calls/struct/stat.h"
+#include "libc/calls/syscall-sysv.internal.h"
+#include "libc/cosmo.h"
 #include "libc/dce.h"
 #include "libc/errno.h"
 #include "libc/intrin/atomic.h"
-#include "libc/intrin/nopl.internal.h"
-#include "libc/intrin/strace.internal.h"
+#include "libc/intrin/strace.h"
 #include "libc/limits.h"
 #include "libc/mem/mem.h"
 #include "libc/runtime/runtime.h"
+#include "libc/runtime/syslib.internal.h"
 #include "libc/str/str.h"
 #include "libc/sysv/consts/at.h"
 #include "libc/sysv/consts/map.h"
 #include "libc/sysv/consts/o.h"
 #include "libc/sysv/consts/prot.h"
 #include "libc/sysv/errfuns.h"
+#include "libc/thread/posixthread.internal.h"
 #include "libc/thread/semaphore.h"
 #include "libc/thread/thread.h"
 #include "libc/thread/tls.h"
 
 static struct Semaphores {
-  pthread_once_t once;
+  atomic_uint once;
   pthread_mutex_t lock;
   struct Semaphore {
     struct Semaphore *next;
@@ -47,34 +51,30 @@ static struct Semaphores {
     char *path;
     bool dead;
     int refs;
-  } * list;
-} g_semaphores;
+  } *list;
+} g_semaphores = {
+    .lock = PTHREAD_MUTEX_INITIALIZER,
+};
 
 static void sem_open_lock(void) {
-  pthread_mutex_lock(&g_semaphores.lock);
+  _pthread_mutex_lock(&g_semaphores.lock);
 }
 
 static void sem_open_unlock(void) {
-  pthread_mutex_unlock(&g_semaphores.lock);
+  _pthread_mutex_unlock(&g_semaphores.lock);
 }
 
-static void sem_open_funlock(void) {
-  pthread_mutex_init(&g_semaphores.lock, 0);
+static void sem_open_wipe(void) {
+  _pthread_mutex_wipe_np(&g_semaphores.lock);
 }
 
 static void sem_open_setup(void) {
-  sem_open_funlock();
-  pthread_atfork(sem_open_lock, sem_open_unlock, sem_open_funlock);
+  pthread_atfork(sem_open_lock, sem_open_unlock, sem_open_wipe);
 }
 
 static void sem_open_init(void) {
-  pthread_once(&g_semaphores.once, sem_open_setup);
+  cosmo_once(&g_semaphores.once, sem_open_setup);
 }
-
-#ifdef _NOPL0
-#define sem_open_lock()   _NOPL0("__threadcalls", sem_open_lock)
-#define sem_open_unlock() _NOPL0("__threadcalls", sem_open_unlock)
-#endif
 
 static sem_t *sem_open_impl(const char *path, int oflag, unsigned mode,
                             unsigned value) {
@@ -85,12 +85,12 @@ static sem_t *sem_open_impl(const char *path, int oflag, unsigned mode,
   if ((fd = openat(AT_FDCWD, path, oflag, mode)) == -1) {
     return SEM_FAILED;
   }
-  _npassert(!fstat(fd, &st));
-  if (st.st_size < PAGESIZE && ftruncate(fd, PAGESIZE) == -1) {
-    _npassert(!close(fd));
+  npassert(!fstat(fd, &st));
+  if (st.st_size < 4096 && ftruncate(fd, 4096) == -1) {
+    npassert(!close(fd));
     return SEM_FAILED;
   }
-  sem = mmap(0, PAGESIZE, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+  sem = mmap(0, 4096, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
   if (sem != MAP_FAILED) {
     atomic_store_explicit(&sem->sem_value, value, memory_order_relaxed);
     sem->sem_magic = SEM_MAGIC_NAMED;
@@ -100,7 +100,7 @@ static sem_t *sem_open_impl(const char *path, int oflag, unsigned mode,
   } else {
     sem = SEM_FAILED;
   }
-  _npassert(!close(fd));
+  npassert(!close(fd));
   return sem;
 }
 
@@ -136,7 +136,7 @@ static struct Semaphore *sem_open_reopen(const char *path) {
 
 static struct Semaphore *sem_open_get(const sem_t *sem,
                                       struct Semaphore ***out_prev) {
-  struct Semaphore *s, *t, **p;
+  struct Semaphore *s, **p;
   for (p = &g_semaphores.list, s = *p; s; p = &s->next, s = s->next) {
     if (s && sem == s->sem) {
       *out_prev = p;
@@ -171,32 +171,47 @@ static struct Semaphore *sem_open_get(const sem_t *sem,
  * @raise ENFILE if system-wide file limit has been reached
  * @raise ENOMEM if we require more vespene gas
  * @raise EINTR if signal handler was called
- * @threadsafe
  */
 sem_t *sem_open(const char *name, int oflag, ...) {
   sem_t *sem;
   va_list va;
+  char path[78];
   struct Semaphore *s;
   unsigned mode = 0, value = 0;
-  char *path, pathbuf[PATH_MAX];
+
+  va_start(va, oflag);
+  mode = va_arg(va, unsigned);
+  value = va_arg(va, unsigned);
+  va_end(va);
+
+#if 0
+  if (IsXnuSilicon()) {
+    long kernel;
+    if (!(sem = calloc(1, sizeof(sem_t))))
+      return SEM_FAILED;
+    sem->sem_magic = SEM_MAGIC_KERNEL;
+    kernel = _sysret(__syslib->__sem_open(name, oflag, mode, value));
+    if (kernel == -1) {
+      free(sem);
+      return SEM_FAILED;
+    }
+    sem->sem_magic = SEM_MAGIC_KERNEL;
+    sem->sem_kernel = (int *)kernel;
+  }
+#endif
+
   if (oflag & ~(O_CREAT | O_EXCL)) {
     einval();
     return SEM_FAILED;
   }
   if (oflag & O_CREAT) {
-    va_start(va, oflag);
-    mode = va_arg(va, unsigned);
-    value = va_arg(va, unsigned);
-    va_end(va);
     if (value > SEM_VALUE_MAX) {
       einval();
       return SEM_FAILED;
     }
   }
-  if (!(path = sem_path_np(name, pathbuf, sizeof(pathbuf)))) {
-    return SEM_FAILED;
-  }
-  BLOCK_CANCELLATIONS;
+  shm_path_np(name, path);
+  BLOCK_CANCELATION;
   sem_open_init();
   sem_open_lock();
   if ((s = sem_open_reopen(path))) {
@@ -235,7 +250,7 @@ sem_t *sem_open(const char *name, int oflag, ...) {
     sem = SEM_FAILED;
   }
   sem_open_unlock();
-  ALLOW_CANCELLATIONS;
+  ALLOW_CANCELATION;
   return sem;
 }
 
@@ -253,29 +268,37 @@ sem_t *sem_open(const char *name, int oflag, ...) {
  * @return 0 on success, or -1 w/ errno
  */
 int sem_close(sem_t *sem) {
-  int rc, prefs;
+  int prefs;
   bool unmap, delete;
   struct Semaphore *s, **p;
-  _npassert(sem->sem_magic == SEM_MAGIC_NAMED);
+
+#if 0
+  if (IsXnuSilicon()) {
+    npassert(sem->sem_magic == SEM_MAGIC_KERNEL);
+    return _sysret(__syslib->__sem_close(sem->sem_kernel));
+  }
+#endif
+
+  npassert(sem->sem_magic == SEM_MAGIC_NAMED);
   sem_open_init();
   sem_open_lock();
-  _npassert((s = sem_open_get(sem, &p)));
+  npassert((s = sem_open_get(sem, &p)));
   prefs = atomic_fetch_add_explicit(&sem->sem_prefs, -1, memory_order_acq_rel);
-  _npassert(s->refs > 0);
+  npassert(s->refs > 0);
   if ((unmap = !--s->refs)) {
-    _npassert(prefs > 0);
+    npassert(prefs > 0);
     delete = sem->sem_lazydelete && prefs == 1;
     *p = s->next;
   } else {
-    _npassert(prefs > 1);
+    npassert(prefs > 1);
     delete = false;
   }
   sem_open_unlock();
   if (unmap) {
-    _npassert(!munmap(sem, PAGESIZE));
+    npassert(!munmap(sem, 4096));
   }
   if (delete) {
-    rc = unlink(s->path);
+    unlink(s->path);
   }
   if (unmap) {
     free(s->path);
@@ -300,10 +323,17 @@ int sem_close(sem_t *sem) {
  * @raise ENAMETOOLONG if too long
  */
 int sem_unlink(const char *name) {
+  char path[78];
   int rc, e = errno;
   struct Semaphore *s;
-  char *path, pathbuf[PATH_MAX];
-  if (!(path = sem_path_np(name, pathbuf, sizeof(pathbuf)))) return -1;
+
+#if 0
+  if (IsXnuSilicon()) {
+    return _sysret(__syslib->__sem_unlink(name));
+  }
+#endif
+
+  shm_path_np(name, path);
   if ((rc = unlink(path)) == -1 && IsWindows() && errno == EACCES) {
     sem_open_init();
     sem_open_lock();

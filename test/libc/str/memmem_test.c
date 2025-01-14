@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2020 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -16,13 +16,18 @@
 │ TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR             │
 │ PERFORMANCE OF THIS SOFTWARE.                                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
-#include "libc/mem/alg.h"
-#include "libc/intrin/bits.h"
-#include "libc/intrin/likely.h"
 #include "libc/mem/mem.h"
+#include "libc/assert.h"
+#include "libc/calls/calls.h"
+#include "libc/intrin/likely.h"
+#include "libc/intrin/safemacros.h"
+#include "libc/mem/alg.h"
+#include "libc/runtime/runtime.h"
+#include "libc/runtime/sysconf.h"
 #include "libc/stdio/rand.h"
-#include "libc/str/internal.h"
 #include "libc/str/str.h"
+#include "libc/sysv/consts/map.h"
+#include "libc/sysv/consts/prot.h"
 #include "libc/testlib/ezbench.h"
 #include "libc/testlib/hyperion.h"
 #include "libc/testlib/testlib.h"
@@ -32,13 +37,18 @@
 void *memmem_naive(const void *haystk, size_t haystklen,  //
                    const void *needle, size_t needlelen) {
   size_t i, j;
-  if (!needlelen) return haystk;
-  if (needlelen > haystklen) return 0;
+  if (!needlelen)
+    return (void *)haystk;
+  if (needlelen > haystklen)
+    return 0;
   for (i = 0; i < haystklen; ++i) {
     for (j = 0;; ++j) {
-      if (j == needlelen) return (/*unconst*/ char *)haystk + i;
-      if (i + j == haystklen) break;
-      if (((char *)haystk)[i + j] != ((char *)needle)[j]) break;
+      if (j == needlelen)
+        return (/*unconst*/ char *)haystk + i;
+      if (i + j == haystklen)
+        break;
+      if (((char *)haystk)[i + j] != ((char *)needle)[j])
+        break;
     }
   }
   return 0;
@@ -156,7 +166,7 @@ TEST(memmem, testWut) {
 }
 
 TEST(memmem, fuzz) {
-  int i, j, k, n, m;
+  int i, n, m;
   char a[128], b[128], *p, *q;
   for (i = 0; i < 10000; ++i) {
     rngset(a, sizeof(a), lemur64, -1);
@@ -167,6 +177,26 @@ TEST(memmem, fuzz) {
     m = lemur64() % sizeof(b) / 2;
     ASSERT_EQ(memmem_naive(p, n, q, m), memmem(p, n, q, m));
   }
+}
+
+TEST(memmem, safety) {
+  int pagesz = sysconf(_SC_PAGESIZE);
+  char *map = (char *)mmap(0, pagesz * 2, PROT_READ | PROT_WRITE,
+                           MAP_ANONYMOUS | MAP_PRIVATE, -1, 0);
+  npassert(map != MAP_FAILED);
+  npassert(!mprotect(map + pagesz, pagesz, PROT_NONE));
+  for (int haylen = 1; haylen < 128; ++haylen) {
+    char *hay = map + pagesz - (haylen + 1);
+    for (int i = 0; i < haylen; ++i)
+      hay[i] = max(rand() & 255, 1);
+    hay[haylen] = 0;
+    for (int neelen = 1; neelen < haylen; ++neelen) {
+      char *nee = hay + (haylen + 1) - (neelen + 1);
+      ASSERT_EQ(memmem_naive(hay, haylen, nee, neelen),
+                memmem(hay, haylen, nee, neelen));
+    }
+  }
+  munmap(map, pagesz * 2);
 }
 
 /*
@@ -194,11 +224,16 @@ TEST(memmem, fuzz) {
  */
 BENCH(memmem, bench) {
   EZBENCH2("memmem naive", donothing,
-           EXPROPRIATE(memmem_naive(kHyperion, kHyperionSize, "THE END", 7)));
+           __expropriate(memmem_naive(kHyperion, kHyperionSize, "THE END", 7)));
   EZBENCH2("memmem", donothing,
-           EXPROPRIATE(memmem(kHyperion, kHyperionSize, "THE END", 7)));
+           __expropriate(memmem(kHyperion, kHyperionSize, "THE END", 7)));
   EZBENCH2("memmem", donothing,
-           EXPROPRIATE(memmem(
-               "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaab",
-               62, "aaaaaab", 7)));
+           __expropriate(
+               memmem("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+                      "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+                      "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaab",
+                      152,
+                      "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+                      "aaaaaaaaaaaaaaaaaaaaaaaab",
+                      81)));
 }

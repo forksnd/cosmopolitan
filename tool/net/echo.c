@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2020 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -98,7 +98,8 @@ void TcpServer(void) {
             ip, ntohs(addr2.sin_port));
     for (;;) {
       CHECK_NE(-1, (rc = read(client, buf, sizeof(buf))));
-      if (!rc) break;
+      if (!rc)
+        break;
       CHECK_NE(-1, write(client, buf, rc));
     }
   }
@@ -117,7 +118,8 @@ void TcpClient(void) {
 int main(int argc, char *argv[]) {
   int port = 0;
   int64_t ip = 0;
-  if (argc < 3) PrintUsage(argv);
+  if (argc < 3)
+    PrintUsage(argv);
   if (argc >= 4) {
     if ((ip = ParseIp(argv[3], -1)) == -1) {
       PrintUsage(argv);

@@ -1,6 +1,5 @@
 #ifndef COSMOPOLITAN_TOOL_PLINKO_LIB_CHAR_H_
 #define COSMOPOLITAN_TOOL_PLINKO_LIB_CHAR_H_
-#if !(__ASSEMBLER__ + __LINKER__ + 0)
 COSMOPOLITAN_C_START_
 
 static inline pureconst bool IsC0(int c) {
@@ -27,7 +26,7 @@ static inline pureconst bool IsControl(int c) {
   return (0 <= c && c <= 0x1F) || (0x7F <= c && c <= 0x9F);
 }
 
-static noinstrument pureconst inline int ToUpper(int c) {
+static dontinstrument pureconst inline int ToUpper(int c) {
   return 'a' <= c && c <= 'z' ? 'A' - 'a' + c : c;
 }
 
@@ -39,5 +38,4 @@ int GetMonospaceCharacterWidth(int) pureconst;
 bool IsWide(int) pureconst;
 
 COSMOPOLITAN_C_END_
-#endif /* !(__ASSEMBLER__ + __LINKER__ + 0) */
 #endif /* COSMOPOLITAN_TOOL_PLINKO_LIB_CHAR_H_ */

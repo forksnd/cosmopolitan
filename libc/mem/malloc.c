@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2023 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -16,11 +16,10 @@
 │ TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR             │
 │ PERFORMANCE OF THIS SOFTWARE.                                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
-#include "libc/mem/hook.internal.h"
 #include "libc/mem/mem.h"
 #include "third_party/dlmalloc/dlmalloc.h"
 
-void *(*hook_malloc)(size_t) = dlmalloc;
+__static_yoink("free");
 
 /**
  * Allocates uninitialized memory.
@@ -30,16 +29,18 @@ void *(*hook_malloc)(size_t) = dlmalloc;
  * on ANSI C systems.
  *
  * If n is zero, malloc returns a minimum-sized chunk. (The minimum size
- * is 32 bytes on 64bit systems.) Note that size_t is an unsigned type,
- * so calls with arguments that would be negative if signed are
- * interpreted as requests for huge amounts of space, which will often
- * fail. The maximum supported value of n differs across systems, but is
- * in all cases less than the maximum representable value of a size_t.
+ * is 32 bytes on 64bit systems.) It should be assumed that zero bytes
+ * are possible access, since that'll be enforced by `MODE=asan`.
+ *
+ * Note that size_t is an unsigned type, so calls with arguments that
+ * would be negative if signed are interpreted as requests for huge
+ * amounts of space, which will often fail. The maximum supported value
+ * of n differs across systems, but is in all cases less than the
+ * maximum representable value of a size_t.
  *
  * @param rdi is number of bytes needed, coerced to 1+
  * @return new memory, or NULL w/ errno
- * @threadsafe
  */
 void *malloc(size_t n) {
-  return hook_malloc(n);
+  return dlmalloc(n);
 }

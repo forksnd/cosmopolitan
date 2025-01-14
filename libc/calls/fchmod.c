@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2020 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -17,18 +17,32 @@
 │ PERFORMANCE OF THIS SOFTWARE.                                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
 #include "libc/calls/calls.h"
+#include "libc/calls/internal.h"
+#include "libc/calls/syscall-nt.internal.h"
 #include "libc/calls/syscall-sysv.internal.h"
 #include "libc/dce.h"
+#include "libc/intrin/strace.h"
 #include "libc/sysv/errfuns.h"
 
 /**
  * Changes file permissions via open()'d file descriptor.
  *
  * @param mode contains octal flags (base 8)
+ * @raise EROFS if `fd` is a `/zip/...` file
  * @asyncsignalsafe
  * @see chmod()
  */
 int fchmod(int fd, uint32_t mode) {
-  /* TODO(jart): Windows */
-  return sys_fchmod(fd, mode);
+  int rc;
+  if (__isfdkind(fd, kFdZip)) {
+    rc = erofs();
+  } else if (IsLinux() || IsXnu() || IsFreebsd() || IsOpenbsd() || IsNetbsd()) {
+    rc = sys_fchmod(fd, mode);
+  } else if (IsWindows()) {
+    rc = sys_fchmod_nt(fd, mode);
+  } else {
+    rc = enosys();
+  }
+  STRACE("fchmod(%d, %#o) → %d% m", fd, mode, rc);
+  return rc;
 }

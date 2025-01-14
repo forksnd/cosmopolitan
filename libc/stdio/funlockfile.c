@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2022 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -16,13 +16,14 @@
 │ TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR             │
 │ PERFORMANCE OF THIS SOFTWARE.                                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
-#include "libc/stdio/lock.internal.h"
+#include "libc/stdio/internal.h"
 #include "libc/stdio/stdio.h"
+#include "libc/thread/posixthread.internal.h"
 #include "libc/thread/thread.h"
 
 /**
  * Releases lock on stdio object.
  */
-void(funlockfile)(FILE *f) {
-  pthread_mutex_unlock((pthread_mutex_t *)f->lock);
+void funlockfile(FILE *f) {
+  _pthread_mutex_unlock(&f->lock);
 }

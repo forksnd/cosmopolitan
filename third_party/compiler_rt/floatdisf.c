@@ -1,4 +1,3 @@
-/* clang-format off */
 /*===-- floatdisf.c - Implement __floatdisf -------------------------------===
  *
  *                     The LLVM Compiler Infrastructure
@@ -13,7 +12,7 @@
  *===----------------------------------------------------------------------===
  */
 
-STATIC_YOINK("huge_compiler_rt_license");
+__static_yoink("huge_compiler_rt_license");
 
 /* Returns: convert a to a float, rounding toward even.*/
 

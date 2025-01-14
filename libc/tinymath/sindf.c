@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:t;c-basic-offset:8;tab-width:8;coding:utf-8   -*-│
-│vi: set et ft=c ts=8 tw=8 fenc=utf-8                                       :vi│
+│ vi: set noet ft=c ts=8 sw=8 fenc=utf-8                                   :vi │
 ╚──────────────────────────────────────────────────────────────────────────────╝
 │                                                                              │
 │  Musl Libc                                                                   │
@@ -27,15 +27,9 @@
 ╚─────────────────────────────────────────────────────────────────────────────*/
 #include "libc/math.h"
 #include "libc/tinymath/kernel.internal.h"
+__static_yoink("musl_libc_notice");
+__static_yoink("fdlibm_notice");
 
-asm(".ident\t\"\\n\\n\
-fdlibm (fdlibm license)\\n\
-Copyright (C) 1993 by Sun Microsystems, Inc. All rights reserved.\"");
-asm(".ident\t\"\\n\\n\
-Musl libc (MIT License)\\n\
-Copyright 2005-2014 Rich Felker, et. al.\"");
-asm(".include \"libc/disclaimer.inc\"");
-/* clang-format off */
 
 /* origin: FreeBSD /usr/src/lib/msun/src/k_sinf.c */
 /*
@@ -60,7 +54,7 @@ S2 =  0x111110896efbb2.0p-59, /*  0.0083333293858894631756 */
 S3 = -0x1a00f9e2cae774.0p-65, /* -0.000198393348360966317347 */
 S4 =  0x16cd878c3b46a7.0p-71; /*  0.0000027183114939898219064 */
 
-noinstrument float __sindf(double x)
+dontinstrument float __sindf(double x)
 {
 	double_t r, s, w, z;
 

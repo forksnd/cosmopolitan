@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2022 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -18,9 +18,10 @@
 ╚─────────────────────────────────────────────────────────────────────────────*/
 #include "libc/calls/calls.h"
 #include "libc/calls/struct/sysinfo.h"
+#include "libc/calls/struct/sysinfo.internal.h"
 #include "libc/calls/syscall-nt.internal.h"
 #include "libc/dce.h"
-#include "libc/intrin/strace.internal.h"
+#include "libc/intrin/strace.h"
 #include "libc/sysv/errfuns.h"
 
 #define CTL_VM     2
@@ -40,9 +41,10 @@ struct loadavg {
  * @raise ENOSYS on metal
  */
 int getloadavg(double *a, int n) {
-  /* cat /proc/loadavg  */
+  // cat /proc/loadavg
   int i, rc;
-  if (n > 3) n = 3;
+  if (n > 3)
+    n = 3;
   if (!n) {
     rc = 0;
   } else if (n < 0) {
@@ -51,7 +53,7 @@ int getloadavg(double *a, int n) {
     return sys_getloadavg_nt(a, n);
   } else if (IsLinux()) {
     struct sysinfo si;
-    if ((rc = sysinfo(&si)) != -1) {
+    if ((rc = sys_sysinfo(&si)) != -1) {
       for (i = 0; i < n; i++) {
         a[i] = 1. / 65536 * si.loads[i];
       }
@@ -62,7 +64,7 @@ int getloadavg(double *a, int n) {
     struct loadavg loadinfo;
     int mib[2] = {CTL_VM, VM_LOADAVG};
     size = sizeof(loadinfo);
-    if ((rc = sys_sysctl(mib, 2, &loadinfo, &size, 0, 0)) != -1) {
+    if ((rc = sysctl(mib, 2, &loadinfo, &size, 0, 0)) != -1) {
       for (i = 0; i < n; i++) {
         a[i] = (double)loadinfo.ldavg[i] / loadinfo.fscale;
       }

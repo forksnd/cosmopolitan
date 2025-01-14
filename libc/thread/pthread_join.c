@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2022 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -22,7 +22,7 @@
  * Waits for thread to terminate.
  *
  * Multiple threads joining the same thread is undefined behavior. If a
- * deferred or masked cancellation happens to the calling thread either
+ * deferred or masked cancelation happens to the calling thread either
  * before or during the waiting process then the target thread will not
  * be joined. Calling pthread_join() on a non-joinable thread, e.g. one
  * that's been detached, is undefined behavior. If a thread attempts to
@@ -33,9 +33,8 @@
  *     pthread_cancel() destroyed the thread instead
  * @return 0 on success, or errno on error
  * @raise ECANCELED if calling thread was cancelled in masked mode
- * @cancellationpoint
+ * @cancelationpoint
  * @returnserrno
- * @threadsafe
  */
 errno_t pthread_join(pthread_t thread, void **value_ptr) {
   return pthread_timedjoin_np(thread, value_ptr, 0);

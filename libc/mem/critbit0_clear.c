@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2020 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -26,9 +26,9 @@ static void critbit0_clear_traverse(void *top) {
     struct CritbitNode *q = (void *)(p - 1);
     critbit0_clear_traverse(q->child[0]);
     critbit0_clear_traverse(q->child[1]);
-    free(q), q = NULL;
+    free(q);
   } else {
-    free(p), p = NULL;
+    free(p);
   }
 }
 

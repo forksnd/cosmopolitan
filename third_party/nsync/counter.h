@@ -2,10 +2,7 @@
 #define NSYNC_COUNTER_H_
 #include "third_party/nsync/atomic.h"
 #include "third_party/nsync/time.h"
-#if !(__ASSEMBLER__ + __LINKER__ + 0)
 COSMOPOLITAN_C_START_
-
-struct nsync_dll_element_s_;
 
 /* An nsync_counter represents an unsigned integer that can count up and down,
    and wake waiters when zero.  */
@@ -36,8 +33,7 @@ uint32_t nsync_counter_value(nsync_counter c);
    a waiter may have been woken due to the counter reaching zero.
    If abs_deadline==nsync_time_no_deadline, the deadline
    is far in the future. */
-uint32_t nsync_counter_wait(nsync_counter c, nsync_time abs_deadline);
+uint32_t nsync_counter_wait(nsync_counter c, int clock, nsync_time abs_deadline);
 
 COSMOPOLITAN_C_END_
-#endif /* !(__ASSEMBLER__ + __LINKER__ + 0) */
 #endif /* NSYNC_COUNTER_H_ */

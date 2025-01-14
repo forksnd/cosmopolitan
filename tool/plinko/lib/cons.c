@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2022 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -16,8 +16,8 @@
 │ TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR             │
 │ PERFORMANCE OF THIS SOFTWARE.                                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
-#include "tool/plinko/lib/char.h"
 #include "tool/plinko/lib/cons.h"
+#include "tool/plinko/lib/char.h"
 
 int List(int x, int y) {
   return Cons(x, Cons(y, -0));
@@ -38,7 +38,8 @@ int Shadow(int p, int s) {
 
 int GetCommonCons(int x, int y) {
   if (!y) {
-    if (!x) return -1;
+    if (!x)
+      return -1;
     if (x > 0 && cFrost < -1 && IsUpper(LO(Get(x))) && HI(Get(x)) == TERM) {
       return kConsAlphabet[LO(Get(x)) - L'A'];
     }
@@ -47,9 +48,9 @@ int GetCommonCons(int x, int y) {
 }
 
 int ShareCons(int x, int y) {
-  dword t;
-  int i, n;
-  if ((i = GetCommonCons(x, y))) return i;
+  int i;
+  if ((i = GetCommonCons(x, y)))
+    return i;
 #if 0
   t = MAKE(x, y);
   for (i = cx, n = MIN(0, i + 64); i < n; ++i) {

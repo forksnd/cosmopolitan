@@ -1,16 +1,15 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:4;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=4 sts=4 sw=4 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=4 sts=4 sw=4 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Python 3                                                                     │
 │ https://docs.python.org/3/license.html                                       │
 ╚─────────────────────────────────────────────────────────────────────────────*/
-#include "libc/intrin/bits.h"
 #include "libc/intrin/likely.h"
 #include "third_party/python/Include/pyerrors.h"
 #include "third_party/python/Include/pymem.h"
+#include "third_party/python/Modules/bextra.h"
 #include "third_party/python/Modules/unicodedata.h"
 #include "third_party/python/Modules/unicodedata_unidata.h"
-/* clang-format off */
 
 PyObject *
 _PyUnicode_NfcNfkc(PyObject *self, PyObject *input, int k)
@@ -115,10 +114,10 @@ _PyUnicode_NfcNfkc(PyObject *self, PyObject *input, int k)
           }
           index = f * UNIDATA_TOTAL_LAST + l;
           index1 = _PyUnicode_CompIndex[index >> _PyUnicode_CompShift];
-          code = _bextra(_PyUnicode_CompData,
-                         (index1 << _PyUnicode_CompShift)+
-                         (index & ((1 << _PyUnicode_CompShift) - 1)),
-                         _PyUnicode_CompDataBits);
+          code = BitFieldExtract(_PyUnicode_CompData,
+                                 (index1 << _PyUnicode_CompShift)+
+                                 (index & ((1 << _PyUnicode_CompShift) - 1)),
+                                 _PyUnicode_CompDataBits);
           if (code == 0)
               goto not_combinable;
           /* Replace the original character. */

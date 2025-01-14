@@ -1,12 +1,13 @@
 #include "libc/nt/codegen.h"
-.imp	user32,__imp_GetWindowTextW,GetWindowTextW,2007
+.imp	user32,__imp_GetWindowTextW,GetWindowTextW
 
 	.text.windows
+	.ftrace1
 GetWindowText:
+	.ftrace2
 #ifdef __x86_64__
 	push	%rbp
 	mov	%rsp,%rbp
-	.profilable
 	mov	__imp_GetWindowTextW(%rip),%rax
 	jmp	__sysv2nt
 #elif defined(__aarch64__)

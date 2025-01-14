@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2020 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -19,7 +19,7 @@
 #include "libc/calls/calls.h"
 #include "libc/stdio/stdio.h"
 #include "libc/str/str.h"
-#include "libc/str/tab.internal.h"
+#include "libc/str/tab.h"
 
 /**
  * @fileoverview UnBing: Glyphs → Binary.
@@ -30,9 +30,9 @@
  * something almost representing a source code file. A hack also exists
  * for comments in such files: 𝘶𝘴𝘦 𝑛𝑜𝑛-𝑎𝑠𝑐𝑖𝑖 𝗹𝗲𝘁𝘁𝗲𝗿𝗶𝗻𝗴 𝔞𝔩𝔱𝔢𝔯𝔫𝔞𝔱𝔦𝔳𝔢𝔰.
  *
- *   bash$ o/tool/viz/bing.com </bin/sh | o/tool/viz/fold.com >sh.txt
+ *   bash$ o/tool/viz/bing </bin/sh | o/tool/viz/fold >sh.txt
  *   bash$ emacs sh.txt
- *   bash$ o/tool/viz/unbing.com <sh.txt >sh
+ *   bash$ o/tool/viz/unbing <sh.txt >sh
  *   bash$ chmod +x sh
  *   bash$ ./sh
  *

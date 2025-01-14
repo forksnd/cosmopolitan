@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2022 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -20,18 +20,16 @@
 #include "libc/dce.h"
 #include "libc/errno.h"
 #include "libc/sysv/consts/at.h"
+#include "libc/sysv/consts/o.h"
 #include "libc/testlib/testlib.h"
 
-char testlib_enable_tmp_setup_teardown;
-
 void SetUpOnce(void) {
+  testlib_enable_tmp_setup_teardown();
   ASSERT_SYS(0, 0, pledge("stdio rpath wpath cpath fattr", 0));
 }
 
 TEST(unlink, efault) {
   ASSERT_SYS(EFAULT, -1, unlink(0));
-  if (IsWindows() || !IsAsan()) return;  // not possible
-  ASSERT_SYS(EFAULT, -1, unlink((void *)77));
 }
 
 TEST(unlink, enoent) {
@@ -43,6 +41,16 @@ TEST(unlink, enoent) {
 TEST(unlink, enotdir) {
   ASSERT_SYS(0, 0, touch("o", 0644));
   ASSERT_SYS(ENOTDIR, -1, unlink("o/doesnotexist"));
+}
+
+TEST(rmdir, willDeleteRegardlessOfAccessBits) {
+  ASSERT_SYS(0, 0, mkdir("foo", 0));
+  ASSERT_SYS(0, 0, rmdir("foo/"));
+}
+
+TEST(unlink, willDeleteRegardlessOfAccessBits) {
+  ASSERT_SYS(0, 0, touch("foo", 0));
+  ASSERT_SYS(0, 0, unlink("foo"));
 }
 
 TEST(unlinkat, test) {

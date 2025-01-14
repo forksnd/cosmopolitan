@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2023 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -16,11 +16,8 @@
 │ TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR             │
 │ PERFORMANCE OF THIS SOFTWARE.                                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
-#include "libc/mem/hook.internal.h"
 #include "libc/mem/mem.h"
 #include "third_party/dlmalloc/dlmalloc.h"
-
-int (*hook_malloc_trim)(size_t) = dlmalloc_trim;
 
 /**
  * Releases freed memory back to system.
@@ -29,5 +26,6 @@ int (*hook_malloc_trim)(size_t) = dlmalloc_trim;
  * @return 1 if it actually released any memory, else 0
  */
 int malloc_trim(size_t n) {
-  return hook_malloc_trim(n);
+  return dlmalloc_trim(n);
 }
+

@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2020 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -18,27 +18,32 @@
 ╚─────────────────────────────────────────────────────────────────────────────*/
 #include "libc/stdio/stdio.h"
 #include "libc/str/str.h"
-#include "libc/str/tab.internal.h"
+#include "libc/str/tab.h"
 
 #define COLS 8
 
 int main(int argc, char *argv[]) {
   int c, col = 0;
-  unsigned char ch;
+  int need_newline = 0;
   char16_t glyphs[COLS + 1];
   while ((c = getchar()) != -1) {
-    if (col == 0) {
+    if (!col) {
+      need_newline = 1;
       printf("\t.byte\t");
       bzero(glyphs, sizeof(glyphs));
     }
-    ch = c & 0xff;
-    glyphs[col] = kCp437[ch];
-    if (col) putchar(',');
-    printf("0x%02x", ch);
+    glyphs[col] = kCp437[c];
+    if (col)
+      putchar(',');
+    printf("0x%02x", c);
     if (++col == COLS) {
       col = 0;
-      printf("\t#%hs\n", glyphs);
+      printf("\t//%hs\n", glyphs);
+      need_newline = 0;
     }
+  }
+  if (need_newline) {
+    printf("\n");
   }
   return 0;
 }

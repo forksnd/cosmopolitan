@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2021 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -29,7 +29,8 @@
 bool IsReasonablePath(const char *data, size_t size) {
   const char *p, *e;
   int x, y, z, a, b, i, n;
-  if (size == -1) size = data ? strlen(data) : 0;
+  if (size == -1)
+    size = data ? strlen(data) : 0;
   z = '/';
   y = '/';
   x = '/';
@@ -43,7 +44,8 @@ bool IsReasonablePath(const char *data, size_t size) {
       if (p + n <= e) {
         for (i = 0;;) {
           b = p[i] & 0xff;
-          if (!ThomPikeCont(b)) break;
+          if (!ThomPikeCont(b))
+            break;
           a = ThomPikeMerge(a, b);
           if (++i == n) {
             x = a;
@@ -56,12 +58,16 @@ bool IsReasonablePath(const char *data, size_t size) {
     if (x == '\\') {
       x = '/';
     }
-    if (z == '/' && y == '.' && x == '/') return false;
-    if (z == '/' && y == '.' && x == '.') return false;
+    if (z == '/' && y == '.' && x == '/')
+      return false;
+    if (z == '/' && y == '.' && x == '.')
+      return false;
     z = y;
     y = x;
   }
-  if (y == '/' && x == '.') return false;
-  if (z == '/' && y == '.' && x == '.') return false;
+  if (y == '/' && x == '.')
+    return false;
+  if (z == '/' && y == '.' && x == '.')
+    return false;
   return true;
 }

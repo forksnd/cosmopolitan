@@ -1,6 +1,5 @@
 #ifndef COSMOPOLITAN_DSP_CORE_C1331_H_
 #define COSMOPOLITAN_DSP_CORE_C1331_H_
-#if !(__ASSEMBLER__ + __LINKER__ + 0)
 
 /**
  * Byte sized kernel for resampling memory in half.
@@ -9,10 +8,8 @@
  * @see C161() afterward for superior sin(𝑥)/𝑥
  * @limit [0,255] → [0..2,044] → [0..255]
  */
-forceinline pureconst artificial unsigned char C1331(unsigned char al,
-                                                     unsigned char bl,
-                                                     unsigned char cl,
-                                                     unsigned char dl) {
+__funline unsigned char C1331(unsigned char al, unsigned char bl,
+                              unsigned char cl, unsigned char dl) {
   short ax, bx;
   bx = bl;
   bx += cl;
@@ -26,5 +23,4 @@ forceinline pureconst artificial unsigned char C1331(unsigned char al,
   return al;
 }
 
-#endif /* !(__ASSEMBLER__ + __LINKER__ + 0) */
 #endif /* COSMOPOLITAN_DSP_CORE_C1331_H_ */

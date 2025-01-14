@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:4;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=4 sts=4 sw=4 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=4 sts=4 sw=4 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Python 3                                                                     │
 │ https://docs.python.org/3/license.html                                       │
@@ -7,7 +7,6 @@
 #include "libc/calls/calls.h"
 #include "libc/sysv/consts/sig.h"
 #include "third_party/python/Include/pylifecycle.h"
-/* clang-format off */
 
 /* Restore signals that the interpreter has called SIG_IGN on to SIG_DFL.
  *

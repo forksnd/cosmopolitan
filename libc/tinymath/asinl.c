@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:t;c-basic-offset:8;tab-width:8;coding:utf-8   -*-│
-│vi: set et ft=c ts=8 tw=8 fenc=utf-8                                       :vi│
+│ vi: set noet ft=c ts=8 sw=8 fenc=utf-8                                   :vi │
 ╚──────────────────────────────────────────────────────────────────────────────╝
 │                                                                              │
 │  Musl Libc                                                                   │
@@ -29,15 +29,9 @@
 #include "libc/tinymath/internal.h"
 #include "libc/tinymath/invtrigl.internal.h"
 #include "libc/tinymath/ldshape.internal.h"
-
-asm(".ident\t\"\\n\\n\
-fdlibm (fdlibm license)\\n\
-Copyright (C) 1993 by Sun Microsystems, Inc. All rights reserved.\"");
-asm(".ident\t\"\\n\\n\
-Musl libc (MIT License)\\n\
-Copyright 2005-2014 Rich Felker, et. al.\"");
-asm(".include \"libc/disclaimer.inc\"");
-// clang-format off
+#if !(LDBL_MANT_DIG == 53 && LDBL_MAX_EXP == 1024)
+__static_yoink("fdlibm_notice");
+__static_yoink("musl_libc_notice");
 
 /* origin: FreeBSD /usr/src/lib/msun/src/e_asinl.c */
 /*
@@ -55,16 +49,6 @@ asm(".include \"libc/disclaimer.inc\"");
  * Converted to long double by David Schultz <das@FreeBSD.ORG>.
  */
 
-/**
- * Returns arc sine of 𝑥.
- *
- * @define atan2(𝑥,sqrt((1-𝑥)*(1+𝑥)))
- * @domain -1 ≤ 𝑥 ≤ 1
- */
-long double asinl(long double x) {
-#if LDBL_MANT_DIG == 53 && LDBL_MAX_EXP == 1024
-	return asin(x);
-#elif (LDBL_MANT_DIG == 64 || LDBL_MANT_DIG == 113) && LDBL_MAX_EXP == 16384
 #if LDBL_MANT_DIG == 64
 #define CLOSETO1(u) (u.i.m>>56 >= 0xf7)
 #define CLEARBOTTOM(u) (u.i.m &= -1ULL << 32)
@@ -73,6 +57,14 @@ long double asinl(long double x) {
 #define CLEARBOTTOM(u) (u.i.lo = 0)
 #endif
 
+/**
+ * Returns arc sine of 𝑥.
+ *
+ * @define atan2(𝑥,sqrt((1-𝑥)*(1+𝑥)))
+ * @domain -1 ≤ 𝑥 ≤ 1
+ */
+long double asinl(long double x)
+{
 	union ldshape u = {x};
 	long double z, r, s;
 	uint16_t e = u.i.se & 0x7fff;
@@ -108,7 +100,6 @@ long double asinl(long double x) {
 	}
 	return sign ? -x : x;
 
-#else
-#error "architecture unsupported"
-#endif
 }
+
+#endif /* long double is long */

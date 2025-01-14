@@ -33,12 +33,7 @@
 #include "third_party/libcxx/algorithm"
 #include "third_party/libcxx/climits"
 #include "third_party/libcxx/cmath"
-// clang-format off
-
-asm(".ident\t\"\\n\\n\
-double-conversion (BSD-3 License)\\n\
-Copyright 2006-2012 the V8 project authors\"");
-asm(".include \"libc/disclaimer.inc\"");
+__static_yoink("double_conversion_notice");
 
 namespace double_conversion {
 

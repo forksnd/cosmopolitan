@@ -1,4 +1,3 @@
-// clang-format off
 /*
 *   $Id: sh.c 443 2006-05-30 04:37:13Z darren $
 *
@@ -14,6 +13,7 @@
 /*
 *   INCLUDE FILES
 */
+#include "libc/ctype.h"
 #include "third_party/ctags/general.h"  /* must always come first */
 
 #include "libc/mem/alg.h"

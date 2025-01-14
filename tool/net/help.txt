@@ -10,9 +10,7 @@ OVERVIEW
 
   redbean makes it possible to share web applications that run offline
   as a single-file Actually Portable Executable PKZIP archive which
-  contains your assets. All you need to do is download the redbean.com
-  program below, change the filename to .zip, add your content in a zip
-  editing tool, and then change the extension back to .com.
+  contains your assets.
 
   redbean can serve 1 million+ gzip encoded responses per second on a
   cheap personal computer. That performance is thanks to zip and gzip
@@ -232,14 +230,7 @@ USAGE
   run on six different operating systems. To do that, it needs to
   extract a 4kb loader program to ${TMPDIR:-${HOME:-.}}/.ape that'll
   map your redbean into memory. It does however check to see if `ape`
-  is on the system path beforehand. You can also "assimilate" any
-  redbean into the platform-local executable format by running:
-
-      $ file redbean.com
-      redbean.com: DOS/MBR boot sector
-      $ ./redbean.com --assimilate
-      $ file redbean.com
-      redbean.com: ELF 64-bit LSB executable
+  is on the system path beforehand.
 
 ────────────────────────────────────────────────────────────────────────────────
 SECURITY
@@ -391,7 +382,7 @@ REPL
   interpreter then you can pass the `-i` flag to put redbean into
   interpreter mode.
 
-      redbean.com -i binarytrees.lua 15
+      redbean -i binarytrees.lua 15
 
   When the `-i` flag is passed (for interpreter mode), redbean won't
   start a web server and instead functions like the `lua` command. The
@@ -410,7 +401,9 @@ REPL
 
       $ file redbean.com
       redbean.com: DOS/MBR boot sector
-      $ ./redbean.com --assimilate
+      $ curl -o assimilate https://cosmo.zip/pub/cosmos/bin/assimilate
+      $ chmod +x assimilate
+      $ ./assimilate ./redbean.com
       $ file redbean.com
       redbean.com: ELF 64-bit LSB executable
       $ sudo cp redbean.com /usr/bin/redbean
@@ -459,11 +452,11 @@ GLOBALS
 
           For example, if you launch your redbean as follows:
 
-              redbean.com -v arg1 arg2
+              redbean -v arg1 arg2
 
           Then your `/.init.lua` file will have the `arg` array like:
 
-              arg[-1] = '/usr/bin/redbean.com'
+              arg[-1] = '/usr/bin/redbean
               arg[ 0] = '/zip/.init.lua'
               arg[ 1] = 'arg1'
               arg[ 2] = 'arg2'
@@ -499,7 +492,7 @@ SPECIAL PATHS
           this path is a hidden file so that it can't be unintentionally run
           by the network client.
 
-  /.reload.lua
+  /.reload.lua (deprecated; use OnServerReload instead)
           This script is run from the main process when SIGHUP is received.
           This only applies to redbean when running in daemon mode. Any
           changes that are made to the Lua interpreter state will be
@@ -540,7 +533,7 @@ SPECIAL PATHS
           If the special argument `...` *is* encountered, then it'll be
           replaced with whatever CLI args were specified by the user.
 
-          For example, you might want to use redbean.com in interpreter
+          For example, you might want to use redbean in interpreter
           mode, where your script file is inside the zip. Then, if your
           redbean is run, what you want is to have the default behavior
           be running your script. In that case, you might:
@@ -554,13 +547,13 @@ SPECIAL PATHS
               print("hello world")
               EOF
 
-              $ zip redbean.com .args hello.lua
-              $ ./redbean.com
+              $ zip redbean .args hello.lua
+              $ ./redbean
               hello world
 
           Please note that if you ran:
 
-              $ ./redbean.com -vv
+              $ ./redbean -vv
 
           Then the default mode of redbean will kick back in. To prevent
           that from happening, simply add the magic arg `...` to the end
@@ -576,16 +569,22 @@ HOOKS
           *). See functions like Route which asks redbean to do its default
           thing from the handler.
 
+  OnError(status:int, message:string, details:string)
+          If this function is defined and if any errors occurs in
+          OnHttpRequest() then this method will be called instead of displaying
+          the default error page. Useful if you need to display the error page
+          using your specific code or send it to any tier service.
+
   OnClientConnection(ip:int, port:int, serverip:int, serverport:int) → bool
           If this function is defined it'll be called from the main process
           each time redbean accepts a new client connection. If it returns
           `true`, redbean will close the connection without calling fork.
 
   OnLogLatency(reqtimeus:int, contimeus:int)
-          If this function is defined it'll be called from the main process
-          each time redbean completes handling of a request, but before the
-          response is sent. The handler received the time (in µs) since the
-          request handling and connection handling started.
+          If this function is defined it'll be called from the child worker
+          process each time redbean completes the handling of a request, but
+          before the response is sent. The handler receives the time (in µs)
+          since the request handling and connection handling started.
 
   OnProcessCreate(pid:int, ip:int, port:int, serverip:int, serverport:int)
           If this function is defined it'll be called from the main process
@@ -611,6 +610,12 @@ HOOKS
           before redbean starts listening on a port. This hook can be used
           to modify socket configuration to set `SO_REUSEPORT`, for example.
           If it returns `true`, redbean will not listen to that ip/port.
+
+  OnServerReload(reindex:bool)
+          If this function is defined it'll be called from the main process
+          on each server reload triggered by SIGHUP (for daemonized) and
+          SIGUSR1 (for all) redbean instances. reindex indicates if redbean
+          assets have been re-indexed following the signal.
 
   OnServerStart()
           If this function is defined it'll be called from the main process
@@ -721,13 +726,32 @@ FUNCTIONS
           A granular. It can tell you if traffic originated from private
           networks, ARIN, APNIC, DOD, etc.
 
-  DecodeBase64(ascii:str) → binary:str
-          Turns ASCII into binary, in a permissive way that ignores
-          characters outside the base64 alphabet, such as whitespace. See
-          decodebase64.c.
-
   DecodeLatin1(iso-8859-1:str) → utf-8:str
           Turns ISO-8859-1 string into UTF-8.
+
+  EncodeHex(binary:str) → ascii:str
+          Turns binary into ASCII base-16 hexadecimal lowercase string.
+
+  DecodeHex(ascii:str) → binary:str
+          Turns ASCII base-16 hexadecimal byte string into binary string,
+          case-insensitively. Non-hex characters may not appear in string.
+
+  DecodeBase32(ascii:str[, alphabet:str]) → binary:str
+          Turns ASCII into binary using provided alphabet. The default
+          decoding uses Crockford's base32 alphabet in a permissive way
+          that ignores whitespaces and dash ('-') and stops at the first
+          character outside of the alphabet.
+
+  EncodeBase32(binary:str[, alphabet:str]) → ascii:str
+          Turns binary into ASCII using provided alphabet (using Crockford's
+          base32 encoding by default). Any alphabet that has a power of 2
+          length (up to 128) may be supplied for encoding and decoding,
+          which allows to provide alternative base32 encodings.
+
+  DecodeBase64(ascii:str) → binary:str
+          Turns ASCII into binary in a permissive way that ignores
+          characters outside the base64 alphabet, such as whitespace. See
+          decodebase64.c.
 
   EncodeBase64(binary:str) → ascii:str
           Turns binary into ASCII. This can be used to create HTML data:
@@ -1033,6 +1057,12 @@ FUNCTIONS
           Server Name Indicator (SNI) when performing Fetch() requests.
           This function is not available in unsecure mode.
 
+  UuidV4() -> str
+          Returns a uuid v4 string.
+
+  UuidV7() -> str
+          Returns a uuid v7 string.
+
   Fetch(url:str[,body:str|{method=value:str,body=value:str,headers=table,...}])
       ├─→ status:int, {header:str=value:str,...}, body:str
       └─→ nil, error:str
@@ -1054,6 +1084,16 @@ FUNCTIONS
             - maxredirects (default = 5): sets the number of allowed redirects
               to minimize looping due to misconfigured servers. When the number
               is exceeded, the last response is returned.
+            - keepalive (default = false): configures each request to keep the
+              connection open (unless closed by the server) and reuse for the
+              next request to the same host. This option is disabled when SSL
+              connection is used.
+              The mapping of hosts and their sockets is stored in a table
+              assigned to the `keepalive` field itself, so it can be passed to
+              the next call.
+              If the table includes the `close` field set to a true value,
+              then the connection is closed after the request is made and the
+              host is removed from the mapping table.
           When the redirect is being followed, the same method and body values
           are being sent in all cases except when 303 status is returned. In
           that case the method is set to GET and the body is removed before the
@@ -1102,12 +1142,33 @@ FUNCTIONS
           The name can be one of the following strings: MD5, SHA1, SHA224,
           SHA256, SHA384, SHA512, and BLAKE2B256.
 
-  GetRemoteAddr() → ip:uint32,port:uint16
+  Curve25519(secret:str, public_or_basepoint:str) -> str
+          Returns the shared key for the specified secret and public values.
+          The second argument can be either a public key or a basepoint, used
+          for generating a shared or public key.
+
+          Here a small usage sample :
+
+            >: secret1 = GetRandomBytes(32)
+            >: public1 = Curve25519(secret1, "\9")
+            >: secret2 = GetRandomBytes(32)
+            >: public2 = Curve25519(secret2, "\9")
+            >: shared_key1 = Curve25519(secret1, public2)
+            >: shared_key2 = Curve25519(secret2, public1)
+            >: shared_key1 == shared_key2
+            true
+
+  GetRemoteAddr()
+      ├─→ ip:uint32,port:uint16
+      └─→ nil
           Returns client ip4 address and port, e.g. 0x01020304,31337 would
           represent 1.2.3.4:31337. This is the same as GetClientAddr except
-          it will use the ip:port from the X-Forwarded-For header, only if
-          IsPrivateIp or IsLoopbackIp return true. When multiple addresses
-          are present in the header, the last/right-most address is used.
+          it will use the ip:port from the X-Forwarded-For header when the
+          IP returned by GetClientAddr is a trusted IP (returns true when
+          checked against IsTrustedIp). When multiple addresses are present
+          in the header, the last/right-most address is used.
+          Returns `nil` if the address doesn't parse as IPv4 value (e.g.
+          because it is misformatted or an IPv6 address).
 
   GetResponseBody()
       ├─→ body:str
@@ -1191,6 +1252,15 @@ FUNCTIONS
           - `"NETBSD"`
           - `"FREEBSD"`
           - `"OPENBSD"`
+
+  GetHostIsa() → str
+          Returns string describing host instruction set architecture.
+
+          This can return:
+
+          - `"X86_64"` for Intel and AMD systems
+          - `"AARCH64"` for ARM64, M1, and Raspberry Pi systems
+          - `"POWERPC64"` for OpenPOWER Raptor Computing Systems
 
   GetMonospaceWidth(str|char) → int
           Returns monospace display width of string. This is useful for
@@ -1540,7 +1610,7 @@ FUNCTIONS
           called from `.init.lua`. This function is not available in
           unsecure mode.
 
-  ProgramSslRequired(mandatory:str)
+  ProgramSslRequired(mandatory:bool)
           Enables the blocking of HTTP so that all inbound clients and
           must use the TLS transport layer. This has the same effect as
           the `-J` flag. Fetch() is still allowed to make outbound HTTP
@@ -1559,11 +1629,16 @@ FUNCTIONS
   ProgramGid(int)
           Same as the -G flag if called from .init.lua for setgid()
 
-  ProgramDirectory(str)
+  ProgramDirectory([directory:str]) → {directory, ...}
           Same as the -D flag if called from .init.lua for overlaying local
           file system directories. This may be called multiple times. The
           first directory programmed is preferred. These currently do not
           show up in the index page listing.
+          This call also modifies `package.path` value to either prepend
+          the added directory in front of the default path (if found) or
+          to append it (in all other cases).
+          If no directory is provided, then a table with previously set
+          directories is returned.
 
   ProgramLogMessages(bool)
           Same as the -m flag if called from .init.lua for logging message
@@ -2414,7 +2489,7 @@ MAXMIND MODULE
           Write(EscapeHtml(asorg))
       end
 
-  For further details, please see maxmind.lua in redbean-demo.com.
+  For further details, please see maxmind.lua in redbean-demo.
 
 
 ────────────────────────────────────────────────────────────────────────────────
@@ -2802,11 +2877,13 @@ UNIX MODULE
         unix.execve(prog, {prog, '-hal', '.'}, {'PATH=/bin'})
         unix.exit(127)
 
-    We automatically suffix `.com` and `.exe` for all platforms when
-    path searching. By default, the current directory is not on the
-    path. If `prog` is an absolute path, then it's returned as-is. If
-    `prog` contains slashes then it's not path searched either and will
-    be returned if it exists.
+    If `prog` is an absolute path, then it's returned as-is. If `prog`
+    contains slashes then it's not path searched either and will be
+    returned if it exists. On Windows, it's recommended that you install
+    programs from cosmos to c:/bin/ without any .exe or .com suffix, so
+    they can be discovered like they would on UNIX. If you want to find
+    a program like notepad on the $PATH using this function, then you
+    need to specify "notepad.exe" so it includes the extension.
 
   unix.execve(prog:str[, args:List<*>, env:List<*>])
       └─→ nil, unix.Errno
@@ -3598,23 +3675,73 @@ UNIX MODULE
 
     `clock` can be any one of of:
 
-    - `CLOCK_REALTIME`: universally supported
-    - `CLOCK_REALTIME_FAST`: ditto but faster on freebsd
-    - `CLOCK_REALTIME_PRECISE`: ditto but better on freebsd
-    - `CLOCK_REALTIME_COARSE`: : like `CLOCK_REALTIME_FAST` but needs Linux 2.6.32+
-    - `CLOCK_MONOTONIC`: universally supported
-    - `CLOCK_MONOTONIC_FAST`: ditto but faster on freebsd
-    - `CLOCK_MONOTONIC_PRECISE`: ditto but better on freebsd
-    - `CLOCK_MONOTONIC_COARSE`: : like `CLOCK_MONOTONIC_FAST` but needs Linux 2.6.32+
-    - `CLOCK_MONOTONIC_RAW`: is actually monotonic but needs Linux 2.6.28+
-    - `CLOCK_PROCESS_CPUTIME_ID`: linux and bsd
-    - `CLOCK_THREAD_CPUTIME_ID`: linux and bsd
-    - `CLOCK_MONOTONIC_COARSE`: linux, freebsd
-    - `CLOCK_PROF`: linux and netbsd
-    - `CLOCK_BOOTTIME`: linux and openbsd
-    - `CLOCK_REALTIME_ALARM`: linux-only
-    - `CLOCK_BOOTTIME_ALARM`: linux-only
-    - `CLOCK_TAI`: linux-only
+    - `CLOCK_REALTIME` returns a wall clock timestamp represented in
+      nanoseconds since the UNIX epoch (~1970). It'll count time in the
+      suspend state. This clock is subject to being smeared by various
+      adjustments made by NTP. These timestamps can have unpredictable
+      discontinuous jumps when clock_settime() is used. Therefore this
+      clock is the default clock for everything, even pthread condition
+      variables. Cosmopoiltan guarantees this clock will never raise
+      `EINVAL` and also guarantees `CLOCK_REALTIME == 0` will always be
+      the case. On Windows this maps to GetSystemTimePreciseAsFileTime().
+      On platforms with vDSOs like Linux, Windows, and MacOS ARM64 this
+      should take about 20 nanoseconds.
+
+    - `CLOCK_MONOTONIC` returns a timestamp with an unspecified epoch,
+      that should be when the system was powered on. These timestamps
+      shouldn't go backwards. Timestamps shouldn't count time spent in
+      the sleep, suspend, and hibernation states. These timestamps won't
+      be impacted by clock_settime(). These timestamps may be impacted by
+      frequency adjustments made by NTP. Cosmopoiltan guarantees this
+      clock will never raise `EINVAL`. MacOS and BSDs use the word
+      "uptime" to describe this clock. On Windows this maps to
+      QueryUnbiasedInterruptTimePrecise().
+
+    - `CLOCK_BOOTTIME` is a monotonic clock returning a timestamp with an
+      unspecified epoch, that should be relative to when the host system
+      was powered on. These timestamps shouldn't go backwards. Timestamps
+      should also include time spent in a sleep, suspend, or hibernation
+      state. These timestamps aren't impacted by clock_settime(), but
+      they may be impacted by frequency adjustments made by NTP. This
+      clock will raise an `EINVAL` error on extremely old Linux distros
+      like RHEL5. MacOS and BSDs use the word "monotonic" to describe
+      this clock. On Windows this maps to QueryInterruptTimePrecise().
+
+    - `CLOCK_MONOTONIC_RAW` returns a timestamp from an unspecified
+      epoch. These timestamps don't count time spent in the sleep,
+      suspend, and hibernation states. Unlike `CLOCK_MONOTONIC` this
+      clock is guaranteed to not be impacted by frequency adjustments or
+      discontinuous jumps caused by clock_settime(). Providing this level
+      of assurances may make this clock slower than the normal monotonic
+      clock. Furthermore this clock may cause `EINVAL` to be raised if
+      running on a host system that doesn't provide those guarantees,
+      e.g. OpenBSD and MacOS on AMD64.
+
+    - `CLOCK_REALTIME_COARSE` is the same as `CLOCK_REALTIME` except
+      it'll go faster if the host OS provides a cheaper way to read the
+      wall time. Please be warned that coarse can be really coarse.
+      Rather than nano precision, you're looking at `CLK_TCK` precision,
+      which can lag as far as 30 milliseconds behind or possibly more.
+      Cosmopolitan may fallback to `CLOCK_REALTIME` if a faster less
+      accurate clock isn't provided by the system. This clock will raise
+      an `EINVAL` error on extremely old Linux distros like RHEL5.
+
+    - `CLOCK_MONOTONIC_COARSE` is the same as `CLOCK_MONOTONIC` except
+      it'll go faster if the host OS provides a cheaper way to read the
+      unbiased time. Please be warned that coarse can be really coarse.
+      Rather than nano precision, you're looking at `CLK_TCK` precision,
+      which can lag as far as 30 milliseconds behind or possibly more.
+      Cosmopolitan may fallback to `CLOCK_REALTIME` if a faster less
+      accurate clock isn't provided by the system. This clock will raise
+      an `EINVAL` error on extremely old Linux distros like RHEL5.
+
+    - `CLOCK_PROCESS_CPUTIME_ID` returns the amount of time this process
+      was actively scheduled. This is similar to getrusage() and clock().
+      Cosmopoiltan guarantees this clock will never raise `EINVAL`.
+
+    - `CLOCK_THREAD_CPUTIME_ID` returns the amount of time this thread
+      was actively scheduled. This is similar to getrusage() and clock().
+      Cosmopoiltan guarantees this clock will never raise `EINVAL`.
 
     Returns `EINVAL` if clock isn't supported on platform.
 
@@ -4286,6 +4413,16 @@ UNIX MODULE
     OpenBSD should ignore the chown functions without crashing. Linux
     will just EPERM.
 
+    Root access isn't required. Support is limited to OpenBSD and Linux
+    2.6.23+ (i.e. RHEL6 c. 2012) so long as Redbean is running directly
+    on the host system, i.e. not running in a userspace emulator like
+    Blink or Qemu. If your environment isn't supported, then pledge()
+    will return 0 and do nothing, rather than raising ENOSYS, so the
+    apps you share with others will err on the side of not breaking. If
+    a functionality check is needed, please use `unix.pledge(nil, nil)`
+    which is a no-op that will fail appropriately when the necessary
+    system support isn't available to impose security restrictions.
+
     `promises` is a string that may include any of the following groups
     delimited by spaces. This list has been curated to focus on the
     system calls for which this module provides wrappers. See the
@@ -4330,11 +4467,16 @@ UNIX MODULE
 
     tty
 
-      Allows isatty, tiocgwinsz, tcgets, tcsets, tcsetsw, tcsetsf.
+      Allows isatty, tcgetwinsize, tcgets, tcsets, tcsetsw, tcsetsf.
 
     inet
 
       Allows socket (AF_INET), listen, bind, connect, accept,
+      getpeername, getsockname, setsockopt, getsockopt.
+
+    anet
+
+      Allows socket (AF_INET), listen, bind, accept,
       getpeername, getsockname, setsockopt, getsockopt.
 
     unix
@@ -4382,9 +4524,8 @@ UNIX MODULE
 
       If the executable in question needs a loader, then you will need
       "rpath prot_exec" too. With APE, security is strongest when you
-      assimilate your binaries beforehand, using the --assimilate flag,
-      or the o//tool/build/assimilate.com program. On OpenBSD this is
-      mandatory.
+      assimilate your binaries beforehand using the assimilate program.
+      On OpenBSD this is mandatory.
 
     prot_exec
 
@@ -4486,6 +4627,18 @@ UNIX MODULE
 
     This system call is supported natively on OpenBSD and polyfilled on
     Linux using the Landlock LSM[1].
+
+    This function requires OpenBSD or Linux 5.13+ (2022+). If the kernel
+    support isn't available (or we're in an emulator like Qemu or Blink)
+    then zero is returned and nothing happens (instead of raising
+    ENOSYS) because the files are still unveiled. Use `unix.unveil("",
+    nil)` to feature check the host system, which is defined as a no-op
+    that'll fail if the host system doesn't have the necessary features
+    that allow unix.unveil() impose bona-fide security restrictions.
+    Otherwise, if everything is good, a return value `>=0` is returned,
+    where `0` means OpenBSD, and `>=1` means Linux with Landlock LSM, in
+    which case the return code shall be the maximum supported Landlock
+    ABI version.
 
     `path` is the file or directory to unveil
 
@@ -4637,7 +4790,7 @@ UNIX MODULE
 
     No other error numbers are possible.
 
-  unix.tiocgwinsz(fd:int)
+  unix.tcgetwinsize(fd:int)
       ├─→ rows:int, cols:int
       └─→ nil, unix.Errno
 
@@ -4651,8 +4804,7 @@ UNIX MODULE
 
     This creates a secure temporary file inside `$TMPDIR`. If it isn't
     defined, then `/tmp` is used on UNIX and GetTempPath() is used on
-    the New Technology. This resolution of `$TMPDIR` happens once in a
-    ctor, which is copied to the `kTmpDir` global.
+    the New Technology. This resolution of `$TMPDIR` happens once.
 
     Once close() is called, the returned file is guaranteed to be
     deleted automatically. On UNIX the file is unlink()'d before this

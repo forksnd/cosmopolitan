@@ -1,12 +1,13 @@
 #include "libc/nt/codegen.h"
-.imp	kernel32,__imp_InitializeProcThreadAttributeList,InitializeProcThreadAttributeList,0
+.imp	kernel32,__imp_InitializeProcThreadAttributeList,InitializeProcThreadAttributeList
 
 	.text.windows
+	.ftrace1
 InitializeProcThreadAttributeList:
+	.ftrace2
 #ifdef __x86_64__
 	push	%rbp
 	mov	%rsp,%rbp
-	.profilable
 	mov	__imp_InitializeProcThreadAttributeList(%rip),%rax
 	jmp	__sysv2nt
 #elif defined(__aarch64__)

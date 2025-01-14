@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:t;c-basic-offset:8;tab-width:8;coding:utf-8   -*-│
-│vi: set et ft=c ts=8 tw=8 fenc=utf-8                                       :vi│
+│ vi: set noet ft=c ts=8 sw=8 fenc=utf-8                                   :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright (c) 2010, 2012 David E. O'Brien                                    │
 │ Copyright (c) 1980, 1992, 1993                                               │
@@ -29,51 +29,39 @@
 │ OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF       │
 │ SUCH DAMAGE.                                                                 │
 ╚─────────────────────────────────────────────────────────────────────────────*/
-#include "libc/calls/calls.h"
-#include "libc/calls/struct/iovec.h"
-#include "libc/calls/struct/stat.h"
-#include "libc/calls/struct/termios.h"
-#include "libc/calls/struct/timeval.h"
-#include "libc/calls/struct/winsize.h"
-#include "libc/calls/termios.h"
-#include "libc/calls/weirdtypes.h"
-#include "libc/errno.h"
-#include "libc/fmt/conv.h"
-#include "libc/intrin/bswap.h"
-#include "libc/log/bsd.h"
-#include "libc/macros.internal.h"
-#include "libc/mem/mem.h"
-#include "libc/paths.h"
-#include "libc/runtime/runtime.h"
-#include "libc/sock/select.h"
-#include "libc/stdio/stdio.h"
-#include "libc/sysv/consts/fileno.h"
-#include "libc/sysv/consts/s.h"
-#include "libc/sysv/consts/termios.h"
-#include "libc/time/time.h"
-#include "third_party/getopt/getopt.h"
+#include <err.h>
+#include <errno.h>
+#include <paths.h>
+#include <pty.h>
+#include <stdint.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <sys/param.h>
+#include <sys/stat.h>
+#include <sys/time.h>
+#include <sys/uio.h>
+#include <termios.h>
+#include <time.h>
+#include <unistd.h>
 // clang-format off
 
 /**
  * @fileoverview Terminal Screencast Recorder / Player, e.g.
  *
  *     make o//examples/script.com
- *     o//examples/script.com -r
+ *     o//examples/script.com -w80 -h24 -r recording.tty
  *     # type stuff..
  *     # CTRL-D
- *     o//examples/script.com -p typescript
+ *     o//examples/script.com -p recording.tty
  *
  * @note works on Linux, OpenBSD, NetBSD, FreeBSD, MacOS
  * @see https://asciinema.org/
  */
 
-asm(".ident\t\"\\n\\n\
-FreeBSD Script (BSD-3 License)\\n\
-Copyright (c) 2010, 2012 David E. O'Brien\\n\
-Copyright (c) 1980, 1992, 1993\\n\
-\tThe Regents of the University of California.\\n\
-\tAll rights reserved.\"");
-asm(".include \"libc/disclaimer.inc\"");
+__notice(freebsd_script_notice, "\
+FreeBSD Script (BSD-3 License)\n\
+Copyright (c) 2010, 2012 David E. O'Brien\n\
+Copyright (c) 1980, 1992, 1993 The Regents of the University of California");
 
 #define DEF_BUF 65536
 
@@ -113,11 +101,11 @@ main(int argc, char *argv[])
 	static char obuf[BUFSIZ];
 	static char ibuf[BUFSIZ];
 	fd_set rfd;
+	int fm_fd;
 	int aflg, Fflg, kflg, pflg, ch, k, n;
-	int flushtime, readstdin;
-	int fm_fd, fm_log;
+	int flushtime, readstdin, width, height;
 
-	aflg = Fflg = kflg = pflg = 0;
+	aflg = Fflg = kflg = pflg = height = width = 0;
 	usesleep = 1;
 	rawout = 0;
 	flushtime = 30;
@@ -125,7 +113,9 @@ main(int argc, char *argv[])
 			   warning. (not needed w/clang) */
 	showexit = 0;
 
-	while ((ch = getopt(argc, argv, "adeFfkpqrt:")) != -1)
+	(void)fm_fd;
+
+	while ((ch = getopt(argc, argv, "adeFfkpqrt:w:h:")) != -1)
 		switch(ch) {
 		case 'a':
 			aflg = 1;
@@ -155,6 +145,12 @@ main(int argc, char *argv[])
 			if (flushtime < 0)
 				err(1, "invalid flush time %d", flushtime);
 			break;
+		case 'w':
+			width = atoi(optarg);
+			break;
+		case 'h':
+			height = atoi(optarg);
+			break;
 		case '?':
 		default:
 			usage();
@@ -176,12 +172,16 @@ main(int argc, char *argv[])
 		playback(fscript);
 
 	if (tcgetattr(STDIN_FILENO, &tt) == -1 ||
-	    ioctl(STDIN_FILENO, TIOCGWINSZ, &win) == -1) {
+	    tcgetwinsize(STDIN_FILENO, &win) == -1) {
 		if (errno != ENOTTY) /* For debugger. */
 			err(1, "tcgetattr/ioctl");
 		if (openpty(&master, &slave, NULL, NULL, NULL) == -1)
 			err(1, "openpty");
 	} else {
+		if (width)
+			win.ws_col = width;
+		if (height)
+			win.ws_row = height;
 		if (openpty(&master, &slave, NULL, &tt, &win) == -1)
 			err(1, "openpty");
 		ttyflg = 1;

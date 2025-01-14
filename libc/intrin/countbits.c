@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2021 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -18,7 +18,6 @@
 ╚─────────────────────────────────────────────────────────────────────────────*/
 #include "libc/assert.h"
 #include "libc/dce.h"
-#include "libc/intrin/bits.h"
 #include "libc/nexgen32e/x86feature.h"
 
 /**
@@ -29,18 +28,17 @@
  * @note 30gbps on Nehalem (Intel 2008+) otherwise 3gbps
  */
 size_t _countbits(const void *a, size_t n) {
-  int i;
   size_t t;
   unsigned b;
   uint64_t x;
-  long Ai, Bi, Ci, Di;
-  long Ao, Bo, Co, Do;
   const char *p, *e;
   t = 0;
   p = a;
   e = p + n;
   if (!IsTiny()) {
 #ifdef __x86_64__
+    long Ai, Bi, Ci, Di;
+    long Ao, Bo, Co, Do;
     if (X86_HAVE(POPCNT)) {
       while (p + sizeof(long) * 4 <= e) {
         __builtin_memcpy(&Ai, p + 000, sizeof(long));

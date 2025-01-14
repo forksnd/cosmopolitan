@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2020 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -16,8 +16,8 @@
 │ TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR             │
 │ PERFORMANCE OF THIS SOFTWARE.                                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
-#include "libc/intrin/tpenc.h"
 #include "libc/stdio/stdio.h"
+#include "libc/str/str.h"
 
 /**
  * Writes wide character to stream.
@@ -29,7 +29,7 @@
 wint_t fputwc_unlocked(wchar_t wc, FILE *f) {
   uint64_t w;
   if (wc != -1) {
-    w = _tpenc(wc);
+    w = tpenc(wc);
     do {
       if (fputc_unlocked(w, f) == -1) {
         return -1;
@@ -40,3 +40,5 @@ wint_t fputwc_unlocked(wchar_t wc, FILE *f) {
     return -1;
   }
 }
+
+__strong_reference(fputwc_unlocked, putwc_unlocked);

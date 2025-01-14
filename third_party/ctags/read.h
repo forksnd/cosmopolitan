@@ -1,4 +1,3 @@
-// clang-format off
 /*
 *   $Id: read.h 769 2010-09-11 21:00:16Z dhiebert $
 *
@@ -24,12 +23,10 @@
 #include "third_party/ctags/general.h"  /* must always come first */
 
 #include "libc/calls/calls.h"
-#include "libc/calls/dprintf.h"
+#include "libc/stdio/dprintf.h"
 #include "libc/calls/weirdtypes.h"
-#include "libc/fmt/fmt.h"
-#include "libc/mem/fmt.h"
 #include "libc/stdio/stdio.h"
-#include "libc/stdio/temp.h"
+#include "libc/temp.h"
 #include "third_party/musl/tempnam.h"
 #include "libc/str/str.h"
 

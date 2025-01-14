@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2020 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -16,11 +16,11 @@
 │ TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR             │
 │ PERFORMANCE OF THIS SOFTWARE.                                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
+#include "libc/ctype.h"
 #include "libc/fmt/bing.internal.h"
 #include "libc/fmt/itoa.h"
-#include "libc/intrin/bits.h"
-#include "libc/intrin/directmap.internal.h"
-#include "libc/intrin/safemacros.internal.h"
+#include "libc/intrin/directmap.h"
+#include "libc/intrin/safemacros.h"
 #include "libc/runtime/pc.internal.h"
 #include "libc/str/str.h"
 #include "libc/str/thompike.h"
@@ -33,6 +33,7 @@
 #ifdef __x86_64__
 
 /**
+ * @internal
  * @fileoverview ECMA-48 / VT100 video terminal implementation for bare
  * metal VGA.
  *
@@ -71,7 +72,8 @@ static void SetXsFb(struct Tty *tty, unsigned short xsfb) {
 static bool SetWcs(struct Tty *tty, unsigned init_flags) {
 #ifdef VGA_USE_WCS
   struct DirectMap dm;
-  if (!(init_flags & kTtyAllocWcs)) return false;
+  if (!(init_flags & kTtyAllocWcs))
+    return false;
   dm = sys_mmap_metal(NULL, Yn(tty) * Xn(tty) * sizeof(wchar_t),
                       PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1,
                       0);
@@ -165,8 +167,7 @@ void _StartTty(struct Tty *tty, unsigned char type, unsigned short yp,
                unsigned short startx, unsigned char yc, unsigned char xc,
                void *fb, unsigned init_flags) {
   unsigned short yn, xn, xs = xp * sizeof(TtyCanvasColor);
-  struct DirectMap dm;
-  memset(tty, 0, sizeof(struct Tty));
+  bzero(tty, sizeof(struct Tty));
   SetYp(tty, yp);
   SetXp(tty, xp);
   SetXsFb(tty, xsfb);
@@ -181,9 +182,9 @@ void _StartTty(struct Tty *tty, unsigned char type, unsigned short yp,
       tty->canvas = fb;
       xs = xsfb;
     } else {
-      dm = sys_mmap_metal(NULL, (size_t)yp * xs, PROT_READ | PROT_WRITE,
-                          MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
-      if (dm.addr == (void *)-1) {
+      void *addr = sys_mmap_metal(NULL, (size_t)yp * xs, PROT_READ | PROT_WRITE,
+                                  MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+      if (addr == (void *)-1) {
         /*
          * We are a bit low on memory.  Try to go on anyway, & initialize
          * our tty as an emergency console.
@@ -192,7 +193,7 @@ void _StartTty(struct Tty *tty, unsigned char type, unsigned short yp,
         tty->canvas = fb;
         xs = xsfb;
       } else
-        tty->canvas = dm.addr;
+        tty->canvas = addr;
     }
   }
   SetYn(tty, yn);
@@ -200,11 +201,14 @@ void _StartTty(struct Tty *tty, unsigned char type, unsigned short yp,
   tty->yc = yc;
   tty->xc = xc;
   tty->fb = fb;
-  if (starty >= yn) starty = yn - 1;
-  if (startx >= xn) startx = xn - 1;
+  if (starty >= yn)
+    starty = yn - 1;
+  if (startx >= xn)
+    startx = xn - 1;
   tty->y = starty;
   tty->x = startx;
-  if ((init_flags & kTtyKlog) != 0) init_flags &= ~kTtyAllocWcs;
+  if ((init_flags & kTtyKlog) != 0)
+    init_flags &= ~kTtyAllocWcs;
   tty->xs = xs;
   TtySetType(tty, type, init_flags);
   if (SetWcs(tty, init_flags)) {
@@ -212,7 +216,8 @@ void _StartTty(struct Tty *tty, unsigned char type, unsigned short yp,
     size_t n = (size_t)yn * xn, i;
     if (type == PC_VIDEO_TEXT) {
       struct VgaTextCharCell *ccs = fb;
-      for (i = 0; i < n; ++i) wcs[i] = bing(ccs[i].ch, 0);
+      for (i = 0; i < n; ++i)
+        wcs[i] = bing(ccs[i].ch, 0);
     } else
       wmemset(wcs, L' ', n);
   }
@@ -313,7 +318,6 @@ static void TtySetXlat(struct Tty *tty, wchar_t *xlat) {
 }
 
 static void TtySetCodepage(struct Tty *tty, char id) {
-  unsigned i;
   switch (id) {
     default:
     case 'B':
@@ -326,6 +330,7 @@ static void TtySetCodepage(struct Tty *tty, char id) {
 }
 
 /**
+ * @internal
  * Map the given direct color value to one of the 16 basic foreground colors
  * or one of the 16 background colors.
  *
@@ -334,9 +339,12 @@ static void TtySetCodepage(struct Tty *tty, char id) {
 static uint8_t TtyGetTextColor(TtyCanvasColor color) {
   uint8_t r = color.bgr.r, g = color.bgr.g, b = color.bgr.b;
   uint8_t hue = 0, max = MAX(MAX(r, g), b);
-  if (r > max / 2) hue |= 4;
-  if (g > max / 2) hue |= 2;
-  if (b > max / 2) hue |= 1;
+  if (r > max / 2)
+    hue |= 4;
+  if (g > max / 2)
+    hue |= 2;
+  if (b > max / 2)
+    hue |= 1;
   if (hue == 7 && max <= 0x55)
     hue = 8;
   else if (max > 0xaa)
@@ -345,6 +353,7 @@ static uint8_t TtyGetTextColor(TtyCanvasColor color) {
 }
 
 /**
+ * @internal
  * Map the currently active foreground & background colors & terminal
  * configuration to a VGA text character attribute byte.
  *
@@ -366,9 +375,11 @@ static uint8_t TtyGetTextAttr(struct Tty *tty) {
    * simplistic than what Linux does, but should be enough.
    */
   attr &= ~0x80;
-  if ((tty->pr & kTtyBlink) != 0) attr |= 0x80;
+  if ((tty->pr & kTtyBlink) != 0)
+    attr |= 0x80;
 #endif
-  if ((tty->pr & kTtyBold) != 0) attr |= 0x08;
+  if ((tty->pr & kTtyBold) != 0)
+    attr |= 0x08;
   return attr;
 }
 
@@ -380,7 +391,8 @@ static void TtyTextDrawChar(struct Tty *tty, size_t y, size_t x, wchar_t wc) {
   struct VgaTextCharCell *ccs = (struct VgaTextCharCell *)tty->canvas;
   size_t i = tty->y * Xn(tty) + tty->x;
   int c = unbing(wc);
-  if (c == -1) c = 0xFE;
+  if (c == -1)
+    c = 0xFE;
   ccs[i] = (struct VgaTextCharCell){c, attr};
 }
 
@@ -389,7 +401,8 @@ static void TtyTextEraseLineCells(struct Tty *tty, size_t dsty, size_t dstx,
   uint8_t attr = TtyGetTextAttr(tty);
   struct VgaTextCharCell *ccs = (struct VgaTextCharCell *)tty->canvas;
   size_t dst = dsty * Xn(tty) + dstx, i;
-  for (i = 0; i < n; ++i) ccs[dst + i] = (struct VgaTextCharCell){' ', attr};
+  for (i = 0; i < n; ++i)
+    ccs[dst + i] = (struct VgaTextCharCell){' ', attr};
 }
 
 void _TtyEraseLineCells(struct Tty *tty, size_t dsty, size_t dstx, size_t n) {
@@ -422,7 +435,8 @@ void _TtyMoveLineCells(struct Tty *tty, size_t dsty, size_t dstx, size_t srcy,
   size_t xn = Xn(tty);
   size_t dst = dsty * xn + dstx, src = srcy * xn + srcx;
   tty->movelinecells(tty, dsty, dstx, srcy, srcx, n);
-  if (Wcs(tty)) wmemmove(Wcs(tty) + dst, Wcs(tty) + src, n);
+  if (Wcs(tty))
+    wmemmove(Wcs(tty) + dst, Wcs(tty) + src, n);
 }
 
 void _TtyMoveLines(struct Tty *tty, size_t dsty, size_t srcy, size_t n) {
@@ -434,7 +448,8 @@ void _TtyMoveLines(struct Tty *tty, size_t dsty, size_t srcy, size_t n) {
       ++srcy;
     }
   } else if (dsty > srcy) {
-    while (n-- != 0) _TtyMoveLineCells(tty, dsty + n, 0, srcy + n, 0, xn);
+    while (n-- != 0)
+      _TtyMoveLineCells(tty, dsty + n, 0, srcy + n, 0, xn);
   }
 }
 
@@ -519,12 +534,14 @@ static void TtyAdvance(struct Tty *tty) {
 }
 
 static void TtyWriteGlyph(struct Tty *tty, wint_t wc, int w) {
-  if (w < 1) wc = L' ', w = 1;
+  if (w < 1)
+    wc = L' ', w = 1;
   if ((tty->conf & kTtyRedzone) || tty->x + w > Xn(tty)) {
     TtyAdvance(tty);
   }
   tty->drawchar(tty, tty->y, tty->x, wc);
-  if (Wcs(tty)) Wcs(tty)[tty->y * Xn(tty) + tty->x] = wc;
+  if (Wcs(tty))
+    Wcs(tty)[tty->y * Xn(tty) + tty->x] = wc;
   if ((tty->x += w) >= Xn(tty)) {
     tty->x = Xn(tty) - 1;
     tty->conf |= kTtyRedzone;
@@ -555,14 +572,17 @@ static void TtyWriteTab(struct Tty *tty) {
 
 int TtyAtoi(const char *s, const char **e) {
   int i;
-  for (i = 0; isdigit(*s); ++s) i *= 10, i += *s - '0';
-  if (e) *e = s;
+  for (i = 0; isdigit(*s); ++s)
+    i *= 10, i += *s - '0';
+  if (e)
+    *e = s;
   return i;
 }
 
 static int TtyGetMoveParam(struct Tty *tty) {
   int x = TtyAtoi(tty->esc.s, NULL);
-  if (x < 1) x = 1;
+  if (x < 1)
+    x = 1;
   return x;
 }
 
@@ -570,7 +590,8 @@ static void TtySetCursorPosition(struct Tty *tty) {
   int row, col;
   const char *s = tty->esc.s;
   row = max(1, TtyAtoi(s, &s));
-  if (*s == ';') ++s;
+  if (*s == ';')
+    ++s;
   col = max(1, TtyAtoi(s, &s));
   _TtySetY(tty, row - 1);
   _TtySetX(tty, col - 1);
@@ -592,12 +613,14 @@ static void TtyMoveCursor(struct Tty *tty, int dy, int dx) {
 
 static void TtyScrollUp(struct Tty *tty) {
   int n = TtyGetMoveParam(tty);
-  while (n--) TtyScroll(tty);
+  while (n--)
+    TtyScroll(tty);
 }
 
 static void TtyScrollDown(struct Tty *tty) {
   int n = TtyGetMoveParam(tty);
-  while (n--) TtyReverse(tty);
+  while (n--)
+    TtyReverse(tty);
 }
 
 static void TtySetCursorStatus(struct Tty *tty, bool status) {
@@ -676,7 +699,7 @@ static void TtyEraseLine(struct Tty *tty) {
 }
 
 static void TtyEraseCells(struct Tty *tty) {
-  int yn, xn, yi, xi, n, left;
+  int yn, xn, yi, xi, left;
   yn = Yn(tty);
   xn = Xn(tty);
   yi = tty->y;
@@ -795,12 +818,18 @@ static void TtyCsiN(struct Tty *tty) {
   }
 }
 
-/** Create a direct color pixel value. */
+/**
+ * @internal
+ * Create a direct color pixel value.
+ */
 static TtyCanvasColor TtyMapTrueColor(uint8_t r, uint8_t g, uint8_t b) {
   return (TtyCanvasColor){.bgr.r = r, .bgr.g = g, .bgr.b = b, .bgr.x = 0xff};
 }
 
-/** Map the given 256-color code to a direct color. */
+/**
+ * @internal
+ * Map the given 256-color code to a direct color.
+ */
 static TtyCanvasColor TtyMapXtermColor(uint8_t color) {
   uint8_t r, g, b;
   if (color < 8) {
@@ -823,7 +852,10 @@ static TtyCanvasColor TtyMapXtermColor(uint8_t color) {
   return TtyMapTrueColor(r, g, b);
 }
 
-/** Map the given ECMA-48 / VT100 SGR color code to a direct color. */
+/**
+ * @internal
+ * Map the given ECMA-48 / VT100 SGR color code to a direct color.
+ */
 static TtyCanvasColor TtyMapEcma48Color(uint8_t color) {
   return TtyMapXtermColor(color % 16);
 }
@@ -1002,7 +1034,7 @@ static void TtySelectGraphicsRendition(struct Tty *tty) {
             tty->pr &= ~kTtyTrue;
             break;
           default:
-            abort();
+            __builtin_trap();
         }
         break;
       default:
@@ -1100,8 +1132,10 @@ static void TtyCsi(struct Tty *tty) {
 static void TtyScreenAlignmentDisplay(struct Tty *tty) {
   size_t yn = Yn(tty), xn = Xn(tty), y, x;
   for (y = 0; y < yn; ++y)
-    for (x = 0; x < xn; ++x) tty->drawchar(tty, y, x, 'E');
-  if (Wcs(tty)) wmemset(Wcs(tty), L'E', yn * xn);
+    for (x = 0; x < xn; ++x)
+      tty->drawchar(tty, y, x, 'E');
+  if (Wcs(tty))
+    wmemset(Wcs(tty), L'E', yn * xn);
 }
 
 static void TtyEscHash(struct Tty *tty) {
@@ -1202,7 +1236,8 @@ static void TtyUpdate(struct Tty *tty) {
   if (tty->type == PC_VIDEO_TEXT) {
     unsigned char start = tty->yc - 2, end = tty->yc - 1;
     unsigned short pos = tty->y * Xn(tty) + tty->x;
-    if ((tty->conf & kTtyNocursor)) start |= 1 << 5;
+    if ((tty->conf & kTtyNocursor))
+      start |= 1 << 5;
     outb(CRTPORT, 0x0A);
     outb(CRTPORT + 1, start);
     outb(CRTPORT, 0x0B);
@@ -1241,7 +1276,8 @@ ssize_t _TtyWrite(struct Tty *tty, const void *data, size_t n) {
       case kTtyUtf8:
         if (ThomPikeCont(p[i])) {
           tty->u8 = ThomPikeMerge(tty->u8, p[i]);
-          if (--tty->n8) break;
+          if (--tty->n8)
+            break;
         }
         wc = tty->u8;
         if ((0x00 <= wc && wc <= 0x1F) || (0x7F <= wc && wc <= 0x9F)) {
@@ -1299,7 +1335,7 @@ ssize_t _TtyWrite(struct Tty *tty, const void *data, size_t n) {
         }
         break;
       default:
-        unreachable;
+        __builtin_unreachable();
     }
   }
   TtyUpdate(tty);
@@ -1310,8 +1346,8 @@ ssize_t _TtyWriteInput(struct Tty *tty, const void *data, size_t n) {
   int c;
   bool cr;
   char *p;
+  size_t i, j;
   const char *q;
-  size_t i, j, m;
   q = data;
   p = tty->input.p;
   i = tty->input.i;
@@ -1341,7 +1377,6 @@ ssize_t _TtyWriteInput(struct Tty *tty, const void *data, size_t n) {
 }
 
 ssize_t _TtyRead(struct Tty *tty, void *buf, size_t size) {
-  char *p;
   size_t n;
   n = MIN(size, tty->input.i);
 #ifdef VGA_PERSNICKETY_STATUS

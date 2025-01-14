@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2021 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -25,7 +25,7 @@ void LogCertificate(const char *msg, mbedtls_x509_crt *cert) {
   if (LOGGABLE(kLogDebug)) {
     if ((s = malloc((n = 15000)))) {
       if (mbedtls_x509_crt_info(s, n, " ", cert) > 0) {
-        DEBUGF("%s\n%s", msg, _chomp(s));
+        DEBUGF("%s\n%s", msg, chomp(s));
       }
       free(s);
     }

@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2020 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -19,13 +19,14 @@
 #include "libc/assert.h"
 #include "libc/calls/cp.internal.h"
 #include "libc/calls/internal.h"
+#include "libc/intrin/fds.h"
 #include "libc/calls/struct/iovec.h"
 #include "libc/calls/struct/iovec.internal.h"
 #include "libc/dce.h"
-#include "libc/intrin/asan.internal.h"
-#include "libc/intrin/describeflags.internal.h"
+#include "libc/intrin/describeflags.h"
 #include "libc/intrin/kprintf.h"
-#include "libc/intrin/strace.internal.h"
+#include "libc/intrin/strace.h"
+#include "libc/runtime/runtime.h"
 #include "libc/sock/internal.h"
 #include "libc/sock/sock.h"
 #include "libc/sock/struct/msghdr.h"
@@ -44,7 +45,7 @@
  * @return number of bytes transmitted, or -1 w/ errno
  * @error EINTR, EHOSTUNREACH, ECONNRESET (UDP ICMP Port Unreachable),
  *     EPIPE (if MSG_NOSIGNAL), EMSGSIZE, ENOTSOCK, EFAULT, etc.
- * @cancellationpoint
+ * @cancelationpoint
  * @asyncsignalsafe
  * @restartable (unless SO_RCVTIMEO)
  */
@@ -53,9 +54,9 @@ ssize_t sendmsg(int fd, const struct msghdr *msg, int flags) {
   struct msghdr msg2;
   union sockaddr_storage_bsd bsd;
 
-  BEGIN_CANCELLATION_POINT;
-  if (IsAsan() && !__asan_is_valid_msghdr(msg)) {
-    rc = efault();
+  BEGIN_CANCELATION_POINT;
+  if (fd < g_fds.n && g_fds.p[fd].kind == kFdZip) {
+    rc = enotsock();
   } else if (!IsWindows()) {
     if (IsBsd() && msg->msg_name) {
       memcpy(&msg2, msg, sizeof(msg2));
@@ -73,7 +74,7 @@ ssize_t sendmsg(int fd, const struct msghdr *msg, int flags) {
     } else if (__isfdkind(fd, kFdSocket)) {
       rc = sys_sendto_nt(fd, msg->msg_iov, msg->msg_iovlen, flags,
                          msg->msg_name, msg->msg_namelen);
-    } else if (__isfdkind(fd, kFdFile)) {
+    } else if (__isfdkind(fd, kFdFile)) {  // e.g. socketpair
       rc = sys_write_nt(fd, msg->msg_iov, msg->msg_iovlen, -1);
     } else {
       rc = enotsock();
@@ -81,20 +82,21 @@ ssize_t sendmsg(int fd, const struct msghdr *msg, int flags) {
   } else {
     rc = ebadf();
   }
-  END_CANCELLATION_POINT;
+  END_CANCELATION_POINT;
 
-#if defined(SYSDEBUG) && _DATATRACE
-  if (__strace > 0 && strace_enabled(0) > 0) {
-    kprintf(STRACE_PROLOGUE "sendmsg(");
-    if ((!IsAsan() && kisdangerous(msg)) ||
-        (IsAsan() && !__asan_is_valid(msg, sizeof(*msg)))) {
+#if SYSDEBUG && _DATATRACE
+  // TODO(jart): Write a DescribeMsg() function.
+  if (strace_enabled(0) > 0) {
+    kprintf(STRACE_PROLOGUE "sendmsg(%d, ", fd);
+    if (kisdangerous(msg)) {
       kprintf("%p", msg);
     } else {
       kprintf("{");
       kprintf(".name=%#.*hhs, ", msg->msg_namelen, msg->msg_name);
       if (msg->msg_controllen)
         kprintf(", .control=%#.*hhs, ", msg->msg_controllen, msg->msg_control);
-      if (msg->msg_flags) kprintf(".flags=%#x, ", msg->msg_flags);
+      if (msg->msg_flags)
+        kprintf(".flags=%#x, ", msg->msg_flags);
       kprintf(", .iov=%s",
               DescribeIovec(rc != -1 ? rc : -2, msg->msg_iov, msg->msg_iovlen));
     }

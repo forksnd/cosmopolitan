@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2022 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -22,5 +22,9 @@
  * Returns 𝑥 × 2ʸ.
  */
 double scalbln(double x, long n) {
-  return ldexp(x, n > 65536 ? 65536 : n < -65536 ? -65536 : (int)n);
+  return scalbn(x, n > 65536 ? 65536 : n < -65536 ? -65536 : (int)n);
 }
+
+#if LDBL_MANT_DIG == 53 && LDBL_MAX_EXP == 1024
+__weak_reference(scalbln, scalblnl);
+#endif

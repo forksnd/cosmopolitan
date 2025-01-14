@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2020 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -16,71 +16,130 @@
 │ TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR             │
 │ PERFORMANCE OF THIS SOFTWARE.                                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
-#include "libc/dce.h"
-#include "libc/intrin/asan.internal.h"
 #include "libc/intrin/likely.h"
+#include "libc/str/kmp.h"
 #include "libc/str/str.h"
-
-typedef char xmm_t __attribute__((__vector_size__(16), __aligned__(16)));
+#include "third_party/aarch64/arm_neon.internal.h"
+#include "third_party/intel/emmintrin.internal.h"
 
 /**
  * Searches for fixed-length substring in memory region.
+ *
+ * This function offers assurances against pathological cases, using KMP
+ * if no progress is being made on the O(nm) vectorized fast path. It is
+ * important to note that, if `needle` is untrusted, that it not be long
+ * enough to overflow the stack. That's because KMP needs to allocate an
+ * array of longs the same length as `needle` and it needs to do it with
+ * stack memory because this function is safe to call in signal handlers
  *
  * @param haystack is the region of memory to be searched
  * @param haystacklen is its character count
  * @param needle contains the memory for which we're searching
  * @param needlelen is its character count
  * @return pointer to first result or NULL if not found
+ * @asyncsignalsafe
  */
-noasan void *memmem(const void *haystack, size_t haystacklen,
-                    const void *needle, size_t needlelen) {
-#ifdef __x86_64__
+__vex void *memmem(const void *haystack, size_t haystacklen, const void *needle,
+                   size_t needlelen) {
+#if defined(__x86_64__) && !defined(__chibicc__)
   char c;
-  xmm_t n, *v;
+  __m128i n;
+  const __m128i *v;
   unsigned i, k, m;
+  long progress = 0;
   const char *p, *q, *e;
-  if (IsAsan()) __asan_verify(needle, needlelen);
-  if (IsAsan()) __asan_verify(haystack, haystacklen);
-  if (!needlelen) return haystack;
-  if (UNLIKELY(needlelen > haystacklen)) return 0;
+  long scare = -(needlelen * 10);
+  if (!needlelen)
+    return (void *)haystack;
+  if (UNLIKELY(needlelen > haystacklen))
+    return 0;
   q = needle;
   c = *q;
-  n = (xmm_t){c, c, c, c, c, c, c, c, c, c, c, c, c, c, c, c};
+  n = _mm_set1_epi8(c);
   p = haystack;
   e = p + haystacklen;
   k = (uintptr_t)p & 15;
-  v = (const xmm_t *)((uintptr_t)p & -16);
-  m = __builtin_ia32_pmovmskb128(*v == n);
+  v = (const __m128i *)((uintptr_t)p & -16);
+  m = _mm_movemask_epi8(_mm_cmpeq_epi8(_mm_load_si128(v), n));
   m >>= k;
   m <<= k;
   for (;;) {
     while (!m) {
       ++v;
-      if ((const char *)v >= e) return 0;
-      m = __builtin_ia32_pmovmskb128(*v == n);
+      progress += 16;
+      if ((const char *)v >= e)
+        return 0;
+      m = _mm_movemask_epi8(_mm_cmpeq_epi8(_mm_load_si128(v), n));
     }
     do {
       k = __builtin_ctzl(m);
       p = (const char *)v + k;
-      if (UNLIKELY(p + needlelen > e)) return 0;
+      if (UNLIKELY(p + needlelen > e))
+        return 0;
       for (i = 1;; ++i) {
-        if (i == needlelen) return (/*unconst*/ char *)p;
-        if (p[i] != q[i]) break;
+        if (--progress <= scare)
+          goto OfferPathologicalAssurances;
+        if (i == needlelen)
+          return (/*unconst*/ char *)p;
+        if (p[i] != q[i])
+          break;
       }
       m &= ~(1 << k);
     } while (m);
   }
-#else
-  size_t i, j;
-  if (!needlelen) return haystack;
-  if (needlelen > haystacklen) return 0;
-  for (i = 0; i < haystacklen; ++i) {
-    for (j = 0;; ++j) {
-      if (j == needlelen) return (/*unconst*/ char *)haystack + i;
-      if (i + j == haystacklen) break;
-      if (((char *)haystack)[i + j] != ((char *)needle)[j]) break;
+OfferPathologicalAssurances:
+#elif defined(__aarch64__) && defined(__ARM_NEON)
+  char c;
+  uint8x16_t n;
+  const uint8x16_t *v;
+  size_t i, k;
+  uint64_t m;
+  long progress = 0;
+  const char *p, *q, *e;
+  long scare = -(needlelen * 10);
+  if (!needlelen)
+    return (void *)haystack;
+  if (UNLIKELY(needlelen > haystacklen))
+    return 0;
+  q = needle;
+  c = *q;
+  n = vdupq_n_u8(c);
+  p = haystack;
+  e = p + haystacklen;
+  k = (uintptr_t)p & 15;
+  v = (const uint8x16_t *)((uintptr_t)p & -16);
+  uint8x16_t cmp = vceqq_u8(vld1q_u8((const uint8_t *)v), n);
+  uint8x8_t mask = vshrn_n_u16(vreinterpretq_u16_u8(cmp), 4);
+  vst1_u8((uint8_t *)&m, mask);
+  m >>= k * 4;
+  m <<= k * 4;
+  for (;;) {
+    while (!m) {
+      ++v;
+      progress += 16;
+      if ((const char *)v >= e)
+        return 0;
+      cmp = vceqq_u8(vld1q_u8((const uint8_t *)v), n);
+      mask = vshrn_n_u16(vreinterpretq_u16_u8(cmp), 4);
+      vst1_u8((uint8_t *)&m, mask);
     }
+    do {
+      k = __builtin_ctzll(m) >> 2;
+      p = (const char *)v + k;
+      if (UNLIKELY(p + needlelen > e))
+        return 0;
+      for (i = 1;; ++i) {
+        if (--progress <= scare)
+          goto OfferPathologicalAssurances;
+        if (i == needlelen)
+          return (/*unconst*/ char *)p;
+        if (p[i] != q[i])
+          break;
+      }
+      m &= ~(0xFULL << (k * 4));
+    } while (m);
   }
-  return 0;
+OfferPathologicalAssurances:
 #endif
+  return __memmem_kmp(haystack, haystacklen, needle, needlelen);
 }

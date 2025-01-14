@@ -1,5 +1,5 @@
 /usr/bin/env echo ' -*-mode:sh;indent-tabs-mode:nil;tab-width:8;coding:utf-8-*-│
-│vi: set net ft=sh ts=2 sts=2 sw=2 fenc=utf-8                               :vi│
+│ vi: set et ft=sh ts=8 sts=2 sw=2 fenc=utf-8                              :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2020 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -27,8 +27,7 @@ imp() {
   NAME="$1"
   ACTUAL="$2"
   DLL="$3"
-  HINT="$4"
-  ARITY="$5"
+  ARITY="$4"
   if [ "$MADEDIRS" != "${MADEDIRS#*$3}" ]; then  # ← sre interview question
     mkdir -p "libc/nt/$3"
     MADEDIRS="$MADEDIRS $3"
@@ -40,7 +39,7 @@ imp() {
       echo ".ntimp	$ACTUAL,$NAME"
     else
       echo "#include \"libc/nt/codegen.h\""
-      echo ".imp	$DLL,__imp_$ACTUAL,$ACTUAL,$HINT"
+      echo ".imp	$DLL,__imp_$ACTUAL,$ACTUAL"
     fi
 
     # Generate System Five ABI translating thunks
@@ -62,11 +61,12 @@ imp() {
 thunk() {
   printf '
 	.text.windows
+	.ftrace1
 %s:
+	.ftrace2
 #ifdef __x86_64__
 	push	%%rbp
 	mov	%%rsp,%%rbp
-	.profilable
 	mov	__imp_%s(%%rip),%%rax
 	jmp	%s
 #elif defined(__aarch64__)
@@ -81,11 +81,12 @@ thunk() {
 thunk0() {
   printf '
 	.text.windows
+	.ftrace1
 %s:
+	.ftrace2
 #ifdef __x86_64__
 	push	%%rbp
 	mov	%%rsp,%%rbp
-	.profilable
 	sub	$32,%%rsp
 	call	*__imp_%s(%%rip)
 	leave
@@ -101,11 +102,12 @@ thunk0() {
 thunk1() {
   printf '
 	.text.windows
+	.ftrace1
 %s:
+	.ftrace2
 #ifdef __x86_64__
 	push	%%rbp
 	mov	%%rsp,%%rbp
-	.profilable
 	mov	%%rdi,%%rcx
 	sub	$32,%%rsp
 	call	*__imp_%s(%%rip)

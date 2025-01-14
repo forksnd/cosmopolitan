@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2020 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -17,7 +17,8 @@
 │ PERFORMANCE OF THIS SOFTWARE.                                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
 #include "libc/calls/calls.h"
-#include "libc/intrin/safemacros.internal.h"
+#include "libc/intrin/safemacros.h"
+#include "libc/limits.h"
 #include "libc/log/log.h"
 #include "libc/mem/mem.h"
 #include "libc/runtime/runtime.h"
@@ -48,9 +49,11 @@
 const char *commandvenv(const char *var, const char *cmd) {
   const char *exepath;
   static char pathbuf[PATH_MAX];
-  if (*cmd == '/' || *cmd == '\\') return cmd;
+  if (*cmd == '/' || *cmd == '\\')
+    return cmd;
   if ((exepath = getenv(var))) {
-    if (isempty(exepath)) return NULL;
+    if (isempty(exepath))
+      return NULL;
     if (access(exepath, X_OK) != -1) {
       return exepath;
     } else {

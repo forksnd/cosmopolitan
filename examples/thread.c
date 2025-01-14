@@ -1,33 +1,17 @@
-#if 0
-/*─────────────────────────────────────────────────────────────────╗
-│ To the extent possible under law, Justine Tunney has waived      │
-│ all copyright and related or neighboring rights to this file,    │
-│ as it is written in the following disclaimers:                   │
-│   • http://unlicense.org/                                        │
-│   • http://creativecommons.org/publicdomain/zero/1.0/            │
-╚─────────────────────────────────────────────────────────────────*/
-#endif
-#include "libc/thread/thread.h"
-#include "libc/stdio/stdio.h"
+#include <pthread.h>
+#include <stdio.h>
 
-/**
- * @fileoverview Basic POSIX Threads Example.
- *
- *     $ make -j8 o//examples/thread.com
- *     $ o//examples/thread.com
- *     hi there
- *
- */
+// how to spawn a thread
 
-void *worker(void *arg) {
-  fputs(arg, stdout);
-  return "there\n";
+void *my_thread(void *arg) {
+  printf("my_thread(%p) is running\n", arg);
+  return (void *)0x456L;
 }
 
-int main() {
-  void *result;
-  pthread_t id;
-  pthread_create(&id, 0, worker, "hi ");
-  pthread_join(id, &result);
-  fputs(result, stdout);
+int main(int argc, char *argv[]) {
+  void *res;
+  pthread_t th;
+  pthread_create(&th, 0, my_thread, (void *)0x123L);
+  pthread_join(th, &res);
+  printf("my_thread() returned %p\n", res);
 }

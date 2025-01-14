@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2022 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -18,17 +18,18 @@
 ╚─────────────────────────────────────────────────────────────────────────────*/
 #include "libc/calls/calls.h"
 #include "libc/fmt/itoa.h"
-#include "libc/intrin/describeflags.internal.h"
+#include "libc/intrin/describeflags.h"
+#include "libc/sysv/consts/arch.h"
 
-#ifdef DescribeArchPrctlCode
-#undef DescribeArchPrctlCode
-#endif
-
-const char *DescribeArchPrctlCode(char buf[12], int x) {
-  if (x == ARCH_SET_FS) return "ARCH_SET_FS";
-  if (x == ARCH_GET_FS) return "ARCH_GET_FS";
-  if (x == ARCH_SET_GS) return "ARCH_SET_GS";
-  if (x == ARCH_GET_GS) return "ARCH_GET_GS";
+const char *_DescribeArchPrctlCode(char buf[12], int x) {
+  if (x == ARCH_SET_FS)
+    return "ARCH_SET_FS";
+  if (x == ARCH_GET_FS)
+    return "ARCH_GET_FS";
+  if (x == ARCH_SET_GS)
+    return "ARCH_SET_GS";
+  if (x == ARCH_GET_GS)
+    return "ARCH_GET_GS";
   FormatInt32(buf, x);
   return buf;
 }

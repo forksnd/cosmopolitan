@@ -1,4 +1,3 @@
-// clang-format off
 /*
 *   $Id: entry.c 766 2010-09-11 18:59:45Z dhiebert $
 *
@@ -14,6 +13,7 @@
 *   INCLUDE FILES
 */
 #include "libc/runtime/runtime.h"
+#include "libc/ctype.h"
 #include "third_party/ctags/general.h"  /* must always come first */
 
 #include "libc/mem/alg.h"
@@ -44,8 +44,8 @@
 #include "libc/sysv/consts/fileno.h"
 #include "libc/sysv/consts/o.h"
 #include "libc/sysv/consts/ok.h"
-#include "libc/time/time.h"
-#include "third_party/getopt/getopt.h"
+#include "libc/time.h"
+#include "third_party/getopt/getopt.internal.h"
 #include "third_party/musl/crypt.h"
 #include "third_party/musl/lockf.h"      /* to declare close (), ftruncate (), truncate () */
 #endif

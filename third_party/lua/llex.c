@@ -1,9 +1,9 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╚──────────────────────────────────────────────────────────────────────────────╝
 │                                                                              │
 │  Lua                                                                         │
-│  Copyright © 2004-2021 Lua.org, PUC-Rio.                                     │
+│  Copyright © 2004-2023 Lua.org, PUC-Rio.                                     │
 │                                                                              │
 │  Permission is hereby granted, free of charge, to any person obtaining       │
 │  a copy of this software and associated documentation files (the             │
@@ -27,11 +27,12 @@
 ╚─────────────────────────────────────────────────────────────────────────────*/
 #define llex_c
 #define LUA_CORE
+
+#include "third_party/lua/llex.h"
 #include "third_party/lua/lctype.h"
 #include "third_party/lua/ldebug.h"
 #include "third_party/lua/ldo.h"
 #include "third_party/lua/lgc.h"
-#include "third_party/lua/llex.h"
 #include "third_party/lua/lobject.h"
 #include "third_party/lua/lparser.h"
 #include "third_party/lua/lprefix.h"
@@ -40,12 +41,7 @@
 #include "third_party/lua/ltable.h"
 #include "third_party/lua/lua.h"
 #include "third_party/lua/lzio.h"
-// clang-format off
-
-asm(".ident\t\"\\n\\n\
-Lua 5.4.3 (MIT License)\\n\
-Copyright 1994–2021 Lua.org, PUC-Rio.\"");
-asm(".include \"libc/disclaimer.inc\"");
+__static_yoink("lua_notice");
 
 
 #define next(ls)	(ls->current = zgetc(ls->z))
@@ -147,7 +143,7 @@ l_noret luaX_syntaxerror (LexState *ls, const char *msg) {
 ** ensuring there is only one copy of each unique string.  The table
 ** here is used as a set: the string enters as the key, while its value
 ** is irrelevant. We use the string itself as the value only because it
-** is a TValue readly available. Later, the code generation can change
+** is a TValue readily available. Later, the code generation can change
 ** this value.
 */
 TString *luaX_newstring (LexState *ls, const char *str, size_t l) {
@@ -157,12 +153,12 @@ TString *luaX_newstring (LexState *ls, const char *str, size_t l) {
   if (!ttisnil(o))  /* string already present? */
     ts = keystrval(nodefromval(o));  /* get saved copy */
   else {  /* not in use yet */
-    TValue *stv = s2v(L->top++);  /* reserve stack space for string */
+    TValue *stv = s2v(L->top.p++);  /* reserve stack space for string */
     setsvalue(L, stv, ts);  /* temporarily anchor the string */
     luaH_finishset(L, ls->h, stv, o, stv);  /* t[string] = string */
     /* table is not a metatable, so it does not need to invalidate cache */
     luaC_checkGC(L);
-    L->top--;  /* remove string from stack */
+    L->top.p--;  /* remove string from stack */
   }
   return ts;
 }
@@ -413,9 +409,9 @@ static void read_string (LexState *ls, int del, SemInfo *seminfo) {
         int c;  /* final character to be saved */
         save_and_next(ls);  /* keep '\\' for error messages */
         switch (ls->current) {
-          case 'e': c = '\e'; goto read_save;
           case 'a': c = '\a'; goto read_save;
           case 'b': c = '\b'; goto read_save;
+          case 'e': c = '\e'; goto read_save;  // [jart]
           case 'f': c = '\f'; goto read_save;
           case 'n': c = '\n'; goto read_save;
           case 'r': c = '\r'; goto read_save;

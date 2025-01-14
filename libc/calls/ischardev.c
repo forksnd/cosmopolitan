@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2020 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -54,8 +54,9 @@ bool32 ischardev(int fd) {
       return false;
     }
   } else {
-    return __isfdkind(fd, kFdConsole) ||
+    return __isfdkind(fd, kFdConsole) || __isfdkind(fd, kFdDevNull) ||
+           __isfdkind(fd, kFdDevRandom) ||
            (__isfdkind(fd, kFdFile) &&
-            GetFileType(__getfdhandleactual(fd)) == kNtFileTypeChar);
+            GetFileType(g_fds.p[fd].handle) == kNtFileTypeChar);
   }
 }

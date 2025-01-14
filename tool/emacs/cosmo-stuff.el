@@ -11,19 +11,36 @@
 
 ;;; Code:
 
-(require 'asm-mode)
-(require 'cc-mode)
-(require 'fortran)
-(require 'cosmo-c-types)
-(require 'cosmo-c-keywords)
-(require 'cosmo-c-builtins)
-(require 'cosmo-c-constants)
-(require 'cosmo-cpp-constants)
-(require 'cosmo-platform-constants)
-(require 'dired)
-(require 'javadown)
-(require 'ld-script)
-(require 'make-mode)
+;; (require 'asm-mode)
+;; (require 'cc-mode)
+;; (require 'fortran)
+;; (require 'cosmo-c-types)
+;; (require 'cosmo-c-keywords)
+;; (require 'cosmo-c-builtins)
+;; (require 'cosmo-c-constants)
+;; (require 'cosmo-cpp-constants)
+;; (require 'cosmo-platform-constants)
+;; (require 'dired)
+;; (require 'javadown)
+;; (require 'ld-script)
+;; (require 'make-mode)
+
+(setq cosmo-arch
+      (let ((arch (string-trim-right
+                   (shell-command-to-string
+                    "uname -m"))))
+        (cond ((string= arch "amd64") "x86_64")
+              ((string= arch "arm64") "aarch64")
+              (t arch))))
+
+(setq cosmo-default-mode
+      (cond ((string= cosmo-arch "aarch64") "aarch64")
+            (t "")))
+
+;; TODO(jart): How do we get GCC to do only dead code elimination?
+(setq cosmo-dbg-mode
+      (cond ((string= cosmo-arch "aarch64") "aarch64")
+            (t "dbg")))
 
 (setq c-doc-comment-style 'javadown)
 
@@ -132,8 +149,12 @@
        (format "%s/TAGS"
                (or (locate-dominating-file (buffer-name) "Makefile")
                    (file-name-directory (buffer-name))))))
-(add-hook 'c-mode-common-hook 'stop-asking-questions-etags)
-(add-hook 'c++-mode-common-hook 'stop-asking-questions-etags)
+
+(eval-after-load 'cc-mode
+  '(progn
+     (add-hook 'c-mode-common-hook 'stop-asking-questions-etags)
+     (add-hook 'c++-mode-common-hook 'stop-asking-questions-etags)))
+
 (setq tags-revert-without-query t)
 (setq kill-buffer-query-functions ;; disable kill buffer w/ process question
       (delq 'process-kill-buffer-query-function kill-buffer-query-functions))
@@ -159,17 +180,26 @@
          (cosmo-startswith "test/" pkg))))
 
 (defun cosmo--make-mode (arg &optional default)
-  (cond ((eq arg 1) "tiny")
+  (cond ((eq arg 1)
+         (cond ((string= cosmo-arch "aarch64") "aarch64-tiny")
+               (t "tiny")))
         ((eq arg 2) "opt")
         ((eq arg 3) "rel")
-        ((eq arg 4) "dbg")
-        ((eq arg 5) "")
+        ((eq arg 4)
+         cosmo-dbg-mode)
+        ((eq arg 5)
+         (cond ((string= cosmo-arch "aarch64") "aarch64")
+               (t cosmo-default-mode)))
         ((eq arg 6) "llvm")
-        ((eq arg 7) "aarch64")
-        ((eq arg 8) "aarch64-tiny")
+        ((eq arg 7)
+         (cond ((string= cosmo-arch "aarch64") "x86_64")
+               (t "aarch64")))
+        ((eq arg 8)
+         (cond ((string= cosmo-arch "aarch64") "tiny")
+               (t "aarch64-tiny")))
         (default default)
-        ((cosmo-intest) "dbg")
-        (t "fastbuild")))
+        ((cosmo-intest) cosmo-dbg-mode)
+        (t cosmo-default-mode)))
 
 (defun cosmo--make-suffix (arg)
   (cond ((eq arg 9) ".chibicc")
@@ -185,11 +215,15 @@
          (dots (file-relative-name root dir))   ;; e.g. "../"
          (file (file-relative-name this root))  ;; e.g. "libc/crc32c.c"
          (name (file-name-sans-extension file)) ;; e.g. "libc/crc32c"
-         (buddy (format "test/%s_test.c" name))
-         (runs (format "o/$m/%s.com%s V=5 TESTARGS=-b" name runsuffix))
-         (buns (format "o/$m/test/%s_test.com%s V=5 TESTARGS=-b" name runsuffix)))
-    (cond ((not (member ext '("c" "cc" "s" "S" "rl" "f")))
-           (format "m=%s; make -j12 MODE=$m o/$m/%s"
+         (buddy (let ((c-version (format "test/%s_test.c" name))
+                      (cc-version (format "test/%s_test.cc" name)))
+                  (if (file-exists-p cc-version)
+                      cc-version
+                    c-version)))
+         (runs (format "o/$m/%s%s V=5 TESTARGS=-b" name runsuffix))
+         (buns (format "o/$m/test/%s_test%s V=5 TESTARGS=-b" name runsuffix)))
+    (cond ((not (member ext '("c" "cc" "cpp" "s" "S" "rl" "f" "cu")))
+           (format "m=%s; make -j96 MODE=$m o/$m/%s"
                    mode
                    (directory-file-name
                     (or (file-name-directory
@@ -199,28 +233,28 @@
            (format
             (cosmo-join
              " && "
-             `("m=%s; f=o/$m/%s.com"
-               ,(concat "make -j12 $f MODE=$m")
-               "scp $f $f.dbg win10:; ssh win10 ./%s.com"))
+             `("m=%s; f=o/$m/%s"
+               ,(concat "make -j96 $f MODE=$m")
+               "scp $f $f.dbg win10:; ssh win10 ./%s"))
             mode name (file-name-nondirectory name)))
           ((eq kind 'run-xnu)
            (format
             (cosmo-join
              " && "
-             `("m=%s; f=o/$m/%s.com"
-               ,(concat "make -j12 $f MODE=$m")
+             `("m=%s; f=o/$m/%s"
+               ,(concat "make -j96 $f MODE=$m")
                "scp $f $f.dbg xnu:"
-               "ssh xnu ./%s.com"))
+               "ssh xnu ./%s"))
             mode name (file-name-nondirectory name)))
           ((and (equal suffix "")
                 (cosmo-contains "_test." (buffer-file-name)))
-           (format "m=%s; make -j12 MODE=$m %s"
+           (format "m=%s; make -j96 MODE=$m %s"
                    mode runs))
           ((and (equal suffix "")
                 (file-exists-p (format "%s" buddy)))
            (format (cosmo-join
                     " && "
-                    '("m=%s; n=%s; make -j12 o/$m/$n%s.o MODE=$m"
+                    '("m=%s; n=%s; make -j96 o/$m/$n%s.o MODE=$m"
                       ;; "bloat o/$m/%s.o | head"
                       ;; "nm -C --size o/$m/%s.o | sort -r"
                       "echo"
@@ -231,12 +265,12 @@
            (format
             (cosmo-join
              " && "
-             `("m=%s; f=o/$m/%s.com"
-               ,(concat "make -j12 $f MODE=$m")
+             `("m=%s; f=o/$m/%s"
+               ,(concat "make -j96 $f MODE=$m")
                "build/run ./$f"))
             mode name))
           ((eq kind 'test)
-           (format `"m=%s; f=o/$m/%s.com.ok && make -j12 $f MODE=$m" mode name))
+           (format `"m=%s; f=o/$m/%s.ok && make -j96 $f MODE=$m" mode name))
           ((and (file-regular-p this)
                 (file-executable-p this))
            (format "build/run ./%s" file))
@@ -245,7 +279,7 @@
             (cosmo-join
              " && "
              `("m=%s; f=o/$m/%s%s.o"
-               ,(concat "make -j12 $f MODE=$m")
+               ,(concat "make -j96 $f MODE=$m")
                ;; "nm -C --size $f | sort -r"
                "echo"
                "size -A $f | grep '^[.T]' | grep -v 'debug\\|command.line\\|stack' | sort -rnk2"
@@ -269,14 +303,29 @@
   (local-set-key (kbd "C-c C-c") 'cosmo-compile))
 
 (progn
-  (add-hook 'makefile-mode-hook 'cosmo-compile-hook)
-  (add-hook 'asm-mode-hook 'cosmo-compile-hook)
-  (add-hook 'ld-script-mode-hook 'cosmo-compile-hook)
-  (add-hook 'dired-mode-hook 'cosmo-compile-hook)
-  (add-hook 'c-mode-common-hook 'cosmo-compile-hook)
-  (add-hook 'c++-mode-common-hook 'cosmo-compile-hook)
   (add-hook 'fortran-mode-hook 'cosmo-compile-hook)
   (add-hook 'protobuf-mode-hook 'cosmo-compile-hook))
+
+(eval-after-load 'make-mode
+  '(progn
+     (add-hook 'makefile-mode-hook 'cosmo-compile-hook)))
+
+(eval-after-load 'asm-mode
+  '(progn
+     (add-hook 'asm-mode-hook 'cosmo-compile-hook)))
+
+(eval-after-load 'dired
+  '(progn
+     (add-hook 'dired-mode-hook 'cosmo-compile-hook)))
+
+(eval-after-load 'ld-script
+  '(progn
+     (add-hook 'ld-script-mode-hook 'cosmo-compile-hook)))
+
+(eval-after-load 'cc-mode
+  '(progn
+     (add-hook 'c-mode-common-hook 'cosmo-compile-hook)
+     (add-hook 'c++-mode-common-hook 'cosmo-compile-hook)))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -455,7 +504,7 @@
           (error "don't know how to show assembly for non c/c++ source file"))
         (let* ((default-directory root)
                (compile-command
-                (format "make %s -j12 MODE=%s %s %s"
+                (format "make %s -j96 MODE=%s %s %s"
                         (or extra-make-flags "") mode asm-gcc asm-clang)))
           (save-buffer)
           (set-visited-file-modtime (current-time))
@@ -479,7 +528,7 @@
                           "V=1 OVERRIDE_COPTS='-w -fverbose-asm -fsanitize=undefined -fno-sanitize=null -fno-sanitize=alignment -fno-sanitize=pointer-overflow'"))
         ;; ((not (eq 0 (logand 8 arg)))
         ;;  (cosmo--assembly (setq arg (logand (lognot 8)))
-        ;;                   "V=1 OVERRIDE_COPTS='-w -fverbose-asm -fsanitize=address'"))
+        ;;                   "V=1 OVERRIDE_COPTS='-w -fverbose-asm'"))
         (t (cosmo--assembly arg "V=1 OVERRIDE_COPTS='-w ' CPPFLAGS=''"))))
 
 (defun cosmo-assembly-native (arg)
@@ -576,9 +625,12 @@
   (add-hook 'asm-mode-hook 'cosmo-assemble-hook)
   (add-hook 'ld-script-mode-hook 'cosmo-assemble-hook)
   (add-hook 'dired-mode-hook 'cosmo-assemble-hook)
-  (add-hook 'c-mode-common-hook 'cosmo-assemble-hook)
   (add-hook 'fortran-mode-hook 'cosmo-assemble-hook)
   (add-hook 'protobuf-mode-hook 'cosmo-assemble-hook))
+
+(eval-after-load 'cc-mode
+  '(progn
+     (add-hook 'c-mode-common-hook 'cosmo-assemble-hook)))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -614,16 +666,15 @@
               ((eq major-mode 'sh-mode)
                (compile (format "sh -c %s" file)))
               ((eq major-mode 'lua-mode)
-               (let* ((mode (cosmo--make-mode arg))
-                      (redbean ))
-                 (compile (format "make -j16 MODE=%s o/%s/tool/net/redbean.com && o/%s/tool/net/redbean.com -i %s" mode mode mode file))))
+               (let* ((mode (cosmo--make-mode arg)))
+                 (compile (format "make -j96 MODE=%s o/%s/tool/net/redbean && build/run o/%s/tool/net/redbean -i %s" mode mode mode file))))
               ((and (eq major-mode 'python-mode)
                     (cosmo-startswith "third_party/python/Lib/test/" file))
                (let ((mode (cosmo--make-mode arg)))
-                 (compile (format "make -j12 MODE=%s PYHARNESSARGS=-vv PYTESTARGS=-v o/%s/%s.py.runs"
+                 (compile (format "make -j96 MODE=%s PYHARNESSARGS=-vv PYTESTARGS=-v o/%s/%s.py.runs"
                                   mode mode (file-name-sans-extension file)))))
               ((eq major-mode 'python-mode)
-               (compile (format "python.com %s" file)))
+               (compile (format "python %s" file)))
               ('t
                (error "cosmo-run: unknown major mode")))))))
 
@@ -637,7 +688,7 @@
       (let ((default-directory root))
         (save-buffer)
         (cond ((memq major-mode '(c-mode c++-mode asm-mode fortran-mode))
-               (let* ((mode (cosmo--make-mode arg "fastbuild"))
+               (let* ((mode (cosmo--make-mode arg cosmo-default-mode))
                       (compile-command (cosmo--compile-command this root 'test mode "" "" ".ok")))
                  (compile compile-command)))
               ('t
@@ -653,22 +704,40 @@
       (let ((default-directory root))
         (save-buffer)
         (cond ((memq major-mode '(c-mode c++-mode asm-mode fortran-mode))
-               (let* ((mode (cosmo--make-mode arg "fastbuild"))
+               (let* ((mode (cosmo--make-mode arg cosmo-default-mode))
                       (compile-command (cosmo--compile-command this root 'run-win10 mode "" "" "")))
                  (compile compile-command)))
               ('t
                (error "cosmo-run: unknown major mode")))))))
 
-(progn
-  (define-key asm-mode-map (kbd "C-c C-r") 'cosmo-run)
-  (define-key c-mode-base-map (kbd "C-c C-r") 'cosmo-run)
-  (define-key fortran-mode-map (kbd "C-c C-r") 'cosmo-run)
-  (define-key sh-mode-map (kbd "C-c C-r") 'cosmo-run)
-  (define-key lua-mode-map (kbd "C-c C-r") 'cosmo-run)
-  (define-key python-mode-map (kbd "C-c C-r") 'cosmo-run)
-  (define-key c-mode-map (kbd "C-c C-s") 'cosmo-run-test)
-  (define-key c-mode-map (kbd "C-c C-_") 'cosmo-run-win7)
-  (define-key c-mode-map (kbd "C-c C-_") 'cosmo-run-win10))
+(eval-after-load 'cc-mode
+  '(progn
+     (define-key c-mode-base-map (kbd "C-c C-r") 'cosmo-run)
+     (define-key c-mode-map (kbd "C-c C-s") 'cosmo-run-test)
+     (define-key c++-mode-map (kbd "C-c C-s") 'cosmo-run-test)
+     (define-key c-mode-map (kbd "C-c C-_") 'cosmo-run-win7)
+     (define-key c-mode-map (kbd "C-c C-_") 'cosmo-run-win10)
+     (define-key c++-mode-map (kbd "C-c C-_") 'cosmo-run-win10)))
+
+(eval-after-load 'fortran-mode
+  '(progn
+     (define-key fortran-mode-map (kbd "C-c C-r") 'cosmo-run)))
+
+(eval-after-load 'asm-mode
+  '(progn
+     (define-key asm-mode-map (kbd "C-c C-r") 'cosmo-run)))
+
+(eval-after-load 'sh-script
+  '(progn
+     (define-key sh-mode-map (kbd "C-c C-r") 'cosmo-run)))
+
+(eval-after-load 'lua-mode
+  '(progn
+     (define-key lua-mode-map (kbd "C-c C-r") 'cosmo-run)))
+
+(eval-after-load 'python
+  '(progn
+     (define-key python-mode-map (kbd "C-c C-r") 'cosmo-run)))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -685,18 +754,22 @@
   (let* ((this (or (buffer-file-name) dired-directory))
          (root (locate-dominating-file this "Makefile")))
     (when root
-      (let* ((mode (cosmo--make-mode arg "dbg"))
+      (let* ((mode (cosmo--make-mode arg cosmo-dbg-mode))
              (name (file-relative-name this root))
              (next (file-name-sans-extension name))
-             (exec (format "o/%s/%s.com.dbg" mode next))
+             (exec (format "o/%s/%s.dbg" mode next))
              (default-directory root)
              (compile-command (cosmo--compile-command this root nil mode "" "" ".runs")))
         (compile compile-command)
-        (gdb (format "gdb -q -nh -i=mi %s -ex run" exec))))))
+        (gdb (format "gdb -q -i=mi %s -ex run" exec))))))
 
-(progn
-  (define-key asm-mode-map (kbd "C-c C-d") 'cosmo-debug)
-  (define-key c-mode-base-map (kbd "C-c C-d") 'cosmo-debug))
+(eval-after-load 'cc-mode
+  '(progn
+     (define-key c-mode-base-map (kbd "C-c C-d") 'cosmo-debug)))
+
+(eval-after-load 'asm-mode
+  '(progn
+     (define-key asm-mode-map (kbd "C-c C-d") 'cosmo-debug)))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -728,13 +801,22 @@
                             (concat dots notest ".c")
                             (concat dots notest ".cc")
                             (concat dots notest ".rl")
+                            (concat dots notest ".cpp")
                             (concat dots notest ".greg.c")
                             (concat dots notest ".ncabi.c")
                             (concat dots notest ".hookabi.c")
                             (concat dots notest ".h"))))
                     (t
-                     (format "%stest/%s_test.c"
-                             dots (cosmo-file-name-sans-extensions name))))))
+                     (let ((c-version (format "%stest/%s_test.c"
+                                              dots (cosmo-file-name-sans-extensions name)))
+                           (cc-version (format "%stest/%s_test.cc"
+                                               dots (cosmo-file-name-sans-extensions name))))
+                       (if (file-exists-p cc-version)
+                           cc-version
+                         (if (eq major-mode 'c++-mode)
+                             cc-version
+                           c-version)))
+                     ))))
         (when buddy
           (find-file buddy))))))
 
@@ -779,10 +861,16 @@
       (message header))))
 
 (progn
-  (define-key prog-mode-map (kbd "C-c C-h") 'cosmo-add-include)
-  (define-key asm-mode-map (kbd "C-c C-h") 'cosmo-add-include)
-  (define-key c-mode-base-map (kbd "C-c C-h") 'cosmo-add-include)
-  (define-key c++-mode-map (kbd "C-c C-h") 'cosmo-add-include))
+  (define-key prog-mode-map (kbd "C-c C-h") 'cosmo-add-include))
+
+(eval-after-load 'cc-mode
+  '(progn
+     (define-key c-mode-base-map (kbd "C-c C-h") 'cosmo-add-include)
+     (define-key c++-mode-map (kbd "C-c C-h") 'cosmo-add-include)))
+
+(eval-after-load 'asm-mode
+  '(progn
+     (define-key asm-mode-map (kbd "C-c C-h") 'cosmo-add-include)))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -803,11 +891,17 @@
 
 (defun cosmo-lisp-is-the-best ()
   (define-key c-mode-base-map (kbd "C-c C-o") 'cosmo-show-optinfo))
-(add-hook 'c-mode-common-hook 'cosmo-lisp-is-the-best)
+
+(eval-after-load 'cc-mode
+  '(progn
+     (add-hook 'c-mode-common-hook 'cosmo-lisp-is-the-best)))
 
 (defun cosmo-lisp-is-the-best++ ()
   (define-key c++-mode-base-map (kbd "C-c C-o") 'cosmo-show-optinfo))
-(add-hook 'c++-mode-common-hook 'cosmo-lisp-is-the-best++)
+
+(eval-after-load 'cc-mode
+  '(progn
+     (add-hook 'c++-mode-common-hook 'cosmo-lisp-is-the-best++)))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -827,8 +921,8 @@
    nil `((,cosmo-cpp-constants-regex . font-lock-constant-face)
          (,cosmo-platform-constants-regex . font-lock-constant-face))))
 
-(add-hook 'c-mode-common-hook 'cosmo-c-keywords-hook)
-(add-hook 'c++-mode-common-hook 'cosmo-c-keywords-hook)
+;; (add-hook 'c-mode-common-hook 'cosmo-c-keywords-hook)
+;; (add-hook 'c++-mode-common-hook 'cosmo-c-keywords-hook)
 (add-hook 'asm-mode-hook 'cosmo-asm-keywords-hook)
 
 
@@ -913,13 +1007,27 @@
            "T[0-9][0-9]:[0-9][0-9]:[0-9][0-9]"          ;; time
            "[+.][0-9][0-9][0-9][0-9][0-9][0-9]"         ;; micros
            ":\\([^:]+\\)"                               ;; file
-           ":\\([0-9]+\\)"))                             ;; line
+           ":\\([0-9]+\\)"))                            ;; line
         1 2))
 
 (eval-after-load 'compile
   '(progn
      (add-to-list 'compilation-error-regexp-alist-alist
                   (cons 'cosmo cosmo-compilation-regexps))
+     (add-to-list 'compilation-error-regexp-alist 'cosmo)))
+
+(defvar cosmo-gcc123-compilation-regexps
+  (list (cosmo-join
+         ""
+         '("inlined from '[^']*' at "
+           "\\([^:]+\\)"                ;; file
+           ":\\([0-9]+\\)"))            ;; line
+        1 2))
+
+(eval-after-load 'compile
+  '(progn
+     (add-to-list 'compilation-error-regexp-alist-alist
+                  (cons 'cosmo cosmo-gcc123-compilation-regexps))
      (add-to-list 'compilation-error-regexp-alist 'cosmo)))
 
 (provide 'cosmo-stuff)

@@ -1,4 +1,3 @@
-// clang-format off
 /*
   tailor.h - Zip 3
 
@@ -221,12 +220,10 @@
 
 /* Define void, zvoid, and extent (size_t) */
 #include "libc/calls/calls.h"
-#include "libc/calls/dprintf.h"
+#include "libc/stdio/dprintf.h"
 #include "libc/calls/weirdtypes.h"
-#include "libc/fmt/fmt.h"
-#include "libc/mem/fmt.h"
 #include "libc/stdio/stdio.h"
-#include "libc/stdio/temp.h"
+#include "libc/temp.h"
 #include "third_party/musl/tempnam.h"
 
 #ifndef NO_STDDEF_H
@@ -235,7 +232,7 @@
 
 #ifndef NO_STDLIB_H
 #include "libc/calls/calls.h"
-#include "libc/calls/dprintf.h"
+#include "libc/stdio/dprintf.h"
 #include "libc/calls/termios.h"
 #include "libc/fmt/conv.h"
 #include "libc/limits.h"
@@ -243,11 +240,10 @@
 #include "libc/mem/mem.h"
 #include "libc/runtime/runtime.h"
 #include "libc/stdio/rand.h"
-#include "libc/stdio/temp.h"
+#include "libc/temp.h"
 #include "libc/str/str.h"
 #include "libc/sysv/consts/exit.h"
 #include "third_party/gdtoa/gdtoa.h"
-#include "third_party/getopt/getopt.h"
 #include "third_party/musl/crypt.h"
 #include "third_party/musl/rand48.h"
 #endif /* !NO_STDLIB_H */
@@ -262,8 +258,7 @@
 #include "libc/sysv/consts/fileno.h"
 #include "libc/sysv/consts/o.h"
 #include "libc/sysv/consts/ok.h"
-#include "libc/time/time.h"
-#include "third_party/getopt/getopt.h"
+#include "libc/time.h"
 #include "third_party/musl/crypt.h"
 #include "third_party/musl/lockf.h" /* usually defines _POSIX_VERSION */
 #endif /* !NO_UNISTD_H */
@@ -387,7 +382,7 @@ IZ_IMP char *mktemp();
 #include "libc/stdio/stdio.h"
 #include "libc/str/str.h"
 #include "libc/str/unicode.h"
-#include "libc/time/time.h"
+#include "libc/time.h"
 #include "libc/calls/calls.h"
 #include "libc/fmt/conv.h"
 #include "libc/str/str.h"

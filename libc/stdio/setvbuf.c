@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2020 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -19,7 +19,7 @@
 #include "libc/intrin/weaken.h"
 #include "libc/mem/mem.h"
 #include "libc/runtime/runtime.h"
-#include "libc/stdio/lock.internal.h"
+#include "libc/stdio/internal.h"
 #include "libc/stdio/stdio.h"
 #include "libc/sysv/errfuns.h"
 
@@ -36,16 +36,15 @@
 int setvbuf(FILE *f, char *buf, int mode, size_t size) {
   flockfile(f);
   if (buf) {
-    if (!size) size = BUFSIZ;
-    if (!f->nofree &&        //
-        f->buf != buf &&     //
-        f->buf != f->mem &&  //
-        _weaken(free)) {
-      _weaken(free)(f->buf);
-    }
+    if (!size)
+      size = BUFSIZ;
+    if (f->freebuf)
+      if (f->buf != buf)
+        if (_weaken(free))
+          _weaken(free)(f->buf);
     f->buf = buf;
     f->size = size;
-    f->nofree = true;
+    f->freebuf = 0;
   }
   f->bufmode = mode;
   funlockfile(f);

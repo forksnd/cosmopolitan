@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2020 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -20,7 +20,7 @@
 #include "dsp/core/ks8.h"
 #include "dsp/core/kss8.h"
 #include "dsp/scale/cdecimate2xuint8x8.h"
-#include "libc/macros.internal.h"
+#include "libc/macros.h"
 #include "libc/nexgen32e/x86feature.h"
 #include "libc/str/str.h"
 #include "libc/x/x.h"
@@ -38,11 +38,11 @@
 
 signed char g_magikarp[8];
 const signed char kMagikarp[8][8] = {
-    {-1, -3, 3, 17, 17, 3, -3, -1}, /* 1331+161 derived w/ one off cas */
-    {-1, -3, 6, 28, 6, -3, -1, 0},  /* no due to the convolution theorem? */
-    {0, 0, -11, 53, -11, 0, 0, 0},  /* no plus, some random experimenting */
-    {-2, -6, 2, 22, 22, 2, -6, -2}, /* one a line please clang-format? */
-    {-3, -9, 1, 27, 27, 1, -9, -3},
+    {-1, -1, 3, 15, 15, 3, -1, -1},  // magic kernel sharp
+    {-1, -3, 6, 28, 6, -3, -1, 0},   //
+    {0, 0, -11, 53, -11, 0, 0, 0},   //
+    {-2, -6, 2, 22, 22, 2, -6, -2},  //
+    {-3, -9, 1, 27, 27, 1, -9, -3},  //
 };
 
 signed char g_magkern[8];
@@ -106,9 +106,9 @@ void *Magkern2xY(long ys, long xs, unsigned char p[ys][xs], long yn, long xn) {
   return p;
 }
 
-void *MagikarpY(long dys, long dxs, unsigned char d[restrict dys][dxs],
-                long sys, long sxs, const unsigned char s[sys][sxs], long yn,
-                long xn, const signed char K[8]) {
+void *MagikarpY(long dys, long dxs, unsigned char d[dys][dxs], long sys,
+                long sxs, const unsigned char s[sys][sxs], long yn, long xn,
+                const signed char K[8]) {
   long y, x;
   for (y = 0; y < yn; ++y) {
     for (x = 0; x < xn; ++x) {
@@ -121,8 +121,7 @@ void *MagikarpY(long dys, long dxs, unsigned char d[restrict dys][dxs],
   return d;
 }
 
-static textstartup void g_magikarp_init() {
+__attribute__((__constructor__)) static textstartup void g_magikarp_init() {
   memcpy(g_magkern, kMagkern[0], sizeof(g_magkern));
   memcpy(g_magikarp, kMagikarp[0], sizeof(g_magikarp));
 }
-const void *const g_magikarp_ctor[] initarray = {g_magikarp_init};

@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2022 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -16,8 +16,8 @@
 │ TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR             │
 │ PERFORMANCE OF THIS SOFTWARE.                                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
-#include "libc/intrin/atomic.h"
 #include "net/http/tokenbucket.h"
+#include "libc/intrin/atomic.h"
 
 /**
  * Atomically increments all signed bytes in array, without overflowing.
@@ -37,10 +37,11 @@
 void ReplenishTokens(atomic_uint_fast64_t *w, size_t n) {
   for (size_t i = 0; i < n; ++i) {
     uint64_t a = atomic_load_explicit(w + i, memory_order_relaxed);
-    if (a == 0x7f7f7f7f7f7f7f7f) continue;
+    if (a == 0x7f7f7f7f7f7f7f7f)
+      continue;
     uint64_t b = 0x8080808080808080;
     uint64_t c = 0x7f7f7f7f7f7f7f7f ^ a;
-    uint64_t d = ((c >> 1 | b) - c & b ^ b) >> 7;
+    uint64_t d = ((((c >> 1 | b) - c) & b) ^ b) >> 7;
     atomic_fetch_add_explicit(w + i, d, memory_order_relaxed);
   }
 }
@@ -75,7 +76,8 @@ void ReplenishTokens(atomic_uint_fast64_t *w, size_t n) {
 int AcquireToken(atomic_schar *b, uint32_t x, int c) {
   uint32_t i = x >> (32 - c);
   int t = atomic_load_explicit(b + i, memory_order_relaxed);
-  if (t <= 0) return t;
+  if (t <= 0)
+    return t;
   return atomic_fetch_add_explicit(b + i, -1, memory_order_relaxed);
 }
 

@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2023 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -25,7 +25,7 @@
 //         Sort for double-precision floating points. (2009).
 
 #define HIST_SIZE               (size_t)2048
-#define get_byte_0(v)           ((v)&0x7FF)
+#define get_byte_0(v)           ((v) & 0x7FF)
 #define get_byte_1(v)           (((v) >> 11) & 0x7FF)
 #define get_byte_2(v)           (((v) >> 22) & 0x7FF)
 #define get_byte_3(v)           (((v) >> 33) & 0x7FF)
@@ -34,23 +34,23 @@
 #define get_byte_2_flip_sign(v) (((unsigned)(v) >> 22) ^ 0x200)
 #define get_byte_5_flip_sign(v) ((((v) >> 55) & 0x7FF) ^ 0x400)
 
-bool radix_sort_int64(int64_t *A, size_t n) {
+int radix_sort_int64(int64_t *A, size_t n) {
   int64_t *T, *reader, *writer;
   size_t *b0, *b1, *b2, *b3, *b4, *b5;
   size_t i, pos, sum0, sum1, sum2, sum3, sum4, sum5, tsum;
 
   if (n < HIST_SIZE) {
     _longsort(A, n);
-    return true;
+    return 0;
   }
 
   if (!(T = (int64_t *)malloc(n * sizeof(int64_t)))) {
-    return false;
+    return -1;
   }
 
   if (!(b0 = (size_t *)calloc(HIST_SIZE * 6, sizeof(size_t)))) {
     free(T);
-    return false;
+    return -1;
   }
 
   b1 = b0 + HIST_SIZE;
@@ -140,5 +140,5 @@ bool radix_sort_int64(int64_t *A, size_t n) {
 
   free(b0);
   free(T);
-  return true;
+  return 0;
 }

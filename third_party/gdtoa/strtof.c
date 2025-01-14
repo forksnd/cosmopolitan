@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:t;c-basic-offset:8;tab-width:8;coding:utf-8   -*-│
-│vi: set et ft=c ts=8 tw=8 fenc=utf-8                                       :vi│
+│ vi: set noet ft=c ts=8 sw=8 fenc=utf-8                                   :vi │
 ╚──────────────────────────────────────────────────────────────────────────────╝
 │                                                                              │
 │  The author of this software is David M. Gay.                                │
@@ -29,9 +29,9 @@
 │  THIS SOFTWARE.                                                              │
 │                                                                              │
 ╚─────────────────────────────────────────────────────────────────────────────*/
+#include "libc/fmt/conv.h"
 #include "third_party/gdtoa/gdtoa.h"
 #include "third_party/gdtoa/gdtoa.internal.h"
-/* clang-format off */
 
 float
 strtof(const char *s, char **sp)
@@ -66,3 +66,5 @@ strtof(const char *s, char **sp)
 		u.L[0] |= 0x80000000L;
 	return u.f;
 }
+
+__weak_reference(strtof, strtof_l);

@@ -1,4 +1,3 @@
-// clang-format off
 /*
 ** 2004 May 22
 **
@@ -107,8 +106,7 @@
 #include "libc/sysv/consts/o.h"
 #include "libc/sysv/consts/ok.h"
 #include "libc/sysv/consts/prot.h"
-#include "libc/time/struct/tm.h"
-#include "libc/time/time.h"
+#include "libc/time.h"
 #include "libc/mem/mem.h"
 
 #if !defined(SQLITE_OMIT_WAL) || SQLITE_MAX_MMAP_SIZE>0
@@ -117,7 +115,6 @@
 #endif
 
 #if SQLITE_ENABLE_LOCKING_STYLE
-#include "libc/calls/ioctl.h"
 #include "libc/calls/struct/winsize.h"
 #include "libc/sysv/consts/fd.h"
 #include "libc/sysv/consts/fio.h"
@@ -127,7 +124,7 @@
 #include "libc/sysv/consts/ok.h"
 #include "libc/calls/struct/rlimit.h"
 #include "libc/calls/struct/rusage.h"
-#include "libc/calls/sysparam.h"
+#include "libc/stdio/sysparam.h"
 #include "libc/limits.h"
 #endif /* SQLITE_ENABLE_LOCKING_STYLE */
 
@@ -166,7 +163,7 @@
 #endif /* OS_VXWORKS */
 
 #ifdef HAVE_UTIME
-# include "libc/time/time.h"
+# include "libc/time.h"
 #endif
 
 /*

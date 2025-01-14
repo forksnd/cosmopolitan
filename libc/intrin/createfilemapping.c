@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2022 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -17,8 +17,8 @@
 │ PERFORMANCE OF THIS SOFTWARE.                                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
 #include "libc/calls/syscall_support-nt.internal.h"
-#include "libc/intrin/describeflags.internal.h"
-#include "libc/intrin/strace.internal.h"
+#include "libc/intrin/describeflags.h"
+#include "libc/intrin/strace.h"
 #include "libc/nt/memory.h"
 #include "libc/nt/struct/securityattributes.h"
 #include "libc/nt/thunk/msabi.h"
@@ -42,7 +42,8 @@ textwindows int64_t CreateFileMapping(
   hHandle = __imp_CreateFileMappingW(opt_hFile, opt_lpFileMappingAttributes,
                                      flProtect, dwMaximumSizeHigh,
                                      dwMaximumSizeLow, opt_lpName);
-  if (!hHandle) __winerr();
+  if (!hHandle)
+    __winerr();
   NTTRACE("CreateFileMapping(%ld, %s, %s, %'zu, %#hs) → %ld% m", opt_hFile,
           DescribeNtSecurityAttributes(opt_lpFileMappingAttributes),
           DescribeNtPageFlags(flProtect),

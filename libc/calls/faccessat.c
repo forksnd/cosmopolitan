@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2020 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -22,13 +22,13 @@
 #include "libc/calls/syscall-sysv.internal.h"
 #include "libc/dce.h"
 #include "libc/errno.h"
-#include "libc/intrin/asan.internal.h"
-#include "libc/intrin/describeflags.internal.h"
-#include "libc/intrin/strace.internal.h"
+#include "libc/intrin/describeflags.h"
+#include "libc/intrin/strace.h"
 #include "libc/intrin/weaken.h"
+#include "libc/runtime/zipos.internal.h"
 #include "libc/sysv/consts/at.h"
+#include "libc/sysv/consts/ok.h"
 #include "libc/sysv/errfuns.h"
-#include "libc/zipos/zipos.internal.h"
 
 /**
  * Checks if effective user can access path in particular ways.
@@ -39,9 +39,9 @@
  * @param amode can be `R_OK`, `W_OK`, `X_OK`, or `F_OK`
  * @param flags can have `AT_EACCESS` and/or `AT_SYMLINK_NOFOLLOW`
  * @return 0 if ok, or -1 and sets errno
- * @raise EINVAL if `mode` has bad value
+ * @raise EINVAL if `amode` or `flags` had invalid values
  * @raise EPERM if pledge() is in play without rpath promise
- * @raise EACCES if access for requested `mode` would be denied
+ * @raise EACCES if access for requested `amode` would be denied
  * @raise ENOTDIR if a directory component in `path` exists as non-directory
  * @raise ENOENT if component of `path` doesn't exist or `path` is empty
  * @raise ENOTSUP if `path` is a zip file and `dirfd` isn't `AT_FDCWD`
@@ -51,8 +51,9 @@
 int faccessat(int dirfd, const char *path, int amode, int flags) {
   int e, rc;
   struct ZiposUri zipname;
-  if (!path || (IsAsan() && !__asan_is_valid_str(path))) {
-    rc = efault();
+  if ((flags & ~(AT_SYMLINK_NOFOLLOW | AT_EACCESS)) ||
+      !(amode == F_OK || !(amode & ~(R_OK | W_OK | X_OK)))) {
+    rc = einval();
   } else if (__isfdkind(dirfd, kFdZip)) {
     rc = enotsup();
   } else if (_weaken(__zipos_open) &&
@@ -60,7 +61,8 @@ int faccessat(int dirfd, const char *path, int amode, int flags) {
     rc = _weaken(__zipos_access)(&zipname, amode);
   } else if (!IsWindows()) {
     e = errno;
-    if (!flags) goto NoFlags;
+    if (!flags)
+      goto NoFlags;
     if ((rc = sys_faccessat2(dirfd, path, amode, flags)) == -1) {
       if (errno == ENOSYS) {
         errno = e;

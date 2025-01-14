@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2022 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -17,7 +17,7 @@
 │ PERFORMANCE OF THIS SOFTWARE.                                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
 #include "libc/calls/syscall_support-nt.internal.h"
-#include "libc/intrin/strace.internal.h"
+#include "libc/intrin/strace.h"
 #include "libc/nt/console.h"
 #include "libc/nt/thunk/msabi.h"
 
@@ -34,7 +34,8 @@ textwindows bool32 GenerateConsoleCtrlEvent(uint32_t dwCtrlEvent,
                                             uint32_t dwProcessGroupId) {
   bool32 ok;
   ok = __imp_GenerateConsoleCtrlEvent(dwCtrlEvent, dwProcessGroupId);
-  if (!ok) __winerr();
+  if (!ok)
+    __winerr();
   NTTRACE("GenerateConsoleCtrlEvent(%x, %d) → %hhhd% m", dwCtrlEvent,
           dwProcessGroupId, ok);
   return ok;

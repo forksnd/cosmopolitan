@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2021 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -17,11 +17,10 @@
 │ PERFORMANCE OF THIS SOFTWARE.                                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
 #include "libc/dce.h"
-#include "libc/intrin/asan.internal.h"
-#include "libc/intrin/describeflags.internal.h"
+#include "libc/intrin/describeflags.h"
 #include "libc/intrin/kprintf.h"
 #include "libc/limits.h"
-#include "libc/macros.internal.h"
+#include "libc/macros.h"
 #include "libc/sock/struct/pollfd.h"
 #include "libc/sock/struct/pollfd.internal.h"
 
@@ -29,15 +28,14 @@
 
 #define append(...) o += ksnprintf(buf + o, N - o, __VA_ARGS__)
 
-const char *(DescribePollFds)(char buf[N], ssize_t rc, struct pollfd *fds,
-                              size_t nfds) {
+const char *_DescribePollFds(char buf[N], ssize_t rc, struct pollfd *fds,
+                             size_t nfds) {
   char b64[64];
-  const char *d;
-  int i, j, o = 0;
+  int i, o = 0;
 
-  if (!fds) return "NULL";
-  if ((!IsAsan() && kisdangerous(fds)) ||
-      (IsAsan() && !__asan_is_valid(fds, sizeof(*fds) * nfds))) {
+  if (!fds)
+    return "NULL";
+  if (kisdangerous(fds)) {
     ksnprintf(buf, N, "%p", fds);
     return buf;
   }
@@ -45,10 +43,11 @@ const char *(DescribePollFds)(char buf[N], ssize_t rc, struct pollfd *fds,
   append("{");
 
   for (i = 0; i < nfds; ++i) {
-    if (i) append(", ");
-    append("{%d, %s", fds[i].fd, (DescribePollFlags)(b64, fds[i].events));
+    if (i)
+      append(", ");
+    append("{%d, %s", fds[i].fd, _DescribePollFlags(b64, fds[i].events));
     if (rc >= 0) {
-      append(", [%s]", (DescribePollFlags)(b64, fds[i].revents));
+      append(", [%s]", _DescribePollFlags(b64, fds[i].revents));
     }
     append("}");
   }

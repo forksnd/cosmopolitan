@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=8 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=8 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2020 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -22,11 +22,11 @@
  * Formats and writes text to stream.
  * @see printf() for further documentation
  */
-int(fprintf_unlocked)(FILE *f, const char *fmt, ...) {
+int fprintf_unlocked(FILE *f, const char *fmt, ...) {
   int rc;
   va_list va;
   va_start(va, fmt);
-  rc = (vfprintf_unlocked)(f, fmt, va);
+  rc = vfprintf_unlocked(f, fmt, va);
   va_end(va);
   return rc;
 }

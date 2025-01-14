@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2022 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -17,11 +17,10 @@
 │ PERFORMANCE OF THIS SOFTWARE.                                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
 #include "libc/calls/calls.h"
-#include "libc/mem/copyfd.internal.h"
 #include "libc/calls/struct/sigaction.h"
 #include "libc/errno.h"
 #include "libc/intrin/kprintf.h"
-#include "libc/macros.internal.h"
+#include "libc/macros.h"
 #include "libc/mem/mem.h"
 #include "libc/runtime/runtime.h"
 #include "libc/stdio/stdio.h"
@@ -30,15 +29,15 @@
 #include "libc/sysv/consts/sig.h"
 #include "libc/testlib/testlib.h"
 
-STATIC_YOINK("zip_uri_support");
-STATIC_YOINK("plinko.com");
-STATIC_YOINK("library.lisp");
-STATIC_YOINK("library_test.lisp");
-STATIC_YOINK("binarytrees.lisp");
-STATIC_YOINK("algebra.lisp");
-STATIC_YOINK("algebra_test.lisp");
-STATIC_YOINK("infix.lisp");
-STATIC_YOINK("ok.lisp");
+__static_yoink("zipos");
+__static_yoink("plinko");
+__static_yoink("library.lisp");
+__static_yoink("library_test.lisp");
+__static_yoink("binarytrees.lisp");
+__static_yoink("algebra.lisp");
+__static_yoink("algebra_test.lisp");
+__static_yoink("infix.lisp");
+__static_yoink("ok.lisp");
 
 static const char *const kSauces[] = {
     "/zip/library.lisp",       //
@@ -50,21 +49,19 @@ static const char *const kSauces[] = {
     "/zip/ok.lisp",            //
 };
 
-char testlib_enable_tmp_setup_teardown_once;
-
 void SetUpOnce(void) {
   exit(0);  // TODO(jart): How can we safely disable TLS with *NSYNC?
   int fdin, fdout;
+  testlib_enable_tmp_setup_teardown_once();
   ASSERT_NE(-1, mkdir("bin", 0755));
-  ASSERT_NE(-1, (fdin = open("/zip/plinko.com", O_RDONLY)));
-  ASSERT_NE(-1, (fdout = creat("bin/plinko.com", 0755)));
-  ASSERT_NE(-1, _copyfd(fdin, fdout, -1));
+  ASSERT_NE(-1, (fdin = open("/zip/plinko", O_RDONLY)));
+  ASSERT_NE(-1, (fdout = creat("bin/plinko", 0755)));
+  ASSERT_NE(-1, copyfd(fdin, fdout, -1));
   EXPECT_EQ(0, close(fdout));
   EXPECT_EQ(0, close(fdin));
 }
 
 TEST(plinko, worksOrPrintsNiceError) {
-  size_t n;
   ssize_t rc, got;
   char buf[1024], drain[64];
   sigset_t chldmask, savemask;
@@ -92,27 +89,28 @@ TEST(plinko, worksOrPrintsNiceError) {
     sigaction(SIGQUIT, &savequit, 0);
     sigaction(SIGPIPE, &savepipe, 0);
     sigprocmask(SIG_SETMASK, &savemask, 0);
-    execve("bin/plinko.com", (char *const[]){"bin/plinko.com", 0},
-           (char *const[]){0});
+    execve("bin/plinko", (char *const[]){"bin/plinko", 0}, (char *const[]){0});
     _exit(127);
   }
   close(pfds[0][0]);
   close(pfds[1][1]);
   for (i = 0; i < ARRAYLEN(kSauces); ++i) {
     EXPECT_NE(-1, (fdin = open(kSauces[i], O_RDONLY)));
-    rc = _copyfd(fdin, pfds[0][1], -1);
-    if (rc == -1) EXPECT_EQ(EPIPE, errno);
+    rc = copyfd(fdin, pfds[0][1], -1);
+    if (rc == -1)
+      EXPECT_EQ(EPIPE, errno);
     EXPECT_NE(-1, close(fdin));
   }
   EXPECT_NE(-1, close(pfds[0][1]));
   bzero(buf, sizeof(buf));
   ASSERT_NE(-1, (got = read(pfds[1][0], buf, sizeof(buf) - 1)));
   EXPECT_NE(0, got);
-  while (read(pfds[1][0], drain, sizeof(drain)) > 0) donothing;
+  while (read(pfds[1][0], drain, sizeof(drain)) > 0)
+    donothing;
   EXPECT_NE(-1, close(pfds[1][0]));
   EXPECT_NE(-1, waitpid(pid, &wstatus, 0));
   EXPECT_TRUE(WIFEXITED(wstatus));
-  if (!_startswith(buf, "error: ")) {
+  if (!startswith(buf, "error: ")) {
     EXPECT_STREQ("OKCOMPUTER\n", buf);
     EXPECT_EQ(0, WEXITSTATUS(wstatus));
   } else {

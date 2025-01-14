@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2021 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -17,16 +17,13 @@
 │ PERFORMANCE OF THIS SOFTWARE.                                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
 #include "libc/fmt/magnumstrs.internal.h"
-#include "libc/intrin/describeflags.internal.h"
-
-#ifdef DescribeRlimitName
-#undef DescribeRlimitName
-#endif
+#include "libc/intrin/describeflags.h"
 
 /**
  * Describes setrlimit() / getrlimit() argument.
  */
-const char *DescribeRlimitName(char buf[20], int x) {
-  if (x == 127) return "n/a";
-  return DescribeMagnum(buf, kRlimitNames, "RLIMIT_", x);
+const char *_DescribeRlimitName(char buf[20], int x) {
+  if (x == 127)
+    return "n/a";
+  return _DescribeMagnum(buf, kRlimitNames, "RLIMIT_", x);
 }

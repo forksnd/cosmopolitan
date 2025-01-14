@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2020 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -18,8 +18,8 @@
 ╚─────────────────────────────────────────────────────────────────────────────*/
 #include "libc/assert.h"
 #include "libc/math.h"
-#include "libc/mem/mem.h"
 #include "libc/mem/gc.h"
+#include "libc/mem/mem.h"
 #include "libc/x/xasprintf.h"
 #include "tool/viz/lib/formatstringtable.h"
 #include "tool/viz/lib/stringbuilder.h"
@@ -44,7 +44,7 @@ void FormatMatrixByte(long yn, long xn, const unsigned char M[yn][xn],
       yn, xn,
       formatter(yn, xn,
                 ConvertByteMatrixToStringTable(
-                    yn, xn, _gc(calloc(yn * xn, sizeof(char *))), M),
+                    yn, xn, gc(calloc(yn * xn, sizeof(char *))), M),
                 emit, arg, param1, param2, param3));
 }
 
@@ -52,7 +52,7 @@ char *StringifyMatrixByte(long yn, long xn, const unsigned char M[yn][xn],
                           StringTableFormatter formatter, const char *param1,
                           const char *param2, const char *param3) {
   struct StringBuilder *sb = NewStringBuilder();
-  FormatMatrixByte(yn, xn, M, StringBuilderAppend, sb, formatter, param1,
-                   param2, param3);
+  FormatMatrixByte(yn, xn, M, (void *)StringBuilderAppend, sb, formatter,
+                   param1, param2, param3);
   return FreeStringBuilder(sb);
 }

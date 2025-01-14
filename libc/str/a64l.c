@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2021 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -46,7 +46,8 @@ long a64l(const char *s) {
   uint32_t i, v, x;
   for (x = i = 0; i < 6; ++i) {
     v = kBase64i[s[i] & 0xff];
-    if (v == -1) break;
+    if (v == -1)
+      break;
     x |= v << (i * 6);
   }
   return (int32_t)x;

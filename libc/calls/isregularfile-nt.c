@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2021 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -26,15 +26,13 @@
  * Returns true if file exists and is a regular file on Windows NT.
  */
 bool isregularfile_nt(const char *path) {
-  int e;
   uint32_t x;
   char16_t path16[PATH_MAX];
-  e = errno;
-  if (__mkntpath(path, path16) == -1) return -1;
+  if (__mkntpath(path, path16) == -1)
+    return -1;
   if ((x = GetFileAttributes(path16)) != -1u) {
     return !(x & (kNtFileAttributeDirectory | kNtFileAttributeReparsePoint));
   } else {
-    errno = e;
     return false;
   }
 }

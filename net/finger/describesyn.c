@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2022 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -16,8 +16,8 @@
 │ TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR             │
 │ PERFORMANCE OF THIS SOFTWARE.                                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
-#include "libc/intrin/bits.h"
 #include "libc/fmt/itoa.h"
+#include "libc/serialize.h"
 #include "net/finger/finger.h"
 
 /**
@@ -52,7 +52,7 @@
  */
 char *DescribeSyn(char *q, size_t m, const char *p, size_t n) {
   char *e;
-  int i, j, k, r, iplen, tcplen, ttl, wsize, mss;
+  int i, j, k, iplen, tcplen, ttl, wsize, mss;
   if (n >= 20 + 20 && n >= (iplen = (p[0] & 0x0F) * 4) + 20 &&
       n >= iplen + (tcplen = ((p[iplen + 12] & 0xF0) >> 4) * 4)) {
     e = q + m;

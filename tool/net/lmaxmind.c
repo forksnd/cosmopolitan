@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2021 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -72,7 +72,7 @@ static int LuaMaxmindOpen(lua_State *L) {
   if ((err = MMDB_open(p, 0, &db->mmdb)) != MMDB_SUCCESS) {
     free(db);
     luaL_error(L, "MMDB_open(%s) → MMDB_%s", p, GetMmdbError(err));
-    unreachable;
+    __builtin_unreachable();
   }
   db->refs = 1;
   udb = lua_newuserdatauv(L, sizeof(db), 1);
@@ -88,7 +88,7 @@ static wontreturn void LuaThrowMaxmindIpError(lua_State *L,
              (ip & 0xff000000) >> 030, (ip & 0x00ff0000) >> 020,
              (ip & 0x0000ff00) >> 010, (ip & 0x000000ff) >> 000,
              GetMmdbError(err));
-  unreachable;
+  __builtin_unreachable();
 }
 
 static int LuaMaxmindDbLookup(lua_State *L) {
@@ -203,7 +203,8 @@ static int LuaMaxmindResultGet(lua_State *L) {
     ep = &(*ur)->mmlr.entry;
   } else {
     path = xcalloc(n + 1, sizeof(const char *));
-    for (i = 0; i < n; ++i) path[i] = lua_tostring(L, 2 + i);
+    for (i = 0; i < n; ++i)
+      path[i] = lua_tostring(L, 2 + i);
     err = MMDB_aget_value(&(*ur)->mmlr.entry, &edata, path);
     free(path);
     if (err) {
@@ -223,7 +224,8 @@ static int LuaMaxmindResultGet(lua_State *L) {
     ep = &entry;
   }
   err = MMDB_get_entry_data_list(ep, &dl);
-  if (err) LuaThrowMaxmindIpError(L, "getlist", (*ur)->ip, err);
+  if (err)
+    LuaThrowMaxmindIpError(L, "getlist", (*ur)->ip, err);
   LuaMaxmindDump(L, dl);
   MMDB_free_entry_data_list(dl);
   return 1;

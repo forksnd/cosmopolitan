@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:t;c-basic-offset:8;tab-width:8;coding:utf-8   -*-│
-│vi: set et ft=c ts=8 tw=8 fenc=utf-8                                       :vi│
+│ vi: set noet ft=c ts=8 sw=8 fenc=utf-8                                   :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright (c) 1990, 1993                                                     │
 │      The Regents of the University of California.  All rights reserved.      │
@@ -29,8 +29,6 @@
 │ SUCH DAMAGE.                                                                 │
 ╚─────────────────────────────────────────────────────────────────────────────*/
 #include "libc/str/str.h"
-#include "third_party/getopt/getopt.h"
-// clang-format off
 
 /*
  * The SVID interface to getsubopt provides no way of figuring out which
@@ -47,9 +45,6 @@ getsubopt(char **optionp, char * const *tokens, char **valuep)
 	char *p;
 
 	suboptarg = *valuep = NULL;
-
-	if (!optionp || !*optionp)
-		return(-1);
 
 	/* skip leading white-space, commas */
 	for (p = *optionp; *p && (*p == ',' || *p == ' ' || *p == '\t'); ++p);

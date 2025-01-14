@@ -1,18 +1,14 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:4;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=4 sts=4 sw=4 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=4 sts=4 sw=4 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Python 3                                                                     │
 │ https://docs.python.org/3/license.html                                       │
 ╚─────────────────────────────────────────────────────────────────────────────*/
+#include "third_party/python/Modules/socketmodule.h"
 #include "libc/calls/calls.h"
-#include "libc/calls/ioctl.h"
 #include "libc/calls/weirdtypes.h"
 #include "libc/dce.h"
-#include "libc/dns/dns.h"
-#include "libc/dns/ent.h"
 #include "libc/errno.h"
-#include "libc/nt/enum/version.h"
-#include "libc/nt/version.h"
 #include "libc/runtime/runtime.h"
 #include "libc/sock/sock.h"
 #include "libc/sock/struct/pollfd.h"
@@ -55,9 +51,10 @@
 #include "third_party/python/Include/tupleobject.h"
 #include "third_party/python/Include/warnings.h"
 #include "third_party/python/Include/yoink.h"
-#include "third_party/python/Modules/socketmodule.h"
+#include "third_party/musl/netdb.h"
+#include "libc/sysv/consts/af.h"
+#include "libc/sysv/consts/af.h"
 #include "third_party/python/pyconfig.h"
-/* clang-format off */
 
 PYTHON_PROVIDE("_socket");
 PYTHON_PROVIDE("_socket.AF_APPLETALK");
@@ -688,7 +685,6 @@ internal_setblocking(PySocketSockObject *s, int block)
 #endif
 #if !defined(MS_WINDOWS) \
     && !((defined(HAVE_SYS_IOCTL_H) && defined(FIONBIO)))
-    int delay_flag, new_delay_flag;
 #endif
 #ifdef SOCK_NONBLOCK
     if (block)
@@ -1049,16 +1045,15 @@ setipaddr(const char *name, struct sockaddr *addr_ret, size_t addr_ret_size, int
             set_gaierror(error);
             return -1;
         }
-        switch (res->ai_family) {
-        case AF_INET:
+        if (res->ai_family == AF_INET) {
             siz = 4;
-            break;
+        }
 #ifdef ENABLE_IPV6
-        case AF_INET6:
+        else if (res->ai_family == AF_INET6) {
             siz = 16;
-            break;
+        }
 #endif
-        default:
+        else {
             freeaddrinfo(res);
             PyErr_SetString(PyExc_OSError,
                 "unsupported address family");
@@ -1165,17 +1160,14 @@ setipaddr(const char *name, struct sockaddr *addr_ret, size_t addr_ret_size, int
         addr_ret_size = res->ai_addrlen;
     memcpy((char *) addr_ret, res->ai_addr, addr_ret_size);
     freeaddrinfo(res);
-    switch (addr_ret->sa_family) {
-    case AF_INET:
+    if (addr_ret->sa_family == AF_INET)
         return 4;
 #ifdef ENABLE_IPV6
-    case AF_INET6:
+    if (addr_ret->sa_family == AF_INET6)
         return 16;
 #endif
-    default:
-        PyErr_SetString(PyExc_OSError, "unknown address family");
-        return -1;
-    }
+    PyErr_SetString(PyExc_OSError, "unknown address family");
+    return -1;
 }
 
 
@@ -5656,7 +5648,7 @@ socket_inet_aton(PyObject *self, PyObject *args)
 #ifdef HAVE_INET_ATON
 
 #ifdef USE_INET_ATON_WEAKLINK
-    if (inet_aton != NULL) {
+    if (__veil("r", inet_aton) != NULL) {
 #endif
     if (inet_aton(ip_addr, &buf))
         return PyBytes_FromStringAndSize((char *)(&buf),
@@ -6761,7 +6753,6 @@ PyInit__socket(void)
     PyModule_AddIntMacro(m, SO_DEBUG);
     PyModule_AddIntMacro(m, SO_ACCEPTCONN);
     if (SO_REUSEADDR) PyModule_AddIntMacro(m, SO_REUSEADDR);
-    if (SO_EXCLUSIVEADDRUSE) PyModule_AddIntMacro(m, SO_EXCLUSIVEADDRUSE);
     PyModule_AddIntMacro(m, SO_KEEPALIVE);
     PyModule_AddIntMacro(m, SO_DONTROUTE);
     PyModule_AddIntMacro(m, SO_BROADCAST);
@@ -6777,17 +6768,6 @@ PyInit__socket(void)
     PyModule_AddIntMacro(m, SO_RCVTIMEO);
     PyModule_AddIntMacro(m, SO_ERROR);
     PyModule_AddIntMacro(m, SO_TYPE);
-    if (SO_SETFIB) PyModule_AddIntMacro(m, SO_SETFIB);
-    if (SO_PASSCRED) PyModule_AddIntMacro(m, SO_PASSCRED);
-    if (SO_PEERCRED) PyModule_AddIntMacro(m, SO_PEERCRED);
-    if (LOCAL_PEERCRED) PyModule_AddIntMacro(m, LOCAL_PEERCRED);
-    if (SO_PASSSEC) PyModule_AddIntMacro(m, SO_PASSSEC);
-    if (SO_PEERSEC) PyModule_AddIntMacro(m, SO_PEERSEC);
-    if (SO_BINDTODEVICE) PyModule_AddIntMacro(m, SO_BINDTODEVICE);
-    if (SO_PRIORITY) PyModule_AddIntMacro(m, SO_PRIORITY);
-    if (SO_MARK) PyModule_AddIntMacro(m, SO_MARK);
-    if (SO_DOMAIN) PyModule_AddIntMacro(m, SO_DOMAIN);
-    if (SO_PROTOCOL) PyModule_AddIntMacro(m, SO_PROTOCOL);
 
     /* Maximum number of connections for "listen" */
     PyModule_AddIntConstant(m, "SOMAXCONN", 0x80);
@@ -6810,24 +6790,9 @@ PyInit__socket(void)
     PyModule_AddIntMacro(m, MSG_TRUNC);
     PyModule_AddIntMacro(m, MSG_CTRUNC);
     PyModule_AddIntMacro(m, MSG_WAITALL);
-    if (MSG_DONTWAIT) PyModule_AddIntMacro(m, MSG_DONTWAIT);
-    if (MSG_EOR) PyModule_AddIntMacro(m, MSG_EOR);
-    if (MSG_NOSIGNAL) PyModule_AddIntMacro(m, MSG_NOSIGNAL);
-    if (MSG_BCAST) PyModule_AddIntMacro(m, MSG_BCAST);
-    if (MSG_MCAST) PyModule_AddIntMacro(m, MSG_MCAST);
-    if (MSG_CMSG_CLOEXEC) PyModule_AddIntMacro(m, MSG_CMSG_CLOEXEC);
-    if (MSG_ERRQUEUE) PyModule_AddIntMacro(m, MSG_ERRQUEUE);
-    if (MSG_CONFIRM) PyModule_AddIntMacro(m, MSG_CONFIRM);
-    if (MSG_MORE) PyModule_AddIntMacro(m, MSG_MORE);
-    if (MSG_NOTIFICATION) PyModule_AddIntMacro(m, MSG_NOTIFICATION);
-    if (MSG_EOF) PyModule_AddIntMacro(m, MSG_EOF);
-    if (MSG_FASTOPEN) PyModule_AddIntMacro(m, MSG_FASTOPEN);
-#ifdef MSG_BTAG
-    if (MSG_BTAG) PyModule_AddIntMacro(m, MSG_BTAG);
-#endif
-#ifdef MSG_ETAG
-    if (MSG_ETAG) PyModule_AddIntMacro(m, MSG_ETAG);
-#endif
+    PyModule_AddIntMacro(m, MSG_DONTWAIT);
+    PyModule_AddIntMacro(m, MSG_NOSIGNAL);
+    if (MSG_FASTOPEN != -1) PyModule_AddIntMacro(m, MSG_FASTOPEN);
 
     /* Protocol level and numbers, usable for [gs]etsockopt */
     PyModule_AddIntMacro(m, SOL_SOCKET);
@@ -6916,12 +6881,10 @@ PyInit__socket(void)
 #endif
 
     PyModule_AddIntMacro(m, IPPROTO_IP);
-    PyModule_AddIntMacro(m, IPPROTO_HOPOPTS);
     PyModule_AddIntMacro(m, IPPROTO_ICMP);
     PyModule_AddIntMacro(m, IPPROTO_TCP);
     PyModule_AddIntMacro(m, IPPROTO_UDP);
     PyModule_AddIntMacro(m, IPPROTO_RAW);
-    PyModule_AddIntMacro(m, IPPROTO_IGMP);
 #ifdef IPPROTO_GGP
     if (IPPROTO_GGP) PyModule_AddIntMacro(m, IPPROTO_GGP);
 #endif
@@ -7037,12 +7000,6 @@ PyInit__socket(void)
     PyModule_AddIntMacro(m, IP_MULTICAST_LOOP);
     PyModule_AddIntMacro(m, IP_DEFAULT_MULTICAST_TTL);
     PyModule_AddIntMacro(m, IP_DEFAULT_MULTICAST_LOOP);
-    PyModule_AddIntMacro(m, IP_MAX_MEMBERSHIPS);
-    if (IP_RECVOPTS) PyModule_AddIntMacro(m, IP_RECVOPTS);
-    if (IP_RECVRETOPTS) PyModule_AddIntMacro(m, IP_RECVRETOPTS);
-    if (IP_RECVDSTADDR) PyModule_AddIntMacro(m, IP_RECVDSTADDR);
-    if (IP_RETOPTS) PyModule_AddIntMacro(m, IP_RETOPTS);
-    if (IP_TRANSPARENT) PyModule_AddIntMacro(m, IP_TRANSPARENT);
 
 #ifdef ENABLE_IPV6
     /* IPv6 [gs]etsockopt options, defined in RFC2553 */
@@ -7147,9 +7104,9 @@ PyInit__socket(void)
     if (TCP_USER_TIMEOUT) PyModule_AddIntMacro(m, TCP_USER_TIMEOUT);
     if (TCP_SAVE_SYN) PyModule_AddIntMacro(m, TCP_SAVE_SYN);
     if (TCP_SAVED_SYN) PyModule_AddIntMacro(m, TCP_SAVED_SYN);
-    if (TCP_KEEPCNT && (!IsWindows() || IsAtLeastWindows10()))
+    if (TCP_KEEPCNT)
         PyModule_AddIntMacro(m, TCP_KEEPCNT);
-    if (TCP_FASTOPEN && (!IsWindows() || IsAtLeastWindows10()))
+    if (TCP_FASTOPEN)
         PyModule_AddIntMacro(m, TCP_FASTOPEN);
     if (TCP_FASTOPEN_CONNECT)
         PyModule_AddIntMacro(m, TCP_FASTOPEN_CONNECT);
@@ -7200,7 +7157,12 @@ PyInit__socket(void)
     return m;
 }
 
-_Section(".rodata.pytab.1") const struct _inittab _PyImport_Inittab__socket = {
+#ifdef __aarch64__
+_Section(".rodata.pytab.1 //")
+#else
+_Section(".rodata.pytab.1")
+#endif
+ const struct _inittab _PyImport_Inittab__socket = {
     "_socket",
     PyInit__socket,
 };

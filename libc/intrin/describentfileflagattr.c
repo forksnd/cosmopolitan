@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2022 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -16,14 +16,10 @@
 │ TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR             │
 │ PERFORMANCE OF THIS SOFTWARE.                                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
-#include "libc/intrin/describeflags.internal.h"
-#include "libc/macros.internal.h"
+#include "libc/intrin/describeflags.h"
+#include "libc/macros.h"
 #include "libc/nt/enum/fileflagandattributes.h"
 #include "libc/runtime/runtime.h"
-
-#ifdef DescribeNtFileFlagAttr
-#undef DescribeNtFileFlagAttr
-#endif
 
 static const struct DescribeFlags kFileFlags[] = {
     {kNtFileAttributeReadonly, "AttributeReadonly"},                    //
@@ -54,8 +50,9 @@ static const struct DescribeFlags kFileFlags[] = {
     {kNtFileFlagFirstPipeInstance, "FlagFirstPipeInstance"},            //
 };
 
-const char *DescribeNtFileFlagAttr(char buf[256], uint32_t x) {
-  if (x == -1u) return "-1u";
-  return DescribeFlags(buf, 256, kFileFlags, ARRAYLEN(kFileFlags), "kNtFile",
-                       x);
+const char *_DescribeNtFileFlagAttr(char buf[256], uint32_t x) {
+  if (x == -1u)
+    return "-1u";
+  return _DescribeFlags(buf, 256, kFileFlags, ARRAYLEN(kFileFlags), "kNtFile",
+                        x);
 }

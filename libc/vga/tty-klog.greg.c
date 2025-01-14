@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ This is free and unencumbered software released into the public domain.      │
 │                                                                              │
@@ -25,7 +25,7 @@
 │ OTHER DEALINGS IN THE SOFTWARE.                                              │
 ╚─────────────────────────────────────────────────────────────────────────────*/
 #include "libc/intrin/newbie.h"
-#include "libc/macros.internal.h"
+#include "libc/macros.h"
 #include "libc/runtime/mman.internal.h"
 #include "libc/str/str.h"
 #include "libc/vga/vga.internal.h"
@@ -33,13 +33,15 @@
 #ifdef __x86_64__
 
 /*
- * @fileoverview Instantiation of routines for emergency or system console
- * output in graphical video modes.
+ * @fileoverview Instantiation of routines for emergency console output in
+ * graphical video modes.
  *
  * @see libc/vga/tty-graph.inc
  */
 
+#ifndef __llvm__
 #pragma GCC optimize("s")
+#endif
 
 #define KLOGTTY
 #define MAYUNROLLLOOPS /* do not unroll loops; keep the code small! */
@@ -90,7 +92,7 @@
 
 static unsigned short klog_y = 0, klog_x = 0;
 
-privileged void _klog_vga(const char *b, size_t n) {
+void _klog_vga(const char *b, size_t n) {
   struct Tty tty;
   _vga_reinit(&tty, klog_y, klog_x, kTtyKlog);
   _TtyWrite(&tty, b, n);

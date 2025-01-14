@@ -67,7 +67,6 @@ static void emitlin(char *nextline) {
 
 void println(char *fmt, ...) {
   va_list ap;
-  char *nextline;
   va_start(ap, fmt);
   emitlin(xvasprintf(fmt, ap));
   va_end(ap);
@@ -105,12 +104,12 @@ void pop2(char *a, char *b) {
   DCHECK_GE(depth, 0);
 }
 
-void pushreg(char *arg) {
+void pushreg(const char *arg) {
   println("\tpush\t%%%s", arg);
   depth++;
 }
 
-void popreg(char *arg) {
+void popreg(const char *arg) {
   println("\tpop\t%%%s", arg);
   depth--;
   DCHECK_GE(depth, 0);
@@ -985,7 +984,7 @@ static bool gen_builtin_funcall(Node *node, const char *name) {
     char regprefix;
     gen_expr(node->args);
     emitlin("\tor\t$-1,%edi");
-    regprefix = _endswith(name, "l") ? 'r' : 'e';
+    regprefix = endswith(name, "l") ? 'r' : 'e';
     println("\tbsf\t%%%cax,%%%cax", regprefix, regprefix);
     emitlin("\tcmovz\t%edi,%eax");
     emitlin("\tinc\t%eax");
@@ -1152,19 +1151,6 @@ static int GetSseIntSuffix(Type *ty) {
   }
 }
 
-static bool IsOverflowArithmetic(Node *node) {
-  return (node->kind == ND_ADD || node->kind == ND_SUB ||
-          node->kind == ND_MUL || node->kind == ND_NEG) &&
-         node->overflow;
-}
-
-static void HandleOverflow(const char *ax) {
-  pop("%rdi");
-  println("\tmov\t%s,(%%rdi)", ax);
-  emitlin("\tseto\t%al");
-  emitlin("\tmovzbl\t%al,%eax");
-}
-
 static void HandleAtomicArithmetic(Node *node, const char *op) {
   gen_expr(node->lhs);
   push();
@@ -1238,10 +1224,6 @@ void gen_expr(Node *node) {
       }
     }
     case ND_NEG:
-      if (IsOverflowArithmetic(node)) {
-        gen_expr(node->overflow);
-        push();
-      }
       gen_expr(node->lhs);
       switch (node->ty->kind) {
         case TY_FLOAT:
@@ -1277,9 +1259,6 @@ void gen_expr(Node *node) {
         ax = "%eax";
       }
       println("\tneg\t%s", ax);
-      if (IsOverflowArithmetic(node)) {
-        HandleOverflow(ax);
-      }
       return;
     case ND_VAR:
       gen_addr(node);
@@ -1433,7 +1412,7 @@ void gen_expr(Node *node) {
     case ND_FUNCALL: {
       const char *funcname = NULL;
       if (node->lhs->kind == ND_VAR) {
-        if (_startswith(nameof(node->lhs->var), "__builtin_")) {
+        if (startswith(nameof(node->lhs->var), "__builtin_")) {
           funcname = nameof(node->lhs->var) + 10;
           if (gen_builtin_funcall(node, funcname)) {
             return;
@@ -1771,10 +1750,6 @@ void gen_expr(Node *node) {
       error_tok(node->tok, "invalid expression");
     }
   }
-  if (IsOverflowArithmetic(node)) {
-    gen_expr(node->overflow);
-    push();
-  }
   if (node->lhs->ty->vector_size == 16) {
     gen_expr(node->rhs);
     pushx();
@@ -1801,15 +1776,13 @@ void gen_expr(Node *node) {
     gen_expr(node->lhs);
     pop("%rdi");
   }
-  char *ax, *di, *dx;
+  char *ax, *di;
   if (node->lhs->ty->kind == TY_LONG || node->lhs->ty->base) {
     ax = "%rax";
     di = "%rdi";
-    dx = "%rdx";
   } else {
     ax = "%eax";
     di = "%edi";
-    dx = "%edx";
   }
   switch (node->kind) {
     case ND_PMOVMSKB:
@@ -2209,9 +2182,6 @@ void gen_expr(Node *node) {
       break;
     default:
       error_tok(node->tok, "invalid expression");
-  }
-  if (IsOverflowArithmetic(node)) {
-    HandleOverflow(ax);
   }
 }
 

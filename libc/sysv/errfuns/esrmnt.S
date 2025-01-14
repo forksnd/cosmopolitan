@@ -1,15 +1,16 @@
-#include "libc/macros.internal.h"
+#include "libc/macros.h"
 .text.unlikely
 
+	.ftrace1
 esrmnt:
+	.ftrace2
 #ifdef __x86_64__
 	.leafprologue
-	.profilable
 	mov	ESRMNT(%rip),%ecx
 	jmp	__errfun
 #elif defined(__aarch64__)
 	adrp	x1,ESRMNT
-	ldr	w0,[x1,#:lo12:ESRMNT]
+	ldrsw	x0,[x1,#:lo12:ESRMNT]
 	b	__errfun
 #else
 #error "unsupported architecture"

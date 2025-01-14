@@ -1,12 +1,13 @@
 #include "libc/nt/codegen.h"
-.imp	user32,__imp_FindWindowExW,FindWindowExW,1783
+.imp	user32,__imp_FindWindowExW,FindWindowExW
 
 	.text.windows
+	.ftrace1
 FindWindowEx:
+	.ftrace2
 #ifdef __x86_64__
 	push	%rbp
 	mov	%rsp,%rbp
-	.profilable
 	mov	__imp_FindWindowExW(%rip),%rax
 	jmp	__sysv2nt
 #elif defined(__aarch64__)

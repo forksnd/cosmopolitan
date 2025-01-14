@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2022 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -17,8 +17,9 @@
 │ PERFORMANCE OF THIS SOFTWARE.                                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
 #include "libc/errno.h"
+#include "libc/intrin/atomic.h"
+#include "libc/limits.h"
 #include "libc/thread/thread.h"
-#include "third_party/nsync/counter.h"
 
 /**
  * Initializes barrier.
@@ -28,14 +29,17 @@
  *     before the barrier is released, which must be greater than zero
  * @return 0 on success, or error number on failure
  * @raise EINVAL if `count` isn't greater than zero
- * @raise ENOMEM if insufficient memory exists
  */
 errno_t pthread_barrier_init(pthread_barrier_t *barrier,
                              const pthread_barrierattr_t *attr,
                              unsigned count) {
-  nsync_counter c;
-  if (!count) return EINVAL;
-  if (!(c = nsync_counter_new(count))) return ENOMEM;
-  *barrier = (pthread_barrier_t){._nsync = c};
+  if (!count)
+    return EINVAL;
+  if (count > INT_MAX)
+    return EINVAL;
+  barrier->_count = count;
+  barrier->_pshared = attr ? *attr : PTHREAD_PROCESS_PRIVATE;
+  atomic_store_explicit(&barrier->_counter, count, memory_order_relaxed);
+  atomic_store_explicit(&barrier->_waiters, 0, memory_order_relaxed);
   return 0;
 }

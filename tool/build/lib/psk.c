@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2021 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -16,17 +16,17 @@
 │ TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR             │
 │ PERFORMANCE OF THIS SOFTWARE.                                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
+#include "tool/build/lib/psk.h"
 #include "libc/calls/calls.h"
 #include "libc/calls/struct/stat.h"
 #include "libc/log/check.h"
-#include "libc/mem/mem.h"
 #include "libc/mem/gc.h"
+#include "libc/mem/mem.h"
 #include "libc/runtime/runtime.h"
 #include "libc/stdio/stdio.h"
 #include "libc/sysv/consts/o.h"
 #include "libc/x/x.h"
 #include "libc/x/xasprintf.h"
-#include "tool/build/lib/psk.h"
 
 /**
  * Returns preshared key for runit testing infrastructure.
@@ -35,9 +35,9 @@ void *GetRunitPsk(void) {
   int fd;
   char *r, *p;
   struct stat st;
-  p = _gc(xasprintf("%s/.runit.psk", _gc(xhomedir())));
+  p = gc(xasprintf("%s/.runit.psk", gc(xhomedir())));
   if (stat(p, &st) == -1 || st.st_size != 32) {
-    fprintf(stderr, "need o//examples/getrandom.com -bn32 >~/.runit.psk\n");
+    fprintf(stderr, "need o//examples/getrandom -bn32 >~/.runit.psk\n");
     exit(1);
   }
   CHECK_NOTNULL((r = malloc(32)));

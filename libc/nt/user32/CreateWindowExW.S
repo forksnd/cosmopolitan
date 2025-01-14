@@ -1,12 +1,13 @@
 #include "libc/nt/codegen.h"
-.imp	user32,__imp_CreateWindowExW,CreateWindowExW,1625
+.imp	user32,__imp_CreateWindowExW,CreateWindowExW
 
 	.text.windows
+	.ftrace1
 CreateWindowEx:
+	.ftrace2
 #ifdef __x86_64__
 	push	%rbp
 	mov	%rsp,%rbp
-	.profilable
 	mov	__imp_CreateWindowExW(%rip),%rax
 	jmp	__sysv2nt12
 #elif defined(__aarch64__)

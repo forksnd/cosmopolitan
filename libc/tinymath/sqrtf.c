@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:t;c-basic-offset:8;tab-width:8;coding:utf-8   -*-│
-│vi: set et ft=c ts=8 tw=8 fenc=utf-8                                       :vi│
+│ vi: set noet ft=c ts=8 sw=8 fenc=utf-8                                   :vi │
 ╚──────────────────────────────────────────────────────────────────────────────╝
 │                                                                              │
 │  Musl Libc                                                                   │
@@ -28,12 +28,7 @@
 #include "libc/intrin/likely.h"
 #include "libc/math.h"
 #include "libc/tinymath/internal.h"
-
-asm(".ident\t\"\\n\\n\
-Musl libc (MIT License)\\n\
-Copyright 2005-2014 Rich Felker, et. al.\"");
-asm(".include \"libc/disclaimer.inc\"");
-// clang-format off
+__static_yoink("musl_libc_notice");
 
 #define FENV_SUPPORT 1
 
@@ -42,14 +37,12 @@ static inline uint32_t mul32(uint32_t a, uint32_t b)
 	return (uint64_t)a*b >> 32;
 }
 
-/* see sqrt.c for more detailed comments.  */
-
 /**
  * Returns square root of 𝑥.
  */
 float sqrtf(float x)
 {
-#ifdef __SSE2__
+#if defined(__x86_64__)
 
 	asm("sqrtss\t%1,%0" : "=x"(x) : "x"(x));
 	return x;

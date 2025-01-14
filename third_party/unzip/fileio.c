@@ -1,4 +1,3 @@
-// clang-format off
 /*
   Copyright (c) 1990-2010 Info-ZIP.  All rights reserved.
 
@@ -66,10 +65,6 @@
 #include "third_party/unzip/ttyio.h"
 
 #define st_mtime st_mtim.tv_sec
-
-#if defined( UNIX) && defined( __APPLE__)
-#include "third_party/unzip/unix/macosx.h"
-#endif /* defined( UNIX) && defined( __APPLE__) */
 
 /* setup of codepage conversion for decryption passwords */
 #if CRYPT
@@ -183,8 +178,6 @@ static ZCONST char Far ExtraFieldTooLong[] =
 #else
    static ZCONST char Far DiskFullQuery[] =
      "%s:  write error (disk full?).  Continue? (y/n/^C) ";
-   static ZCONST char Far ZipfileCorrupt[] =
-     "error:  zipfile probably corrupt (%s)\n";
 #  ifdef SYMLINKS
      static ZCONST char Far FileIsSymLink[] =
        "%s exists and is a symbolic link%s.\n";
@@ -2868,7 +2861,7 @@ char *str2oem(dst, src)
 /* Function memset() */
 /*********************/
 
-zvoid *memset(buf, init, len)
+zvoid *memset_(buf, init, len)
     register zvoid *buf;        /* buffer location */
     register int init;          /* initializer character */
     register unsigned int len;  /* length of the buffer */

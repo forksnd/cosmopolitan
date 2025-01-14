@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2020 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -16,11 +16,14 @@
 │ TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR             │
 │ PERFORMANCE OF THIS SOFTWARE.                                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
-#include "libc/intrin/bits.h"
+#include "libc/mem/critbit0.h"
+#include "libc/fmt/itoa.h"
 #include "libc/mem/critbit0.h"
 #include "libc/mem/mem.h"
 #include "libc/runtime/runtime.h"
+#include "libc/stdio/rand.h"
 #include "libc/str/str.h"
+#include "libc/testlib/ezbench.h"
 #include "libc/testlib/testlib.h"
 
 struct Bog {
@@ -29,7 +32,7 @@ struct Bog {
   const char *p[];
 };
 
-static dontdiscard struct Bog *NewBog(unsigned n) {
+static __wur struct Bog *NewBog(unsigned n) {
   struct Bog *res = malloc(sizeof(struct Bog) + sizeof(const char *) * n);
   res->i = 0;
   res->n = n;
@@ -58,7 +61,8 @@ TEST(critbit0, testContains) {
   struct critbit0 tree[1];
   MakeTree(tree);
   for (unsigned i = 0; elems[i]; ++i) {
-    if (!critbit0_contains(tree, elems[i])) abort();
+    if (!critbit0_contains(tree, elems[i]))
+      abort();
   }
   critbit0_clear(tree);
 }
@@ -70,15 +74,19 @@ TEST(critbit0, testDelete) {
   struct critbit0 tree = {0};
   for (unsigned i = 1; elems2[i]; ++i) {
     critbit0_clear(&tree);
-    for (unsigned j = 0; j < i; ++j) critbit0_insert(&tree, elems2[j]);
+    for (unsigned j = 0; j < i; ++j)
+      critbit0_insert(&tree, elems2[j]);
     for (unsigned j = 0; j < i; ++j) {
-      if (!critbit0_contains(&tree, elems2[j])) abort();
+      if (!critbit0_contains(&tree, elems2[j]))
+        abort();
     }
     for (unsigned j = 0; j < i; ++j) {
-      if (1 != critbit0_delete(&tree, elems2[j])) abort();
+      if (1 != critbit0_delete(&tree, elems2[j]))
+        abort();
     }
     for (unsigned j = 0; j < i; ++j) {
-      if (critbit0_contains(&tree, elems2[j])) abort();
+      if (critbit0_contains(&tree, elems2[j]))
+        abort();
     }
   }
   critbit0_clear(&tree);
@@ -127,4 +135,41 @@ TEST(critbit0, testAllPrefixed_haltOnNonzero) {
   ASSERT_STREQ("aa", a->p[1]);
   critbit0_clear(tree);
   FreeBog(&a);
+}
+
+TEST(critbit0, duplicate) {
+  struct critbit0 tree = {0};
+  ASSERT_TRUE(critbit0_insert(&tree, "hi"));
+  ASSERT_FALSE(critbit0_insert(&tree, "hi"));
+  critbit0_clear(&tree);
+}
+
+TEST(critbit0, manual_clear) {
+  struct critbit0 tree = {0};
+  ASSERT_TRUE(critbit0_insert(&tree, "hi"));
+  ASSERT_TRUE(critbit0_delete(&tree, "hi"));
+  ASSERT_EQ(NULL, tree.root);
+}
+
+#define N 500
+
+char words[N][16];
+
+void GenerateWords(void) {
+  for (int i = 0; i < N; ++i) {
+    FormatInt32(words[i], rand());
+  }
+}
+
+void BuildTree(void) {
+  struct critbit0 tree = {0};
+  for (int i = 0; i < N; ++i) {
+    critbit0_insert(&tree, words[i]);
+  }
+  critbit0_clear(&tree);
+}
+
+BENCH(critbit0, bench) {
+  GenerateWords();
+  EZBENCH2("critbit0", donothing, BuildTree());
 }

@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:t;c-basic-offset:8;tab-width:8;coding:utf-8   -*-│
-│vi: set et ft=c ts=8 tw=8 fenc=utf-8                                       :vi│
+│ vi: set noet ft=c ts=8 sw=8 fenc=utf-8                                   :vi │
 ╚──────────────────────────────────────────────────────────────────────────────╝
 │                                                                              │
 │  Musl Libc                                                                   │
@@ -27,12 +27,8 @@
 ╚─────────────────────────────────────────────────────────────────────────────*/
 #include "libc/math.h"
 #include "libc/tinymath/complex.internal.h"
-
-asm(".ident\t\"\\n\\n\
-Double-precision math functions (MIT License)\\n\
-Copyright 2018 ARM Limited\"");
-asm(".include \"libc/disclaimer.inc\"");
-// clang-format off
+__static_yoink("freebsd_libm_notice");
+__static_yoink("fdlibm_notice");
 
 /* origin: FreeBSD /usr/src/lib/msun/src/e_j1.c */
 /*
@@ -144,6 +140,9 @@ s03 =  1.17718464042623683263e-06, /* 0x3EB3BFF8, 0x333F8498 */
 s04 =  5.04636257076217042715e-09, /* 0x3E35AC88, 0xC97DFF2C */
 s05 =  1.23542274426137913908e-11; /* 0x3DAB2ACF, 0xCFB97ED8 */
 
+/**
+ * Returns Bessel function of 𝑥 of first kind of order 1.
+ */
 double j1(double x)
 {
 	double z,r,s;
@@ -183,6 +182,9 @@ static const double V0[5] = {
   1.66559246207992079114e-11, /* 0x3DB25039, 0xDACA772A */
 };
 
+/**
+ * Returns Bessel function of 𝑥 of second kind of order 1.
+ */
 double y1(double x)
 {
 	double z,u,v;

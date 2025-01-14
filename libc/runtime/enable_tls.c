@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2022 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -16,30 +16,54 @@
 │ TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR             │
 │ PERFORMANCE OF THIS SOFTWARE.                                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
-#include "libc/assert.h"
+#include "ape/sections.internal.h"
 #include "libc/calls/syscall-sysv.internal.h"
+#include "libc/dce.h"
 #include "libc/errno.h"
-#include "libc/intrin/asan.internal.h"
-#include "libc/intrin/asancodes.h"
 #include "libc/intrin/atomic.h"
+#include "libc/intrin/dll.h"
+#include "libc/intrin/getenv.h"
+#include "libc/intrin/kprintf.h"
+#include "libc/intrin/maps.h"
 #include "libc/intrin/weaken.h"
-#include "libc/macros.internal.h"
+#include "libc/macros.h"
+#include "libc/nt/files.h"
+#include "libc/nt/process.h"
+#include "libc/nt/runtime.h"
+#include "libc/nt/synchronization.h"
+#include "libc/nt/thread.h"
 #include "libc/runtime/internal.h"
 #include "libc/runtime/runtime.h"
+#include "libc/runtime/syslib.internal.h"
+#include "libc/stdalign.h"
+#include "libc/str/locale.h"
+#include "libc/str/locale.internal.h"
 #include "libc/str/str.h"
+#include "libc/sysv/consts/map.h"
+#include "libc/sysv/consts/prot.h"
 #include "libc/thread/posixthread.internal.h"
 #include "libc/thread/thread.h"
 #include "libc/thread/tls.h"
+#include "third_party/make/gnumake.h"
 
 #define I(x) ((uintptr_t)x)
 
 extern unsigned char __tls_mov_nt_rax[];
 extern unsigned char __tls_add_nt_rax[];
 
-nsync_dll_list_ _pthread_list;
-pthread_spinlock_t _pthread_lock;
-static struct PosixThread _pthread_main;
-_Alignas(TLS_ALIGNMENT) static char __static_tls[6016];
+alignas(TLS_ALIGNMENT) static char __static_tls[6016];
+
+static unsigned long ParseMask(const char *str) {
+  int c;
+  unsigned long x = 0;
+  if (str) {
+    while ((c = *str++)) {
+      x *= 10;
+      x += c - '0';
+    }
+  }
+  return x;
+}
 
 /**
  * Enables thread local storage for main process.
@@ -48,16 +72,17 @@ _Alignas(TLS_ALIGNMENT) static char __static_tls[6016];
  *
  *                           __get_tls()
  *                               │
- *                              %fs Linux/BSDs
+ *                              %fs OpenBSD/NetBSD
  *            _Thread_local      │
  *     ┌───┬──────────┬──────────┼───┐
  *     │pad│  .tdata  │  .tbss   │tib│
  *     └───┴──────────┴──────────┼───┘
  *                               │
- *                  Windows/Mac %gs
+ *    Linux/FreeBSD/Windows/Mac %gs
  *
  * Here's the TLS memory layout on aarch64:
  *
+ *            x28
  *         %tpidr_el0
  *             │
  *             │    _Thread_local
@@ -82,7 +107,7 @@ _Alignas(TLS_ALIGNMENT) static char __static_tls[6016];
  * can disable it as follows:
  *
  *     int main() {
- *       __tls_enabled = false;
+ *       __tls_enabled_set(false);
  *       // do stuff
  *     }
  *
@@ -91,80 +116,82 @@ _Alignas(TLS_ALIGNMENT) static char __static_tls[6016];
  * and your `errno` variable also won't be thread safe anymore.
  */
 textstartup void __enable_tls(void) {
-  int tid;
-  size_t siz;
-  char *mem, *tls;
-  struct CosmoTib *tib;
 
   // Here's the layout we're currently using:
   //
-  //         .align PAGESIZE
+  //         .balign 4096
   //     _tdata_start:
   //         .tdata
   //         _tdata_size = . - _tdata_start
-  //         .align PAGESIZE
+  //         .balign 4096
   //     _tbss_start:
   //     _tdata_start + _tbss_offset:
   //         .tbss
-  //         .align TLS_ALIGNMENT
+  //         .balign TLS_ALIGNMENT
   //         _tbss_size = . - _tbss_start
   //     _tbss_end:
   //     _tbss_start + _tbss_size:
   //     _tdata_start + _tls_size:
   //
-  _unassert(_tbss_start == _tdata_start + I(_tbss_offset));
-  _unassert(_tbss_start + I(_tbss_size) == _tdata_start + I(_tls_size));
+  // unassert(_tbss_start == _tdata_start + I(_tbss_offset));
+  // unassert(_tbss_start + I(_tbss_size) == _tdata_start + I(_tls_size));
 
 #ifdef __x86_64__
 
-  siz = ROUNDUP(I(_tls_size) + sizeof(*tib), _Alignof(__static_tls));
+  char *mem;
+  size_t siz = ROUNDUP(I(_tls_size) + sizeof(struct CosmoTib), TLS_ALIGNMENT);
   if (siz <= sizeof(__static_tls)) {
     // if tls requirement is small then use the static tls block
-    // which helps avoid a system call for appes with little tls
+    // which helps avoid a system call for apes with little tls.
     // this is crucial to keeping life.com 16 kilobytes in size!
     mem = __static_tls;
   } else {
-    // if this binary needs a hefty tls block then we'll bank on
-    // malloc() being linked, which links _mapanon().  otherwise
-    // if you exceed this, you need to STATIC_YOINK("_mapanon").
-    // please note that it's probably too early to call calloc()
-    _npassert(_weaken(_mapanon));
-    siz = ROUNDUP(siz, FRAMESIZE);
-    mem = _weaken(_mapanon)(siz);
-    _npassert(mem);
+    // if a binary needs this much thread_local storage, then it
+    // surely must have linked the mmap() function at some point
+    // we can't call mmap() because it's too early for sig block
+    mem = _weaken(mmap)(0, siz, PROT_READ | PROT_WRITE,
+                        MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
   }
 
-  if (IsAsan()) {
-    // poison the space between .tdata and .tbss
-    __asan_poison(mem + I(_tdata_size), I(_tbss_offset) - I(_tdata_size),
-                  kAsanProtected);
-  }
+  struct CosmoTib *tib = (struct CosmoTib *)(mem + siz - sizeof(*tib));
+  char *tls = mem + siz - sizeof(*tib) - I(_tls_size);
 
-  tib = (struct CosmoTib *)(mem + siz - sizeof(*tib));
-  tls = mem + siz - sizeof(*tib) - I(_tls_size);
+  // copy in initialized data section
+  if (I(_tdata_size))
+    memcpy(tls, _tdata_start, I(_tdata_size));
 
 #elif defined(__aarch64__)
 
-  siz = ROUNDUP(sizeof(*tib) + 2 * sizeof(void *) + I(_tls_size),
-                _Alignof(__static_tls));
-  if (siz <= sizeof(__static_tls)) {
+  uintptr_t size = ROUNDUP(sizeof(struct CosmoTib), I(_tls_align)) +  //
+                   ROUNDUP(sizeof(uintptr_t) * 2, I(_tdata_align)) +  //
+                   ROUNDUP(I(_tdata_size), I(_tbss_align)) +          //
+                   I(_tbss_size);
+
+  char *mem;
+  if (I(_tls_align) <= TLS_ALIGNMENT && size <= sizeof(__static_tls)) {
+    // if tls requirement is small then use the static tls block
+    // which helps avoid a system call for apes with little tls.
+    // this is crucial to keeping life.com 16 kilobytes in size!
     mem = __static_tls;
   } else {
-    _npassert(_weaken(_mapanon));
-    siz = ROUNDUP(siz, FRAMESIZE);
-    mem = _weaken(_mapanon)(siz);
-    _npassert(mem);
+    // if a binary needs this much thread_local storage, then it
+    // surely must have linked the mmap() function at some point
+    // we can't call mmap() because it's too early for sig block
+    mem = _weaken(mmap)(0, size, PROT_READ | PROT_WRITE,
+                        MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
   }
 
-  if (IsAsan()) {
-    // there's a roundup(pagesize) gap between .tdata and .tbss
-    // poison that empty space
-    __asan_poison(mem + sizeof(*tib) + 2 * sizeof(void *) + I(_tdata_size),
-                  I(_tbss_offset) - I(_tdata_size), kAsanProtected);
-  }
+  struct CosmoTib *tib =
+      (struct CosmoTib *)(mem +
+                          ROUNDUP(sizeof(struct CosmoTib), I(_tls_align)) -
+                          sizeof(struct CosmoTib));
 
-  tib = (struct CosmoTib *)mem;
-  tls = mem + sizeof(*tib) + 2 * sizeof(void *);
+  uintptr_t *dtv = (uintptr_t *)(tib + 1);
+  size_t dtv_size = sizeof(uintptr_t) * 2;
+
+  char *tdata = (char *)dtv + ROUNDUP(dtv_size, I(_tdata_align));
+  if (I(_tdata_size))
+    memmove(tdata, _tdata_start, I(_tdata_size));
 
   // Set the DTV.
   //
@@ -174,8 +201,8 @@ textstartup void __enable_tls(void) {
   //
   // @see musl/src/env/__init_tls.c
   // @see https://chao-tic.github.io/blog/2018/12/25/tls
-  ((uintptr_t *)tls)[-2] = 1;
-  ((void **)tls)[-1] = tls;
+  dtv[0] = 1;
+  dtv[1] = (uintptr_t)tdata;
 
 #else
 #error "unsupported architecture"
@@ -187,37 +214,53 @@ textstartup void __enable_tls(void) {
   tib->tib_errno = __errno;
   tib->tib_strace = __strace;
   tib->tib_ftrace = __ftrace;
-  tib->tib_pthread = (pthread_t)&_pthread_main;
-  if (IsLinux()) {
+  tib->tib_pthread = (pthread_t)&_pthread_static;
+  if (IsWindows()) {
+    intptr_t hThread;
+    DuplicateHandle(GetCurrentProcess(), GetCurrentThread(),
+                    GetCurrentProcess(), &hThread, 0, false,
+                    kNtDuplicateSameAccess);
+    atomic_init(&tib->tib_syshand, hThread);
+  } else if (IsXnuSilicon()) {
+    tib->tib_syshand = __syslib->__pthread_self();
+  }
+
+  int tid;
+  if (IsLinux() || IsXnuSilicon()) {
     // gnu/systemd guarantees pid==tid for the main thread so we can
     // avoid issuing a superfluous system call at startup in program
     tid = __pid;
   } else {
     tid = sys_gettid();
   }
-  atomic_store_explicit(&tib->tib_tid, tid, memory_order_relaxed);
+  atomic_init(&tib->tib_ptid, tid);
+  atomic_init(&tib->tib_ctid, tid);
+  // TODO(jart): set_tid_address?
+
+  // inherit signal mask
+  if (IsWindows())
+    atomic_init(&tib->tib_sigmask, ParseMask(__getenv(environ, "_MASK").s));
 
   // initialize posix threads
-  _pthread_main.tib = tib;
-  _pthread_main.flags = PT_STATIC;
-  _pthread_main.list.prev = _pthread_main.list.next =  //
-      _pthread_list = VEIL("r", &_pthread_main.list);
-  _pthread_main.list.container = &_pthread_main;
-  atomic_store_explicit(&_pthread_main.ptid, tid, memory_order_relaxed);
-
-  // copy in initialized data section
-  if (I(_tdata_size)) {
-    memcpy(tls, _tdata_start, I(_tdata_size));
-  }
+  _pthread_static.tib = tib;
+  _pthread_static.pt_flags = PT_STATIC;
+  _pthread_static.pt_locale = &__global_locale;
+  _pthread_static.pt_attr.__stackaddr = __maps.stack.addr;
+  _pthread_static.pt_attr.__stacksize = __maps.stack.size;
+  dll_init(&_pthread_static.list);
+  _pthread_list = &_pthread_static.list;
 
   // ask the operating system to change the x86 segment register
+  if (IsWindows())
+    __tls_index = TlsAlloc();
   __set_tls(tib);
 
 #ifdef __x86_64__
   // rewrite the executable tls opcodes in memory
-  __morph_tls();
+  if (IsWindows() || IsOpenbsd() || IsNetbsd())
+    __morph_tls();
 #endif
 
   // we are now allowed to use tls
-  __tls_enabled = true;
+  __tls_enabled_set(true);
 }

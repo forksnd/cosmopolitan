@@ -1,4 +1,3 @@
-/* clang-format off */
 //=== lib/fp_trunc.h - high precision -> low precision conversion *- C -*-===//
 //
 //                     The LLVM Compiler Infrastructure
@@ -52,6 +51,7 @@ typedef uint32_t dst_rep_t;
 static const int dstSigBits = 23;
 
 #elif defined DST_HALF
+#error use fp16_trunc.inc
 typedef uint16_t dst_t;
 typedef uint16_t dst_rep_t;
 #define DST_REP_C UINT16_C

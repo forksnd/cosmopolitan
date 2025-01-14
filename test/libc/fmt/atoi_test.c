@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2021 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -46,12 +46,8 @@ TEST(atoi, test) {
   EXPECT_EQ(-1, atoi("-1"));
   EXPECT_EQ(-9, atoi("-9"));
   EXPECT_EQ(-31337, atoi("-31337"));
-  EXPECT_EQ(INT_MIN, atoi("-2147483648"));
-  EXPECT_EQ(INT_MAX, atoi("2147483647"));
-  EXPECT_EQ(INT_MIN, atoi("-2147483649"));
-  EXPECT_EQ(INT_MAX, atoi("2147483648"));
-  EXPECT_EQ(INT_MIN, atoi("-2147483658"));
-  EXPECT_EQ(INT_MAX, atoi("2147483657"));
+  EXPECT_EQ(-2147483648, atoi("-2147483648"));
+  EXPECT_EQ(2147483647, atoi("2147483647"));
   EXPECT_EQ(123, atoi(" 123"));
   EXPECT_EQ(123, atoi(" \t123"));
   EXPECT_EQ(+123, atoi(" +123"));
@@ -63,21 +59,21 @@ TEST(atoi, test) {
 }
 
 TEST(atoi, testWithinLimit_doesntChangeErrno) {
-  errno = 7;
+  errno = 666;
   EXPECT_EQ(INT_MAX, atoi("2147483647"));
-  EXPECT_EQ(7, errno);
-  errno = 7;
+  EXPECT_EQ(666, errno);
+  errno = 666;
   EXPECT_EQ(INT_MIN, atoi("-2147483648"));
-  EXPECT_EQ(7, errno);
+  EXPECT_EQ(666, errno);
 }
 
-TEST(atoi, testOutsideLimit_saturatesAndSetsErangeErrno) {
-  errno = 0;
-  EXPECT_EQ(INT_MAX, atoi("2147483648"));
-  EXPECT_EQ(ERANGE, errno);
-  errno = 0;
-  EXPECT_EQ(INT_MIN, atoi("-2147483649"));
-  EXPECT_EQ(ERANGE, errno);
+TEST(atol, testWithinLimit_doesntChangeErrno) {
+  errno = 666;
+  EXPECT_EQ(INT_MAX, atol("2147483647"));
+  EXPECT_EQ(666, errno);
+  errno = 666;
+  EXPECT_EQ(INT_MIN, atol("-2147483648"));
+  EXPECT_EQ(666, errno);
 }
 
 TEST(atol, test) {
@@ -97,10 +93,6 @@ TEST(atol, test) {
   EXPECT_EQ(-31337, atol("-31337"));
   EXPECT_EQ(LONG_MIN, atol("-9223372036854775808"));
   EXPECT_EQ(LONG_MAX, atol("9223372036854775807"));
-  EXPECT_EQ(LONG_MIN, atol("-9223372036854775809"));
-  EXPECT_EQ(LONG_MAX, atol("9223372036854775808"));
-  EXPECT_EQ(LONG_MIN, atol("-9223372036854775818"));
-  EXPECT_EQ(LONG_MAX, atol("9223372036854775817"));
   EXPECT_EQ(123, atol(" 123"));
   EXPECT_EQ(123, atol(" \t123"));
   EXPECT_EQ(-123, atol(" -123"));
@@ -306,37 +298,12 @@ TEST(strtoimax, testEndPtr) {
   ASSERT_EQ(1, e - p);
 }
 
-TEST(strtoi128, testLimits) {
-  EXPECT_EQ(
-      ((uint128_t)0xffffffffffffffff) << 64 | (uint128_t)0xffffffffffffffff,
-      strtoi128("-1", NULL, 0));
-  EXPECT_EQ(
-      ((uint128_t)0x7fffffffffffffff) << 64 | (uint128_t)0xffffffffffffffff,
-      strtoi128("0x7fffffffffffffffffffffffffffffff", NULL, 0));
-}
-
-TEST(strtoi128, testOutsideLimit) {
-  errno = 0;
-  EXPECT_EQ(
-      ((uint128_t)0x7fffffffffffffff) << 64 | (uint128_t)0xffffffffffffffff,
-      strtoi128("0x80000000000000000000000000000000", NULL, 0));
-  EXPECT_EQ(ERANGE, errno);
-  errno = 0;
-  EXPECT_EQ(((uint128_t)0x8000000000000000) << 64 | 0x0000000000000000,
-            strtoi128("-0x80000000000000000000000000000001", NULL, 0));
-  EXPECT_EQ(ERANGE, errno);
-}
-
 TEST(strtoul, neghex) {
   errno = 0;
   ASSERT_EQ(-16, (long)strtoul("0xfffffffffffffff0", NULL, 0));
   EXPECT_EQ(0, errno);
 }
 
-TEST(strtoumax, testZero) {
-  EXPECT_EQ(UINTMAX_MIN, strtoumax("0", NULL, 0));
-  EXPECT_EQ(UINT128_MIN, strtou128("0", NULL, 0));
-}
 TEST(strtoumax, testDecimal) {
   EXPECT_EQ(123, strtoumax("123", NULL, 0));
   EXPECT_EQ(-123, strtoumax("-123", NULL, 0));
@@ -352,18 +319,6 @@ TEST(strtoumax, testOctal) {
 TEST(strtoumax, testBinary) {
   EXPECT_EQ(42, strtoumax("0b101010", NULL, 0));
   EXPECT_EQ(42, strtoumax("0b101010", NULL, 2));
-}
-
-TEST(strtou128, test128imum) {
-  EXPECT_EQ(UINT128_MAX,
-            strtou128("340282366920938463463374607431768211455", NULL, 0));
-  EXPECT_EQ(UINT128_MAX,
-            strtou128("0xffffffffffffffffffffffffffffffff", NULL, 0));
-}
-
-TEST(strtou128, testTwosBane) {
-  EXPECT_EQ(((uint128_t)0x8000000000000000) << 64 | 0x0000000000000000,
-            strtou128("0x80000000000000000000000000000000", NULL, 0));
 }
 
 TEST(wcstol, test) {
@@ -549,6 +504,18 @@ TEST(wcstoumax, testIBM) {
   ASSERT_STREQ(L"f", e);
 }
 
+TEST(strtol, term) {
+  static char const input[2][3] = {"0x", "0b"};
+  static int const base[] = {0, 2, 10};
+  for (int i = 0; i < 2; i++) {
+    for (int j = 0; j < 3; j++) {
+      char *term;
+      strtoll(input[i], &term, base[j]);
+      ASSERT_EQ(input[i] + 1, term);
+    }
+  }
+}
+
 TEST(strtoul, testoverflow) {
   errno = 0;
   char *e = 0;
@@ -558,44 +525,60 @@ TEST(strtoul, testoverflow) {
   ASSERT_STREQ("", e);
 }
 
-TEST(strtol, invalidHex_consistentWithBsd) {
+TEST(strtol, invalidHex1) {
   char *c = 0;
   long x = strtol("0xz", &c, 16);
   ASSERT_EQ(0, x);
-  ASSERT_STREQ("z", c);
+  ASSERT_STREQ("xz", c);
 }
 
-TEST(strtol, invalidHex_consistentWithBsd2) {
+TEST(strtol, invalidHex2) {
   char *c = 0;
   long x = strtol("0xez", &c, 16);
   ASSERT_EQ(0xe, x);
   ASSERT_STREQ("z", c);
 }
 
+TEST(strtol, invalidHex3) {
+  char *c = 0;
+  long x = strtol("0xez", &c, 0);
+  ASSERT_EQ(0xe, x);
+  ASSERT_STREQ("z", c);
+}
+
+TEST(strtol, invalidBin1) {
+  char *c = 0;
+  long x = strtol("0b2", &c, 2);
+  ASSERT_EQ(0, x);
+  ASSERT_STREQ("b2", c);
+}
+
+TEST(strtol, invalidBin2) {
+  char *c = 0;
+  long x = strtol("0b2", &c, 0);
+  ASSERT_EQ(0, x);
+  ASSERT_STREQ("b2", c);
+}
+
 BENCH(atoi, bench) {
-  EZBENCH2("atoi 10⁸", donothing, EXPROPRIATE(atoi(VEIL("r", "100000000"))));
+  EZBENCH2("atoi 10⁸", donothing,
+           __expropriate(atoi(__veil("r", "100000000"))));
+  EZBENCH2("atol 10⁸", donothing,
+           __expropriate(atol(__veil("r", "100000000"))));
   EZBENCH2("strtol 10⁸", donothing,
-           EXPROPRIATE(strtol(VEIL("r", "100000000"), 0, 10)));
+           __expropriate(strtol(__veil("r", "100000000"), 0, 10)));
   EZBENCH2("strtoul 10⁸", donothing,
-           EXPROPRIATE(strtol(VEIL("r", "100000000"), 0, 10)));
+           __expropriate(strtol(__veil("r", "100000000"), 0, 10)));
   EZBENCH2("wcstol 10⁸", donothing,
-           EXPROPRIATE(wcstol(VEIL("r", L"100000000"), 0, 10)));
+           __expropriate(wcstol(__veil("r", L"100000000"), 0, 10)));
   EZBENCH2("wcstoul 10⁸", donothing,
-           EXPROPRIATE(wcstol(VEIL("r", L"100000000"), 0, 10)));
+           __expropriate(wcstol(__veil("r", L"100000000"), 0, 10)));
   EZBENCH2("strtoimax 10⁸", donothing,
-           EXPROPRIATE(strtoimax(VEIL("r", "100000000"), 0, 10)));
+           __expropriate(strtoimax(__veil("r", "100000000"), 0, 10)));
   EZBENCH2("strtoumax 10⁸", donothing,
-           EXPROPRIATE(strtoimax(VEIL("r", "100000000"), 0, 10)));
+           __expropriate(strtoimax(__veil("r", "100000000"), 0, 10)));
   EZBENCH2("wcstoimax 10⁸", donothing,
-           EXPROPRIATE(wcstoimax(VEIL("r", L"100000000"), 0, 10)));
+           __expropriate(wcstoimax(__veil("r", L"100000000"), 0, 10)));
   EZBENCH2("wcstoumax 10⁸", donothing,
-           EXPROPRIATE(wcstoimax(VEIL("r", L"100000000"), 0, 10)));
-  EZBENCH2("strtoi128 10⁸", donothing,
-           EXPROPRIATE(strtoi128(VEIL("r", "100000000"), 0, 10)));
-  EZBENCH2("strtou128 10⁸", donothing,
-           EXPROPRIATE(strtoi128(VEIL("r", "100000000"), 0, 10)));
-  EZBENCH2("wcstoi128 10⁸", donothing,
-           EXPROPRIATE(wcstoi128(VEIL("r", L"100000000"), 0, 10)));
-  EZBENCH2("wcstou128 10⁸", donothing,
-           EXPROPRIATE(wcstoi128(VEIL("r", L"100000000"), 0, 10)));
+           __expropriate(wcstoimax(__veil("r", L"100000000"), 0, 10)));
 }

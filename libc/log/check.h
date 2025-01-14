@@ -1,8 +1,7 @@
 #ifndef COSMOPOLITAN_LIBC_LOG_CHECK_H_
 #define COSMOPOLITAN_LIBC_LOG_CHECK_H_
 #include "libc/dce.h"
-#include "libc/macros.internal.h"
-#if !(__ASSEMBLER__ + __LINKER__ + 0)
+#include "libc/macros.h"
 COSMOPOLITAN_C_START_
 
 #define CHECK(X, ...)         __CHK(ne, !=, false, "false", !!(X), #X, "" __VA_ARGS__)
@@ -26,19 +25,19 @@ COSMOPOLITAN_C_START_
 
 #define CHECK_ALIGNED(BYTES, VAR, ...)                                \
   do {                                                                \
-    if (((uintptr_t)VAR & ((BYTES)-1u))) {                            \
+    if (((uintptr_t)VAR & ((BYTES) - 1u))) {                          \
       __check_fail_aligned(BYTES, (uintptr_t)VAR, __FILE__, __LINE__, \
                            "" __VA_ARGS__);                           \
-      unreachable;                                                    \
+      __builtin_unreachable();                                        \
     }                                                                 \
     VAR = (typeof(VAR))__builtin_assume_aligned(VAR, BYTES);          \
   } while (0)
 
 #define DCHECK_ALIGNED(BYTES, VAR, ...)                      \
   do {                                                       \
-    if (((uintptr_t)VAR & ((BYTES)-1u))) {                   \
+    if (((uintptr_t)VAR & ((BYTES) - 1u))) {                 \
       __DCHK_ALIGNED(BYTES, (uintptr_t)VAR, "" __VA_ARGS__); \
-      unreachable;                                           \
+      __builtin_unreachable();                               \
     }                                                        \
     VAR = (typeof(VAR))__builtin_assume_aligned(VAR, BYTES); \
   } while (0)
@@ -55,7 +54,7 @@ COSMOPOLITAN_C_START_
         __check_fail_##SUFFIX((uint64_t)Want, (uint64_t)Got, __FILE__,       \
                               __LINE__, 0, __VA_ARGS__);                     \
       }                                                                      \
-      unreachable;                                                           \
+      __builtin_unreachable();                                               \
     }                                                                        \
   } while (0)
 
@@ -65,7 +64,7 @@ COSMOPOLITAN_C_START_
     autotype(GOT) Got = (GOT);                      \
     autotype(WANT) Want = (WANT);                   \
     if (!(Want OP Got)) {                           \
-      unreachable;                                  \
+      __builtin_unreachable();                      \
     }                                               \
   } while (0)
 #else
@@ -107,5 +106,4 @@ void __check_fail_aligned(unsigned, uint64_t, const char *, int, const char *,
 #endif
 
 COSMOPOLITAN_C_END_
-#endif /* !(__ASSEMBLER__ + __LINKER__ + 0) */
 #endif /* COSMOPOLITAN_LIBC_LOG_CHECK_H_ */

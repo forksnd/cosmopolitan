@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:4;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=4 sts=4 sw=4 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=4 sts=4 sw=4 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Python 3                                                                     │
 │ https://docs.python.org/3/license.html                                       │
@@ -7,7 +7,6 @@
 #include "third_party/python/Include/import.h"
 #include "third_party/python/Include/yoink.h"
 #include "third_party/python/Modules/cjkcodecs/cjkcodecs.h"
-/* clang-format off */
 
 PYTHON_PROVIDE("_codecs_cn");
 PYTHON_PROVIDE("_codecs_cn.__map_gb18030ext");
@@ -524,7 +523,12 @@ END_CODECS_LIST
 
 I_AM_A_MODULE_FOR(cn)
 
-_Section(".rodata.pytab.1") const struct _inittab _PyImport_Inittab__codecs_cn = {
+#ifdef __aarch64__
+_Section(".rodata.pytab.1 //")
+#else
+_Section(".rodata.pytab.1")
+#endif
+ const struct _inittab _PyImport_Inittab__codecs_cn = {
     "_codecs_cn",
     PyInit__codecs_cn,
 };

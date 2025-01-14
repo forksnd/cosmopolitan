@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2022 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -17,6 +17,7 @@
 │ PERFORMANCE OF THIS SOFTWARE.                                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
 #include "libc/str/str.h"
+#include "libc/sysv/consts/sig.h"
 #include "libc/thread/thread2.h"
 
 /**
@@ -44,7 +45,7 @@ errno_t pthread_attr_setsigmask_np(pthread_attr_t *attr,
   _Static_assert(sizeof(attr->__sigmask) == sizeof(*sigmask), "");
   if (sigmask) {
     attr->__havesigmask = true;
-    memcpy(attr->__sigmask, sigmask, sizeof(*sigmask));
+    attr->__sigmask = *sigmask;
   } else {
     attr->__havesigmask = false;
   }

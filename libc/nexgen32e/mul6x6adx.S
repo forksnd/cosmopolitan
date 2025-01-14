@@ -1,5 +1,5 @@
 /*-*- mode:unix-assembly; indent-tabs-mode:t; tab-width:8; coding:utf-8     -*-│
-│vi: set et ft=asm ts=8 tw=8 fenc=utf-8                                     :vi│
+│ vi: set noet ft=asm ts=8 sw=8 fenc=utf-8                                 :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2021 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -16,7 +16,7 @@
 │ TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR             │
 │ PERFORMANCE OF THIS SOFTWARE.                                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
-#include "libc/macros.internal.h"
+#include "libc/macros.h"
 
 //	Computes 768-bit product of 384-bit and 384-bit numbers.
 //
@@ -32,10 +32,11 @@
 //	@param	rdx is right hand side which must have 4 quadwords
 //	@note	words are host endian while array is little endian
 //	@mayalias
+	.ftrace1
 Mul6x6Adx:
+	.ftrace2
 	push	%rbp
 	mov	%rsp,%rbp
-	.profilable
 	sub	$64,%rsp
 	mov	%r15,-8(%rbp)
 	mov	%r14,-16(%rbp)

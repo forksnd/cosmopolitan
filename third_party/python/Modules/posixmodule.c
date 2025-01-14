@@ -1,10 +1,11 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:4;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=4 sts=4 sw=4 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=4 sts=4 sw=4 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Python 3                                                                     │
 │ https://docs.python.org/3/license.html                                       │
 ╚─────────────────────────────────────────────────────────────────────────────*/
 #define PY_SSIZE_T_CLEAN
+#include "third_party/python/Modules/posixmodule.h"
 #include "libc/assert.h"
 #include "libc/calls/calls.h"
 #include "libc/calls/internal.h"
@@ -21,14 +22,14 @@
 #include "libc/calls/struct/utsname.h"
 #include "libc/calls/struct/winsize.h"
 #include "libc/calls/syscall-sysv.internal.h"
-#include "libc/calls/sysparam.h"
+#include "libc/stdio/sysparam.h"
 #include "libc/calls/termios.h"
 #include "libc/calls/weirdtypes.h"
 #include "libc/dce.h"
 #include "libc/errno.h"
 #include "libc/log/log.h"
 #include "libc/mem/alg.h"
-#include "libc/mem/gc.internal.h"
+#include "libc/mem/gc.h"
 #include "libc/nt/createfile.h"
 #include "libc/nt/dll.h"
 #include "libc/nt/enum/creationdisposition.h"
@@ -36,7 +37,7 @@
 #include "libc/nt/enum/sw.h"
 #include "libc/nt/files.h"
 #include "libc/nt/runtime.h"
-#include "libc/runtime/dlfcn.h"
+#include "libc/dlopen/dlfcn.h"
 #include "libc/runtime/pathconf.h"
 #include "libc/runtime/sysconf.h"
 #include "libc/sock/sendfile.internal.h"
@@ -56,11 +57,12 @@
 #include "libc/sysv/consts/sf.h"
 #include "libc/sysv/consts/sicode.h"
 #include "libc/sysv/consts/st.h"
+#include "libc/sysv/consts/termios.h"
 #include "libc/sysv/consts/w.h"
 #include "libc/sysv/consts/waitid.h"
 #include "libc/sysv/errfuns.h"
-#include "libc/time/struct/utimbuf.h"
-#include "libc/time/time.h"
+#include "libc/utime.h"
+#include "libc/time.h"
 #include "libc/x/x.h"
 #include "third_party/musl/lockf.h"
 #include "third_party/musl/passwd.h"
@@ -87,9 +89,8 @@
 #include "third_party/python/Include/warnings.h"
 #include "third_party/python/Include/yoink.h"
 #include "third_party/python/Modules/_multiprocessing/multiprocessing.h"
-#include "third_party/python/Modules/posixmodule.h"
+#include "libc/unistd.h"
 #include "third_party/python/pyconfig.h"
-/* clang-format off */
 
 PYTHON_PROVIDE("posix");
 PYTHON_PROVIDE("posix._getfinalpathname");
@@ -10477,7 +10478,7 @@ get_terminal_size(PyObject *self, PyObject *args)
      */
     if (!PyArg_ParseTuple(args, "|i", &fd))
         return NULL;
-    if (ioctl(fd, TIOCGWINSZ, &w))
+    if (tcgetwinsize(fd, &w))
         return PyErr_SetFromErrno(PyExc_OSError);
     columns = w.ws_col;
     lines = w.ws_row;
@@ -10508,7 +10509,7 @@ os_cpu_count_impl(PyObject *module)
 /*[clinic end generated code: output=5fc29463c3936a9c input=e7c8f4ba6dbbadd3]*/
 {
     int ncpu;
-    ncpu = _getcpucount();
+    ncpu = __get_cpu_count();
     if (ncpu >= 1)
         return PyLong_FromLong(ncpu);
     else

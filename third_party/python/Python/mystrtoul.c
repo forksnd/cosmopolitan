@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:4;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=4 sts=4 sw=4 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=4 sts=4 sw=4 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Python 3                                                                     │
 │ https://docs.python.org/3/license.html                                       │
@@ -10,7 +10,6 @@
 #include "third_party/python/Include/pyctype.h"
 #include "third_party/python/Include/pymacro.h"
 #include "third_party/python/pyconfig.h"
-/* clang-format off */
 
 /* Static overflow check values for bases 2 through 36.
  * smallmax[base] is the largest unsigned long i such that

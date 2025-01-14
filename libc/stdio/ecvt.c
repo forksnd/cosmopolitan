@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:t;c-basic-offset:8;tab-width:8;coding:utf-8   -*-│
-│vi: set et ft=c ts=8 tw=8 fenc=utf-8                                       :vi│
+│ vi: set noet ft=c ts=8 sw=8 fenc=utf-8                                   :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ $OpenBSD: ecvt.c,v 1.11 2019/01/25 00:19:25 millert Exp $                    │
 │                                                                              │
@@ -22,16 +22,15 @@
 │ Materiel Command, USAF, under agreement number F39502-99-1-0512.             │
 │ SUCH DAMAGE.                                                                 │
 ╚─────────────────────────────────────────────────────────────────────────────*/
-#include "libc/fmt/fmt.h"
+#include "libc/math.h"
 #include "libc/mem/mem.h"
 #include "libc/runtime/runtime.h"
 #include "libc/str/str.h"
 #include "third_party/gdtoa/gdtoa.h"
 
-asm(".ident\t\"\\n\\n\
-OpenBSD ecvt/gcvt (MIT)\\n\
-Copyright (c) 2002, 2006, 2010 Todd C. Miller <millert@openbsd.org>\"");
-asm(".include \"libc/disclaimer.inc\"");
+__notice(ecvt_notice, "\
+OpenBSD ecvt (MIT)\n\
+Copyright (c) 2002, 2006, 2010 Todd C. Miller <millert@openbsd.org>");
 // clang-format off
 
 static char *s;
@@ -43,7 +42,7 @@ __cvt_atexit(void)
 	s = 0;
 }
 
-static void __attribute__((__constructor__))
+static __attribute__((__constructor__(60))) textstartup void
 __cvt_init(void)
 {
 	atexit(__cvt_atexit);
@@ -55,8 +54,11 @@ __cvt(double value, int ndigit, int *decpt, int *sign, int fmode, int pad)
 	char *p, *rve, c;
 	size_t siz;
 
-	if (ndigit == 0) {
-		*sign = value < 0.0;
+	// Note that we exclude the case of fmode here, since for fcvt having
+	// `ndigit == 0` just means we have to output 0 digits *after* the radix
+	// character
+	if (ndigit == 0 && !fmode) {
+		*sign = signbit(value);
 		*decpt = 0;
 		return ("");
 	}
@@ -73,10 +75,12 @@ __cvt(double value, int ndigit, int *decpt, int *sign, int fmode, int pad)
 	/* __dtoa() doesn't allocate space for 0 so we do it by hand */
 	if (value == 0.0) {
 		*decpt = 1 - fmode;	/* 1 for 'e', 0 for 'f' */
-		*sign = 0;
+		*sign = signbit(value);
 		if ((rve = s = malloc(siz)) == NULL)
 			return(NULL);
-		*rve++ = '0';
+		// handle fcvt(0, 0, ...) by returning ""
+		if (siz > 1)
+			*rve++ = '0';
 		*rve = '\0';
 	} else {
 		p = dtoa(value, fmode + 2, ndigit, decpt, sign, &rve);

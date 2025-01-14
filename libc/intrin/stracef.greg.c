@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2021 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -16,18 +16,28 @@
 │ TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR             │
 │ PERFORMANCE OF THIS SOFTWARE.                                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
+#include "libc/dce.h"
+#include "libc/intrin/describebacktrace.h"
 #include "libc/intrin/kprintf.h"
-#include "libc/intrin/strace.internal.h"
+#include "libc/intrin/strace.h"
 #include "libc/runtime/runtime.h"
-#include "libc/thread/tls2.h"
 
-privileged void __stracef(const char *fmt, ...) {
+dontinstrument void __stracef(const char *fmt, ...) {
   va_list v;
-  if (__strace <= 0 ||
-      (__tls_enabled && __get_tls_privileged()->tib_strace <= 0)) {
+  if (strace_enabled(0) <= 0)
     return;
-  }
   va_start(v, fmt);
   kvprintf(fmt, v);
   va_end(v);
 }
+
+#if IsModeDbg()
+void report_cancellation_point(void) {
+  kprintf("error: cancelable raw system call not annotated in wrapper\n"
+          "choice #1 use BLOCK_CANCELATION / ALLOW_CANCELATION\n"
+          "choice #2 use BEGIN_CANCELATION_POINT / END_CANCELATION_POINT\n"
+          "backtrace: %s\n",
+          DescribeBacktrace(__builtin_frame_address(0)));
+  __builtin_trap();
+}
+#endif

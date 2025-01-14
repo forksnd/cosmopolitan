@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2022 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -16,26 +16,22 @@
 │ TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR             │
 │ PERFORMANCE OF THIS SOFTWARE.                                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
-#include "libc/calls/syscall_support-nt.internal.h"
-#include "libc/intrin/describeflags.internal.h"
-#include "libc/intrin/strace.internal.h"
-#include "libc/nt/enum/fileflagandattributes.h"
+#include "libc/intrin/describeflags.h"
+#include "libc/intrin/strace.h"
 #include "libc/nt/files.h"
+#include "libc/nt/runtime.h"
 #include "libc/nt/thunk/msabi.h"
 
 __msabi extern typeof(GetFileAttributes) *const __imp_GetFileAttributesW;
 
 /**
  * Gets file info on the New Technology.
- *
  * @return handle, or -1u on failure
- * @note this wrapper takes care of ABI, STRACE(), and __winerr()
  */
 textwindows uint32_t GetFileAttributes(const char16_t *lpPathName) {
   uint32_t flags;
   flags = __imp_GetFileAttributesW(lpPathName);
-  if (flags == -1u) __winerr();
-  NTTRACE("GetFileAttributes(%#hs) → %s% m", lpPathName,
-          DescribeNtFileFlagAttr(flags));
+  NTTRACE("GetFileAttributes(%#hs) → {%s, %d}", lpPathName,
+          DescribeNtFileFlagAttr(flags), GetLastError());
   return flags;
 }

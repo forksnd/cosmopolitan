@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2020 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -38,7 +38,6 @@
  *
  * @return process id (always successful)
  * @asyncsignalsafe
- * @threadsafe
  * @vforksafe
  */
 int getpid(void) {
@@ -48,19 +47,7 @@ int getpid(void) {
   } else if (!__vforked) {
     rc = __pid;
   } else {
-#ifdef __x86_64__
     rc = sys_getpid().ax;
-#elif defined(__aarch64__)
-    register long res_x0 asm("x0");
-    asm volatile("mov\tx8,%1\n\t"
-                 "svc\t0"
-                 : "=r"(res_x0)
-                 : "i"(172)
-                 : "x8", "memory");
-    rc = res_x0;
-#else
-#error "arch unsupported"
-#endif
   }
   return rc;
 }

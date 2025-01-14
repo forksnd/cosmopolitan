@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2022 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -31,8 +31,8 @@ int wmemcmp(const wchar_t *a, const wchar_t *b, size_t n) {
   size_t i;
   for (i = 0; i < n; ++i) {
     if (a[i] != b[i]) {
-      return a[i] - b[i];
+      break;
     }
   }
-  return 0;
+  return i < n ? (a[i] > b[i]) - (a[i] < b[i]) : 0;
 }

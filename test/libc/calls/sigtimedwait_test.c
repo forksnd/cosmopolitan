@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2022 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -16,8 +16,9 @@
 │ TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR             │
 │ PERFORMANCE OF THIS SOFTWARE.                                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
-#include "libc/calls/calls.h"
 #include "libc/calls/sigtimedwait.h"
+#include "libc/atomic.h"
+#include "libc/calls/calls.h"
 #include "libc/calls/struct/siginfo.h"
 #include "libc/calls/struct/siginfo.internal.h"
 #include "libc/calls/struct/sigset.h"
@@ -28,16 +29,15 @@
 #include "libc/sysv/consts/sicode.h"
 #include "libc/sysv/consts/sig.h"
 #include "libc/testlib/testlib.h"
+#include "libc/thread/thread.h"
 
 void SetUp(void) {
-  if (IsXnu()) exit(0);
-  if (IsMetal()) exit(0);
-  if (IsWindows()) exit(0);
-  if (IsOpenbsd()) exit(0);
-}
-
-TEST(sigtimedwait, nullSet_efault) {
-  ASSERT_SYS(EFAULT, -1, sigtimedwait(0, 0, 0));
+  if (IsXnu())
+    exit(0);
+  if (IsMetal())
+    exit(0);
+  if (IsOpenbsd())
+    exit(0);
 }
 
 TEST(sigtimedwait, emptySet_timesOut) {
@@ -52,24 +52,28 @@ TEST(sigtimedwait, badTimestamp_einval) {
   ASSERT_SYS(EINVAL, -1, sigtimedwait(&ss, 0, &ts));
 }
 
-TEST(sigtimedwait, test) {
-  int pid, ws;
+atomic_bool g_ready;
+
+void *worker(void *arg) {
+  sigset_t ss;
   siginfo_t info;
-  sigset_t ss, oldss;
-  struct timespec ts = {1, 0};
-  sigemptyset(&ss);
-  sigaddset(&ss, SIGUSR1);
-  ASSERT_SYS(0, 0, sigprocmask(SIG_BLOCK, &ss, &oldss));
-  ASSERT_NE(-1, (pid = fork()));
-  if (!pid) {
-    ASSERT_SYS(0, SIGUSR1, sigtimedwait(&ss, &info, &ts));
-    ASSERT_EQ(SIGUSR1, info.si_signo);
-    ASSERT_EQ(SI_USER, info.si_code);
-    ASSERT_EQ(getuid(), info.si_uid);
-    _Exit(0);
-  }
-  ASSERT_SYS(0, 0, kill(pid, SIGUSR1));
-  ASSERT_SYS(0, pid, wait(&ws));
-  ASSERT_EQ(0, ws);
-  ASSERT_SYS(0, 0, sigprocmask(SIG_SETMASK, &oldss, 0));
+  ASSERT_EQ(0, sigemptyset(&ss));
+  ASSERT_EQ(0, sigaddset(&ss, SIGUSR1));
+  ASSERT_SYS(0, 0, sigprocmask(SIG_BLOCK, &ss, 0));
+  g_ready = true;
+  ASSERT_SYS(0, SIGUSR1, sigtimedwait(&ss, &info, 0));
+  ASSERT_EQ(SIGUSR1, info.si_signo);
+  ASSERT_EQ(SI_TKILL, info.si_code);
+  ASSERT_EQ(getuid(), info.si_uid);
+  return 0;
+}
+
+TEST(sigtimedwait, test) {
+  pthread_t th;
+  ASSERT_EQ(0, pthread_create(&th, 0, worker, 0));
+  for (;;)
+    if (g_ready)
+      break;
+  ASSERT_EQ(0, pthread_kill(th, SIGUSR1));
+  ASSERT_EQ(0, pthread_join(th, 0));
 }

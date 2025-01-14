@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2020 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -26,9 +26,11 @@
 int main(int argc, char *argv[]) {
   long x, sum = 0;
   if (argc == 2 && !strcmp(argv[1], "-x")) {
-    while (scanf("%lx", &x) > 0) sum += x;
+    while (scanf("%lx", &x) > 0)
+      sum += x;
   } else {
-    while (scanf("%ld", &x) > 0) sum += x;
+    while (scanf("%ld", &x) > 0)
+      sum += x;
   }
   printf("%,ld\n", sum);
   return 0;

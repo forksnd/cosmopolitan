@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2021 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -19,20 +19,20 @@
 #include "libc/calls/struct/stat.h"
 #include "libc/calls/struct/stat.internal.h"
 #include "libc/dce.h"
-#include "libc/intrin/asan.internal.h"
 #include "libc/intrin/kprintf.h"
 
 #define N 300
 
 #define append(...) o += ksnprintf(buf + o, N - o, __VA_ARGS__)
 
-const char *(DescribeStat)(char buf[N], int rc, const struct stat *st) {
+const char *_DescribeStat(char buf[N], int rc, const struct stat *st) {
   int o = 0;
 
-  if (rc == -1) return "n/a";
-  if (!st) return "NULL";
-  if ((!IsAsan() && kisdangerous(st)) ||
-      (IsAsan() && !__asan_is_valid(st, sizeof(*st)))) {
+  if (rc == -1)
+    return "n/a";
+  if (!st)
+    return "NULL";
+  if (kisdangerous(st)) {
     ksnprintf(buf, N, "%p", st);
     return buf;
   }
@@ -60,11 +60,11 @@ const char *(DescribeStat)(char buf[N], int rc, const struct stat *st) {
   }
 
   if (st->st_dev) {
-    append(", .st_%s=%lu", "dev", st->st_dev);
+    append(", .st_%s=%#lx", "dev", st->st_dev);
   }
 
   if (st->st_ino) {
-    append(", .st_%s=%lu", "ino", st->st_ino);
+    append(", .st_%s=%#lx", "ino", st->st_ino);
   }
 
   if (st->st_gen) {
@@ -79,7 +79,7 @@ const char *(DescribeStat)(char buf[N], int rc, const struct stat *st) {
     append(", .st_%s=%'lu", "rdev", st->st_rdev);
   }
 
-  if (st->st_blksize != PAGESIZE) {
+  if (st->st_blksize != 4096) {
     append(", .st_%s=%'lu", "blksize", st->st_blksize);
   }
 

@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2021 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -28,13 +28,15 @@
 int mulaw(int x) {
   int b, i, a, s, l, h;
   a = x < 0 ? (~x >> 2) + 33 : (x >> 2) + 33;
-  if (a > 8191) a = 8191;
+  if (a > 8191)
+    a = 8191;
   i = a >> 6;
   s = i ? (__builtin_clz(i) ^ 31) + 2 : 1;
   h = 8 - s;
   l = (a >> s) & 15;
   l = 15 - l;
   b = (h << 4) | l;
-  if (x >= 0) b |= 128;
+  if (x >= 0)
+    b |= 128;
   return b;
 }

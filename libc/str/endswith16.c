@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2020 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -24,10 +24,11 @@
  * @param s is a NUL-terminated string
  * @param suffix is also NUL-terminated
  */
-bool _endswith16(const char16_t *s, const char16_t *suffix) {
+bool32 endswith16(const char16_t *s, const char16_t *suffix) {
   size_t n, m;
   n = strlen16(s);
   m = strlen16(suffix);
-  if (m > n) return false;
+  if (m > n)
+    return false;
   return memcmp(s + n - m, suffix, m * sizeof(char16_t)) == 0;
 }

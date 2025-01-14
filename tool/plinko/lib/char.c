@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2022 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -24,9 +24,12 @@ pureconst bool IsHex(int c) {
 }
 
 pureconst int GetDiglet(int c) {
-  if (IsDigit(c)) return c - L'0';
-  if (IsUpper(c)) return c - L'A' + 10;
-  if (IsLower(c)) return c - L'a' + 10;
+  if (IsDigit(c))
+    return c - L'0';
+  if (IsUpper(c))
+    return c - L'A' + 10;
+  if (IsLower(c))
+    return c - L'a' + 10;
   return -1;
 }
 

@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2020 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -25,7 +25,7 @@
  * @param sep is a NUL-terminated set of bytes to consider separators
  * @return pointer to next token or NULL for end
  * @see strtok_r() and strsep() for superior functions
- * @notasyncsignalsafe
+ * @threadunsafe
  */
 char *strtok(char *s, const char *sep) {
   static char *state;

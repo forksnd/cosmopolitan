@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2021 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -16,12 +16,25 @@
 │ TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR             │
 │ PERFORMANCE OF THIS SOFTWARE.                                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
+#include "libc/calls/internal.h"
 #include "libc/calls/syscall-sysv.internal.h"
 #include "libc/calls/termios.h"
-#include "libc/sysv/consts/termios.h"
+#include "libc/dce.h"
+#include "libc/intrin/strace.h"
+#include "libc/sysv/errfuns.h"
 
+#define TIOCGSID (IsLinux() ? 0x5429 : 0x40047463)
+
+/**
+ * Returns session id controlling terminal.
+ */
 int tcgetsid(int fd) {
-  int sid;
-  if (sys_ioctl(fd, TIOCGSID, &sid) < 0) return -1;
-  return sid;
+  int rc, sid;
+  if (fd < g_fds.n && g_fds.p[fd].kind == kFdZip) {
+    rc = enotty();
+  } else {
+    rc = sys_ioctl(fd, TIOCGSID, &sid);
+  }
+  STRACE("tcgetsid(%d) → %d% m", fd, rc);
+  return rc != -1 ? sid : -1;
 }

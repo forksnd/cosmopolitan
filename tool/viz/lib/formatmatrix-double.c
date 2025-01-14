@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2020 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -20,8 +20,8 @@
 #include "libc/fmt/conv.h"
 #include "libc/log/check.h"
 #include "libc/math.h"
+#include "libc/mem/gc.h"
 #include "libc/mem/mem.h"
-#include "libc/mem/gc.internal.h"
 #include "libc/x/x.h"
 #include "third_party/gdtoa/gdtoa.h"
 #include "tool/viz/lib/formatstringtable.h"
@@ -30,14 +30,13 @@
 void *ConvertMatrixToStringTable(long yn, long xn, char *T[yn][xn],
                                  const double M[yn][xn], double digs,
                                  double rounder(double)) {
-  double f;
   long y, x;
   assert(yn && xn && !T[0][0]);
   for (y = 0; y < yn; ++y) {
     for (x = 0; x < xn; ++x) {
       T[y][x] = xmalloc(40);
       T[y][x][0] = '\0';
-      g_dfmt_p(T[y][x], &M[y][x], digs, 40, 0);
+      g_dfmt_p(T[y][x], (void *)&M[y][x], digs, 40, 0);
     }
   }
   return T;
@@ -62,7 +61,7 @@ char *StringifyMatrixDouble(long yn, long xn, const double M[yn][xn],
                             const char *param2, const char *param3, double digs,
                             double rounder(double)) {
   struct StringBuilder *sb = NewStringBuilder();
-  FormatMatrixDouble(yn, xn, M, StringBuilderAppend, sb, formatter, param1,
-                     param2, param3, digs, rounder);
+  FormatMatrixDouble(yn, xn, M, (void *)StringBuilderAppend, sb, formatter,
+                     param1, param2, param3, digs, rounder);
   return FreeStringBuilder(sb);
 }

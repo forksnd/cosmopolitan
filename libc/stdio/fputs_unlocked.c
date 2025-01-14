@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=8 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=8 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2020 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -34,6 +34,7 @@ int fputs_unlocked(const char *s, FILE *f) {
   size_t n, r;
   n = strlen(s);
   r = fwrite_unlocked(s, 1, n, f);
-  if (!r && n) return -1;
+  if (!r && n)
+    return -1;
   return r;
 }

@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:4;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=4 sts=4 sw=4 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=4 sts=4 sw=4 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Python 3                                                                     │
 │ https://docs.python.org/3/license.html                                       │
@@ -7,14 +7,11 @@
 #include "libc/calls/calls.h"
 #include "libc/dce.h"
 #include "libc/errno.h"
+#include "libc/mem/gc.h"
 #include "libc/mem/mem.h"
-#include "libc/nt/efi.h"
-#include "libc/mem/gc.internal.h"
-#include "libc/sock/epoll.h"
 #include "libc/sock/select.h"
 #include "libc/sock/sock.h"
 #include "libc/sock/struct/pollfd.h"
-#include "libc/sysv/consts/epoll.h"
 #include "libc/sysv/consts/poll.h"
 #include "third_party/python/Include/abstract.h"
 #include "third_party/python/Include/boolobject.h"
@@ -33,24 +30,8 @@
 #include "third_party/python/Include/structmember.h"
 #include "third_party/python/Include/yoink.h"
 #include "third_party/python/pyconfig.h"
-/* clang-format off */
 
 PYTHON_PROVIDE("select");
-PYTHON_PROVIDE("select.EPOLLERR");
-PYTHON_PROVIDE("select.EPOLLET");
-PYTHON_PROVIDE("select.EPOLLEXCLUSIVE");
-PYTHON_PROVIDE("select.EPOLLHUP");
-PYTHON_PROVIDE("select.EPOLLIN");
-PYTHON_PROVIDE("select.EPOLLMSG");
-PYTHON_PROVIDE("select.EPOLLONESHOT");
-PYTHON_PROVIDE("select.EPOLLOUT");
-PYTHON_PROVIDE("select.EPOLLPRI");
-PYTHON_PROVIDE("select.EPOLLRDBAND");
-PYTHON_PROVIDE("select.EPOLLRDHUP");
-PYTHON_PROVIDE("select.EPOLLRDNORM");
-PYTHON_PROVIDE("select.EPOLLWRBAND");
-PYTHON_PROVIDE("select.EPOLLWRNORM");
-PYTHON_PROVIDE("select.EPOLL_CLOEXEC");
 PYTHON_PROVIDE("select.POLLERR");
 PYTHON_PROVIDE("select.POLLHUP");
 PYTHON_PROVIDE("select.POLLIN");
@@ -62,7 +43,6 @@ PYTHON_PROVIDE("select.POLLRDHUP");
 PYTHON_PROVIDE("select.POLLRDNORM");
 PYTHON_PROVIDE("select.POLLWRBAND");
 PYTHON_PROVIDE("select.POLLWRNORM");
-PYTHON_PROVIDE("select.epoll");
 PYTHON_PROVIDE("select.error");
 PYTHON_PROVIDE("select.poll");
 PYTHON_PROVIDE("select.select");
@@ -2605,7 +2585,12 @@ PyInit_select(void)
     return m;
 }
 
-_Section(".rodata.pytab.1") const struct _inittab _PyImport_Inittab_select = {
+#ifdef __aarch64__
+_Section(".rodata.pytab.1 //")
+#else
+_Section(".rodata.pytab.1")
+#endif
+ const struct _inittab _PyImport_Inittab_select = {
     "select",
     PyInit_select,
 };

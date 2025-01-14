@@ -35,8 +35,8 @@
 #include "libc/mem/alg.h"
 #include "libc/mem/mem.h"
 #include "libc/str/str.h"
+#include "libc/ctype.h"
 #include "third_party/tr/extern.h"
-// clang-format off
 
 static int	backslash(STR *);
 static int	bracket(STR *);
@@ -295,7 +295,7 @@ backslash(STR *s)
 	size_t i;
 	int ch, val;
 
-	_unassert(*s->str == '\\');
+	unassert(*s->str == '\\');
 	s->str++;
 
 	/* Empty escapes become plain backslashes. */

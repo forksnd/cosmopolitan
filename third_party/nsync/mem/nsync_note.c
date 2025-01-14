@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:t;c-basic-offset:8;tab-width:8;coding:utf-8   -*-│
-│vi: set et ft=c ts=8 tw=8 fenc=utf-8                                       :vi│
+│ vi: set noet ft=c ts=8 sw=8 fenc=utf-8                                   :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2016 Google Inc.                                                   │
 │                                                                              │
@@ -15,22 +15,18 @@
 │ See the License for the specific language governing permissions and          │
 │ limitations under the License.                                               │
 ╚─────────────────────────────────────────────────────────────────────────────*/
+#include "libc/intrin/dll.h"
 #include "libc/mem/mem.h"
 #include "libc/str/str.h"
 #include "third_party/nsync/atomic.h"
+#include "third_party/nsync/time.h"
 #include "third_party/nsync/common.internal.h"
-#include "third_party/nsync/dll.h"
 #include "third_party/nsync/mu_semaphore.h"
 #include "third_party/nsync/mu_wait.h"
 #include "third_party/nsync/races.internal.h"
 #include "third_party/nsync/wait_s.internal.h"
 #include "third_party/nsync/waiter.h"
-
-asm(".ident\t\"\\n\\n\
-*NSYNC (Apache 2.0)\\n\
-Copyright 2016 Google, Inc.\\n\
-https://github.com/google/nsync\"");
-// clang-format off
+__static_yoink("nsync_notice");
 
 /* Locking discipline for the nsync_note implementation:
 
@@ -64,12 +60,12 @@ static void set_expiry_time (nsync_note n, nsync_time t) {
 	n->expiry_time_valid = 1;
 }
 
-/* Return a pointer to the note containing nsync_dll_element_ *e. */
-#define DLL_NOTE(e) ((nsync_note)((e)->container))
+/* Return a pointer to the note containing struct Dll *e. */
+#define DLL_NOTE(e) DLL_CONTAINER(struct nsync_note_s_, parent_child_link, e)
 
 /* Return whether n->children is empty.  Assumes n->note_mu held. */
 static int no_children (const void *v) {
-	return (nsync_dll_is_empty_ (((nsync_note)v)->children));
+	return (dll_is_empty (((nsync_note)v)->children));
 }
 
 #define WAIT_FOR_NO_CHILDREN(pred_, n_) nsync_mu_wait (&(n_)->note_mu, &pred_, (n_), NULL)
@@ -91,18 +87,18 @@ static void note_notify_child (nsync_note n, nsync_note parent) {
 	nsync_time t;
 	t = NOTIFIED_TIME (n);
 	if (nsync_time_cmp (t, nsync_time_zero) > 0) {
-		nsync_dll_element_ *p;
-		nsync_dll_element_ *next;
+		struct Dll *p;
+		struct Dll *next;
 		ATM_STORE_REL (&n->notified, 1);
-		while ((p = nsync_dll_first_ (n->waiters)) != NULL) {
+		while ((p = dll_first (n->waiters)) != NULL) {
 			struct nsync_waiter_s *nw = DLL_NSYNC_WAITER (p);
-			n->waiters = nsync_dll_remove_ (n->waiters, p);
+			dll_remove (&n->waiters, p);
 			ATM_STORE_REL (&nw->waiting, 0);
 			nsync_mu_semaphore_v (nw->sem);
 		}
-		for (p = nsync_dll_first_ (n->children); p != NULL; p = next) {
+		for (p = dll_first (n->children); p != NULL; p = next) {
 			nsync_note child = DLL_NOTE (p);
-			next = nsync_dll_next_ (n->children, p);
+			next = dll_next (n->children, p);
 			nsync_mu_lock (&child->note_mu);
 			if (child->disconnecting == 0) {
 				note_notify_child (child, n);
@@ -111,8 +107,7 @@ static void note_notify_child (nsync_note n, nsync_note parent) {
 		}
 		WAIT_FOR_NO_CHILDREN (no_children, n);
 		if (parent != NULL) {
-			parent->children = nsync_dll_remove_ (parent->children,
-						              &n->parent_child_link);
+			dll_remove (&parent->children, &n->parent_child_link);
 			WAKEUP_NO_CHILDREN (parent);
 			n->parent = NULL;
 		}
@@ -157,7 +152,7 @@ nsync_time nsync_note_notified_deadline_ (nsync_note n) {
 		ntime = NOTIFIED_TIME (n);
 		nsync_mu_unlock (&n->note_mu);
 		if (nsync_time_cmp (ntime, nsync_time_zero) > 0) {
-			if (nsync_time_cmp (ntime, nsync_time_now ()) <= 0) {
+			if (nsync_time_cmp (ntime, nsync_time_now (n->clock)) <= 0) {
 				notify (n);
 				ntime = nsync_time_zero;
 			}
@@ -174,12 +169,13 @@ int nsync_note_is_notified (nsync_note n) {
 	return (result);
 }
 
-nsync_note nsync_note_new (nsync_note parent,
+nsync_note nsync_note_new (nsync_note parent, int clock,
 			   nsync_time abs_deadline) {
 	nsync_note n = (nsync_note) malloc (sizeof (*n));
 	if (n != NULL) {
-		memset ((void *) n, 0, sizeof (*n));
-		nsync_dll_init_ (&n->parent_child_link, n);
+		bzero (n, sizeof (*n));
+		n->clock = clock;
+		dll_init (&n->parent_child_link);
 		set_expiry_time (n, abs_deadline);
 		if (!nsync_note_is_notified (n) && parent != NULL) {
 			nsync_time parent_time;
@@ -190,8 +186,8 @@ nsync_note nsync_note_new (nsync_note parent,
 			}
 			if (nsync_time_cmp (parent_time, nsync_time_zero) > 0) {
 				n->parent = parent;
-				parent->children = nsync_dll_make_last_in_list_ (parent->children,
-					&n->parent_child_link);
+				dll_make_last (&parent->children,
+					       &n->parent_child_link);
 			}
 			nsync_mu_unlock (&parent->note_mu);
 		}
@@ -201,28 +197,27 @@ nsync_note nsync_note_new (nsync_note parent,
 
 void nsync_note_free (nsync_note n) {
 	nsync_note parent;
-	nsync_dll_element_ *p;
-	nsync_dll_element_ *next;
+	struct Dll *p;
+	struct Dll *next;
 	nsync_mu_lock (&n->note_mu);
 	n->disconnecting++;
-	ASSERT (nsync_dll_is_empty_ (n->waiters));
+	ASSERT (dll_is_empty (n->waiters));
 	parent = n->parent;
 	if (parent != NULL && !nsync_mu_trylock (&parent->note_mu)) {
 		nsync_mu_unlock (&n->note_mu);
 		nsync_mu_lock (&parent->note_mu);
 		nsync_mu_lock (&n->note_mu);
 	}
-	for (p = nsync_dll_first_ (n->children); p != NULL; p = next) {
+	for (p = dll_first (n->children); p != NULL; p = next) {
 		nsync_note child = DLL_NOTE (p);
-		next = nsync_dll_next_ (n->children, p);
+		next = dll_next (n->children, p);
 		nsync_mu_lock (&child->note_mu);
 		if (child->disconnecting == 0) {
-			n->children = nsync_dll_remove_ (n->children,
-							 &child->parent_child_link);
+			dll_remove (&n->children, &child->parent_child_link);
 			if (parent != NULL) {
 				child->parent = parent;
-				parent->children = nsync_dll_make_last_in_list_ (
-					parent->children, &child->parent_child_link);
+				dll_make_last (&parent->children,
+					       &child->parent_child_link);
 			} else {
 				child->parent = NULL;
 			}
@@ -231,8 +226,7 @@ void nsync_note_free (nsync_note n) {
 	}
 	WAIT_FOR_NO_CHILDREN (no_children, n);
 	if (parent != NULL) {
-		parent->children = nsync_dll_remove_ (parent->children,
-						      &n->parent_child_link);
+		dll_remove (&parent->children, &n->parent_child_link);
 		WAKEUP_NO_CHILDREN (parent);
 		n->parent = NULL;
 		nsync_mu_unlock (&parent->note_mu);
@@ -255,7 +249,7 @@ int nsync_note_wait (nsync_note n, nsync_time abs_deadline) {
 	struct nsync_waitable_s *pwaitable = &waitable;
 	waitable.v = n;
 	waitable.funcs = &nsync_note_waitable_funcs;
-	return (nsync_wait_n (NULL, NULL, NULL, abs_deadline, 1, &pwaitable) == 0);
+	return (nsync_wait_n (NULL, NULL, NULL, n->clock, abs_deadline, 1, &pwaitable) == 0);
 }
 
 nsync_time nsync_note_expiry (nsync_note n) {
@@ -273,7 +267,7 @@ static int note_enqueue (void *v, struct nsync_waiter_s *nw) {
 	nsync_mu_lock (&n->note_mu);
 	ntime = NOTIFIED_TIME (n);
 	if (nsync_time_cmp (ntime, nsync_time_zero) > 0) {
-		n->waiters = nsync_dll_make_last_in_list_ (n->waiters, &nw->q);
+		dll_make_last (&n->waiters, &nw->q);
 		ATM_STORE (&nw->waiting, 1);
 		waiting = 1;
 	} else {
@@ -292,7 +286,7 @@ static int note_dequeue (void *v, struct nsync_waiter_s *nw) {
 	nsync_mu_lock (&n->note_mu);
 	ntime = NOTIFIED_TIME (n);
 	if (nsync_time_cmp (ntime, nsync_time_zero) > 0) {
-		n->waiters = nsync_dll_remove_ (n->waiters, &nw->q);
+		dll_remove (&n->waiters, &nw->q);
 		ATM_STORE (&nw->waiting, 0);
 		was_queued = 1;
 	}

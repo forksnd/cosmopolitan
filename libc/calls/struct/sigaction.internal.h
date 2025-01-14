@@ -3,7 +3,6 @@
 #include "libc/calls/struct/sigaction.h"
 #include "libc/calls/struct/siginfo.h"
 #include "libc/mem/alloca.h"
-#if !(__ASSEMBLER__ + __LINKER__ + 0)
 COSMOPOLITAN_C_START_
 
 struct sigaction_linux {
@@ -31,6 +30,12 @@ struct sigaction_netbsd {
   uint32_t sa_flags;
 };
 
+struct sigaction_silicon {
+  void *sa_handler;
+  uint32_t sa_mask[1];
+  uint32_t sa_flags;
+};
+
 struct sigaction_xnu_in {
   void *sa_handler;
   void *sa_restorer;
@@ -50,19 +55,21 @@ union metasigaction {
   struct sigaction_freebsd freebsd;
   struct sigaction_openbsd openbsd;
   struct sigaction_netbsd netbsd;
+  struct sigaction_silicon silicon;
   struct sigaction_xnu_in xnu_in;
   struct sigaction_xnu_out xnu_out;
 };
 
-void __sigenter_xnu(int, struct siginfo *, void *) _Hide;
-void __sigenter_wsl(int, struct siginfo *, void *) _Hide;
-void __sigenter_netbsd(int, struct siginfo *, void *) _Hide;
-void __sigenter_freebsd(int, struct siginfo *, void *) _Hide;
-void __sigenter_openbsd(int, struct siginfo *, void *) _Hide;
+void __sigenter_xnu(int, siginfo_t *, void *);
+void __sigenter_wsl(int, siginfo_t *, void *);
+void __sigenter_netbsd(int, siginfo_t *, void *);
+void __sigenter_freebsd(int, siginfo_t *, void *);
+void __sigenter_openbsd(int, siginfo_t *, void *);
 
-const char *DescribeSigaction(char[256], int, const struct sigaction *);
-#define DescribeSigaction(rc, sa) DescribeSigaction(alloca(256), rc, sa)
+const char *_DescribeSigaction(char[256], int, const struct sigaction *);
+#define DescribeSigaction(rc, sa) _DescribeSigaction(alloca(256), rc, sa)
+
+void _init_onntconsoleevent(void);
 
 COSMOPOLITAN_C_END_
-#endif /* !(__ASSEMBLER__ + __LINKER__ + 0) */
 #endif /* COSMOPOLITAN_LIBC_CALLS_STRUCT_SIGACTION_INTERNAL_H_ */

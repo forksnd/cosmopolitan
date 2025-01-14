@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2022 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -18,16 +18,20 @@
 ╚─────────────────────────────────────────────────────────────────────────────*/
 #include "libc/calls/syscall-sysv.internal.h"
 #include "libc/dce.h"
+#include "libc/intrin/kprintf.h"
 #include "libc/nt/thread.h"
 #include "libc/nt/thunk/msabi.h"
 #include "libc/runtime/internal.h"
 
 __msabi extern typeof(GetCurrentThreadId) *const __imp_GetCurrentThreadId;
 
-privileged int sys_gettid(void) {
+// it's important that this be noinstrument because the child process
+// created by fork() needs to update this value quickly, since ftrace
+// will deadlock __maps_lock() if the wrong tid is accidentally used.
+dontinstrument int sys_gettid(void) {
+  int64_t wut;
 #ifdef __x86_64__
   int tid;
-  int64_t wut;
   if (IsWindows()) {
     tid = __imp_GetCurrentThreadId();
   } else if (IsLinux()) {
@@ -63,13 +67,26 @@ privileged int sys_gettid(void) {
   }
   return tid;
 #elif defined(__aarch64__)
-  register long res_x0 asm("x0");
-  asm volatile("mov\tx8,%1\n\t"
-               "svc\t0"
-               : "=r"(res_x0)
-               : "i"(178)
-               : "x8", "memory");
-  return res_x0;
+  // this can't be used on xnu
+  register long res asm("x0");
+  if (IsLinux()) {
+    asm volatile("mov\tx8,%1\n\t"
+                 "svc\t0"
+                 : "=r"(res)
+                 : "i"(178)
+                 : "x8", "memory");
+  } else if (IsFreebsd()) {
+    res = (long)&wut;
+    asm volatile("mov\tx8,%2\n\t"
+                 "svc\t0"
+                 : "+r"(res), "=m"(wut)
+                 : "i"(432)  // thr_self()
+                 : "x8", "memory");
+    res = wut;
+  } else {
+    res = __pid;
+  }
+  return res;
 #else
 #error "arch unsupported"
 #endif

@@ -1,5 +1,5 @@
 /*-*- mode:unix-assembly; indent-tabs-mode:t; tab-width:8; coding:utf-8     -*-│
-│vi: set et ft=asm ts=8 tw=8 fenc=utf-8                                     :vi│
+│ vi: set noet ft=asm ts=8 sw=8 fenc=utf-8                                 :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2020 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -16,7 +16,7 @@
 │ TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR             │
 │ PERFORMANCE OF THIS SOFTWARE.                                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
-#include "libc/macros.internal.h"
+#include "libc/macros.h"
 
 //	Duplicates chrominance samples horizontally, e.g.
 //
@@ -27,9 +27,10 @@
 //	@param	%rsi is char[edi/16][16] output and %rsi==%rdx is OK
 //	@param	%rdx is char[edi/16][8] input
 //	@return	%rax is %rsi
+	.ftrace1
 doublechrominance:
+	.ftrace2
 	.leafprologue
-	.profilable
 	shr	$1,%edi			# backwards algorithm
 	jbe	1f			# do nothing if !n || n%2
 	mov	%edi,%ecx

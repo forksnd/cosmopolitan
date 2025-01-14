@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2020 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -18,10 +18,14 @@
 ╚─────────────────────────────────────────────────────────────────────────────*/
 #include "libc/calls/calls.h"
 #include "libc/calls/struct/rlimit.internal.h"
+#include "libc/calls/syscall-sysv.internal.h"
 #include "libc/dce.h"
-#include "libc/intrin/asan.internal.h"
-#include "libc/intrin/describeflags.internal.h"
-#include "libc/intrin/strace.internal.h"
+#include "libc/intrin/describeflags.h"
+#include "libc/intrin/rlimit.h"
+#include "libc/intrin/strace.h"
+#include "libc/runtime/runtime.h"
+#include "libc/runtime/stack.h"
+#include "libc/runtime/syslib.internal.h"
 #include "libc/sysv/consts/rlimit.h"
 #include "libc/sysv/errfuns.h"
 
@@ -37,10 +41,15 @@ int getrlimit(int resource, struct rlimit *rlim) {
   int rc;
   if (resource == 127) {
     rc = einval();
-  } else if (!rlim || (IsAsan() && !__asan_is_valid(rlim, sizeof(*rlim)))) {
+  } else if (!rlim) {
     rc = efault();
+  } else if (IsXnuSilicon()) {
+    rc = _sysret(__syslib->__getrlimit(resource, rlim));
   } else if (!IsWindows()) {
     rc = sys_getrlimit(resource, rlim);
+  } else if (resource == RLIMIT_STACK) {
+    *rlim = __rlimit_stack_get();
+    rc = 0;
   } else if (resource == RLIMIT_AS) {
     rlim->rlim_cur = __virtualmax;
     rlim->rlim_max = __virtualmax;
@@ -52,3 +61,5 @@ int getrlimit(int resource, struct rlimit *rlim) {
          DescribeRlimit(rc, rlim), rc);
   return rc;
 }
+
+__weak_reference(getrlimit, getrlimit64);

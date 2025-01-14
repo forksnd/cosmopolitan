@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2022 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -17,6 +17,7 @@
 │ PERFORMANCE OF THIS SOFTWARE.                                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
 #include "libc/errno.h"
+#include "libc/thread/lock.h"
 #include "libc/thread/thread.h"
 
 /**
@@ -32,7 +33,7 @@ errno_t pthread_mutexattr_setpshared(pthread_mutexattr_t *attr, int pshared) {
   switch (pshared) {
     case PTHREAD_PROCESS_SHARED:
     case PTHREAD_PROCESS_PRIVATE:
-      attr->_pshared = pshared;
+      attr->_word = MUTEX_SET_PSHARED(attr->_word, pshared);
       return 0;
     default:
       return EINVAL;

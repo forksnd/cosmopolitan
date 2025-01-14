@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2020 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -45,6 +45,7 @@ void *unbingbuf(void *buf, size_t size, const char16_t *glyphs, int fill) {
     *p = (b = unbing(*glyphs)) & 0xff;
     /* DCHECK_NE(-1, b, "%`'hc ∉ IBMCP437\n", *glyphs); */
   }
-  if (fill != -1) memset(p, fill, pe - p);
+  if (fill != -1)
+    memset(p, fill, pe - p);
   return buf;
 }

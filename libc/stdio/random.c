@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╚──────────────────────────────────────────────────────────────────────────────╝
 │                                                                              │
 │  Musl Libc                                                                   │
@@ -26,11 +26,7 @@
 │                                                                              │
 ╚─────────────────────────────────────────────────────────────────────────────*/
 #include "libc/stdio/rand.h"
-
-asm(".ident\t\"\\n\\n\
-Musl libc (MIT License)\\n\
-Copyright 2005-2014 Rich Felker, et. al.\"");
-asm(".include \"libc/disclaimer.inc\"");
+__static_yoink("musl_libc_notice");
 
 /*
  * this code uses the same lagged fibonacci generator as the
@@ -91,7 +87,8 @@ void srandom(unsigned seed) {
 
 char *initstate(unsigned seed, char *state, size_t size) {
   void *old;
-  if (size < 8) return 0;
+  if (size < 8)
+    return 0;
   old = savestate();
   if (size < 32) {
     n = 0;
@@ -119,10 +116,13 @@ char *setstate(char *state) {
 
 long random(void) {
   long k;
-  if (!n) return (x[0] = lcg31(x[0]));
+  if (!n)
+    return (x[0] = lcg31(x[0]));
   x[i] += x[j];
   k = x[i] >> 1;
-  if (++i == n) i = 0;
-  if (++j == n) j = 0;
+  if (++i == n)
+    i = 0;
+  if (++j == n)
+    j = 0;
   return k;
 }

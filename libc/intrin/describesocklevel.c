@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2022 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -17,21 +17,29 @@
 │ PERFORMANCE OF THIS SOFTWARE.                                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
 #include "libc/fmt/itoa.h"
-#include "libc/intrin/describeflags.internal.h"
+#include "libc/intrin/describeflags.h"
 #include "libc/sysv/consts/sol.h"
-
-#ifdef DescribeSockLevel
-#undef DescribeSockLevel
-#endif
 
 /**
  * Describes setsockopt() level arguments.
  */
-const char *DescribeSockLevel(char buf[12], int x) {
-  if (x == SOL_IP) return "SOL_IP";
-  if (x == SOL_TCP) return "SOL_TCP";
-  if (x == SOL_UDP) return "SOL_UDP";
-  if (x == SOL_SOCKET) return "SOL_SOCKET";
+const char *_DescribeSockLevel(char buf[12], int x) {
+  if (x == SOL_SOCKET)
+    return "SOL_SOCKET";
+  if (x == SOL_IP)
+    return "SOL_IP";
+  if (x == SOL_ICMP)
+    return "SOL_ICMP";
+  if (x == SOL_TCP)
+    return "SOL_TCP";
+  if (x == SOL_UDP)
+    return "SOL_UDP";
+  if (x == SOL_IPV6)
+    return "SOL_IPV6";
+  if (x == SOL_ICMPV6)
+    return "SOL_ICMPV6";
+  if (x == SOL_RAW)
+    return "SOL_RAW";
   FormatInt32(buf, x);
   return buf;
 }

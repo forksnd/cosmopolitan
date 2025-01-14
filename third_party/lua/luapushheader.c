@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2022 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -22,7 +22,7 @@
 #include "third_party/lua/lauxlib.h"
 #include "third_party/lua/lua.h"
 
-int LuaPushHeader(lua_State *L, struct HttpMessage *m, char *b, int h) {
+int LuaPushHeader(lua_State *L, struct HttpMessage *m, const char *b, int h) {
   char *val;
   size_t vallen;
   if (!kHttpRepeatable[h]) {

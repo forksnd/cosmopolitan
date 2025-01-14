@@ -33,6 +33,8 @@
 #define _SC_VERSION                      29
 #define _SC_PAGE_SIZE                    30
 #define _SC_PAGESIZE                     30 /* !! */
+#define _SC_GRAN_SIZE                    3000
+#define _SC_GRANSIZE                     3000
 #define _SC_RTSIG_MAX                    31
 #define _SC_SEM_NSEMS_MAX                32
 #define _SC_SEM_VALUE_MAX                33
@@ -142,12 +144,12 @@
 #define _SC_XOPEN_STREAMS                246
 #define _SC_THREAD_ROBUST_PRIO_INHERIT   247
 #define _SC_THREAD_ROBUST_PRIO_PROTECT   248
+#define _SC_SIGSTKSZ                     249
+#define _SC_MINSIGSTKSZ                  250
 
-#if !(__ASSEMBLER__ + __LINKER__ + 0)
 COSMOPOLITAN_C_START_
 
 long sysconf(int);
 
 COSMOPOLITAN_C_END_
-#endif /* !(__ASSEMBLER__ + __LINKER__ + 0) */
 #endif /* COSMOPOLITAN_LIBC_RUNTIME_SYSCONF_H_ */

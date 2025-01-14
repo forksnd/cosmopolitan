@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:t;c-basic-offset:8;tab-width:8;coding:utf-8   -*-│
-│vi: set et ft=c ts=8 tw=8 fenc=utf-8                                       :vi│
+│ vi: set noet ft=c ts=8 sw=8 fenc=utf-8                                   :vi │
 ╚──────────────────────────────────────────────────────────────────────────────╝
 │                                                                              │
 │  Musl Libc                                                                   │
@@ -25,22 +25,17 @@
 │  SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.                      │
 │                                                                              │
 ╚─────────────────────────────────────────────────────────────────────────────*/
-#include "libc/str/str.h"
 #include "third_party/musl/rand48.h"
-
-asm(".ident\t\"\\n\\n\
-Musl libc (MIT License)\\n\
-Copyright 2005-2014 Rich Felker, et. al.\"");
-asm(".include \"libc/disclaimer.inc\"");
-// clang-format off
+#include "libc/str/str.h"
+__static_yoink("musl_libc_notice");
 
 static unsigned short __seed48[7] = { 0, 0, 0, 0xe66d, 0xdeec, 0x5, 0xb };
 
 static uint64_t __rand48_step(unsigned short *xi, unsigned short *lc)
 {
 	uint64_t a, x;
-	x = xi[0] | xi[1]+0U<<16 | xi[2]+0ULL<<32;
-	a = lc[0] | lc[1]+0U<<16 | lc[2]+0ULL<<32;
+	x = xi[0] | (xi[1]+0U)<<16 | (xi[2]+0ULL)<<32;
+	a = lc[0] | (lc[1]+0U)<<16 | (lc[2]+0ULL)<<32;
 	x = a*x + lc[3];
 	xi[0] = x;
 	xi[1] = x>>16;
@@ -87,7 +82,7 @@ long mrand48(void)
 	return jrand48(__seed48);
 }
 
-unsigned short *seed48(unsigned short *s)
+unsigned short *seed48(unsigned short s[3])
 {
 	static unsigned short p[3];
 	memcpy(p, __seed48, sizeof p);

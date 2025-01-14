@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2020 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -68,7 +68,8 @@ ssize_t readansi(int fd, char *p, size_t n) {
   e = errno;
   t = kAscii;
   x = i = j = 0;
-  if (n) p[0] = 0;
+  if (n)
+    p[0] = 0;
   do {
     for (;;) {
       if (n) {
@@ -102,7 +103,8 @@ ssize_t readansi(int fd, char *p, size_t n) {
     ++i;
     switch (t) {
     Whoopsie:
-      if (n) p[0] = c;
+      if (n)
+        p[0] = c;
       t = kAscii;
       i = 1;
         /* fallthrough */
@@ -255,7 +257,7 @@ ssize_t readansi(int fd, char *p, size_t n) {
         }
         break;
       default:
-        unreachable;
+        __builtin_unreachable();
     }
   } while (t != kDone);
   errno = e;

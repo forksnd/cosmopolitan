@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2022 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -17,6 +17,7 @@
 │ PERFORMANCE OF THIS SOFTWARE.                                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
 #include "libc/str/str.h"
+#include "libc/wctype.h"
 #include "tool/lambda/lib/blc.h"
 
 char GetBit(FILE* f) {
@@ -26,14 +27,16 @@ char GetBit(FILE* f) {
   if (!binary) {
     for (comment = 0;;) {
       c = fgetwc(f);
-      if (c == -1) break;
+      if (c == -1)
+        break;
       if (!comment) {
         fflush(stdout);
         if (c == ';') {
           comment = 1;
         } else if (!iswspace(c) && c != '(' && c != ')' && c != '[' &&
                    c != ']') {
-          if (c != -1) c &= 1;
+          if (c != -1)
+            c &= 1;
           break;
         }
       } else if (c == '\n') {

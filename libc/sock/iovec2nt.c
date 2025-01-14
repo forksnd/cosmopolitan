@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2020 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -16,9 +16,8 @@
 │ TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR             │
 │ PERFORMANCE OF THIS SOFTWARE.                                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
-#include "libc/assert.h"
 #include "libc/calls/struct/iovec.h"
-#include "libc/macros.internal.h"
+#include "libc/macros.h"
 #include "libc/sock/internal.h"
 #include "libc/sysv/consts/iov.h"
 
@@ -30,15 +29,21 @@
  */
 textwindows size_t __iovec2nt(struct NtIovec iovnt[hasatleast 16],
                               const struct iovec *iov, size_t iovlen) {
-  size_t i, limit;
-  for (limit = 0x7ffff000, i = 0; i < MIN(16, iovlen); ++i) {
-    iovnt[i].buf = iov[i].iov_base;
+  size_t i, j, limit = 0x7ffff000;
+  for (j = i = 0; i < iovlen; ++i) {
+    if (!iov[i].iov_len)
+      continue;
+    if (j == 16)
+      break;
+    iovnt[j].buf = iov[i].iov_base;
     if (iov[i].iov_len < limit) {
-      limit -= (iovnt[i].len = iov[i].iov_len);
+      limit -= (iovnt[j].len = iov[i].iov_len);
+      ++j;
     } else {
-      iovnt[i].len = limit;
+      iovnt[j].len = limit;
+      ++j;
       break;
     }
   }
-  return i;
+  return j;
 }

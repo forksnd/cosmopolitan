@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2020 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -24,12 +24,13 @@
 #include "libc/calls/syscall-nt.internal.h"
 #include "libc/calls/syscall-sysv.internal.h"
 #include "libc/dce.h"
-#include "libc/intrin/describeflags.internal.h"
-#include "libc/intrin/strace.internal.h"
+#include "libc/intrin/describeflags.h"
+#include "libc/intrin/strace.h"
 #include "libc/intrin/weaken.h"
+#include "libc/runtime/zipos.internal.h"
+#include "libc/str/str.h"
 #include "libc/sysv/consts/f.h"
 #include "libc/sysv/errfuns.h"
-#include "libc/zipos/zipos.internal.h"
 
 /**
  * Does things with file descriptor, e.g.
@@ -57,6 +58,12 @@
  *     - `F_SETFD` sets `FD_CLOEXEC` status of `arg` file descriptor
  *     - `F_GETFL` returns file descriptor status flags
  *     - `F_SETFL` sets file descriptor status flags
+ *       - `O_NONBLOCK` may be changed
+ *       - `O_APPEND` may be changed
+ *       - `O_DIRECT` may be changed
+ *       - `O_SEQUENTIAL` may be changed (no-op on non-Windows)
+ *       - `O_RANDOM` may be changed (no-op on non-Windows)
+ *       - Other bits (`O_ACCMODE`, `O_CREAT`, etc.) are ignored
  *     - `F_DUPFD` is like dup() but `arg` is a minimum result, e.g. 3
  *     - `F_DUPFD_CLOEXEC` ditto but sets `O_CLOEXEC` on returned fd
  *     - `F_SETLK` for record locking where `arg` is `struct flock *`
@@ -95,7 +102,7 @@
  * @raise EDEADLK if `cmd` was `F_SETLKW` and waiting would deadlock
  * @raise EMFILE if `cmd` is `F_DUPFD` or `F_DUPFD_CLOEXEC` and
  *     `RLIMIT_NOFILE` would be exceeded
- * @cancellationpoint when `cmd` is `F_SETLKW` or `F_OFD_SETLKW`
+ * @cancelationpoint when `cmd` is `F_SETLKW` or `F_OFD_SETLKW`
  * @asyncsignalsafe
  * @restartable
  */
@@ -114,11 +121,15 @@ int fcntl(int fd, int cmd, ...) {
         rc = _weaken(__zipos_fcntl)(fd, cmd, arg);
       } else if (!IsWindows()) {
         if (cmd == F_SETLKW || cmd == F_OFD_SETLKW) {
-          BEGIN_CANCELLATION_POINT;
+          BEGIN_CANCELATION_POINT;
           rc = sys_fcntl(fd, cmd, arg, __sys_fcntl_cp);
-          END_CANCELLATION_POINT;
+          END_CANCELATION_POINT;
         } else {
           rc = sys_fcntl(fd, cmd, arg, __sys_fcntl);
+          if (rc != -1 && (cmd == F_DUPFD || cmd == F_DUPFD_CLOEXEC) &&
+              __isfdkind(rc, kFdZip)) {
+            _weaken(__zipos_postdup)(fd, rc);
+          }
         }
       } else {
         rc = sys_fcntl_nt(fd, cmd, arg);
@@ -130,12 +141,16 @@ int fcntl(int fd, int cmd, ...) {
     rc = ebadf();
   }
 
-#ifdef SYSDEBUG
-  if (cmd == F_GETFD ||         //
-      cmd == F_GETOWN ||        //
-      cmd == F_FULLFSYNC ||     //
-      cmd == F_BARRIERFSYNC ||  //
-      cmd == F_MAXFD) {
+#if SYSDEBUG
+  if (rc != -1 && cmd == F_GETFL) {
+    STRACE("fcntl(%d, F_GETFL) → %s", fd, DescribeOpenFlags(rc));
+  } else if (cmd == F_SETFL) {
+    STRACE("fcntl(%d, F_SETFL, %s) → %d% m", fd, DescribeOpenFlags(arg), rc);
+  } else if (cmd == F_GETFD ||         //
+             cmd == F_GETOWN ||        //
+             cmd == F_FULLFSYNC ||     //
+             cmd == F_BARRIERFSYNC ||  //
+             cmd == F_MAXFD) {
     STRACE("fcntl(%d, %s) → %d% m", fd, DescribeFcntlCmd(cmd), rc);
   } else if (cmd == F_GETFL) {
     STRACE("fcntl(%d, %s) → %s% m", fd, DescribeFcntlCmd(cmd),
@@ -158,7 +173,7 @@ int fcntl(int fd, int cmd, ...) {
     STRACE("fcntl(%d, %s, %s) → %d% m", fd, DescribeFcntlCmd(cmd),
            DescribeDnotifyFlags(arg), rc);
   } else {
-    STRACE("fcntl(%d, %s, %ld) → %#x% m", fd, DescribeFcntlCmd(cmd), arg, rc);
+    STRACE("fcntl(%d, %s, %ld) → %d% m", fd, DescribeFcntlCmd(cmd), arg, rc);
   }
 #endif
 

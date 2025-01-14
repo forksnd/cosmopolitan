@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2021 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -20,7 +20,7 @@
 #include "libc/calls/struct/sigset.h"
 #include "libc/dce.h"
 #include "libc/fmt/conv.h"
-#include "libc/mem/gc.internal.h"
+#include "libc/mem/gc.h"
 #include "libc/runtime/runtime.h"
 #include "libc/sock/goodsocket.internal.h"
 #include "libc/sock/sock.h"
@@ -40,24 +40,26 @@
 #include "libc/x/x.h"
 #include "third_party/regex/regex.h"
 
-STATIC_YOINK("zip_uri_support");
-STATIC_YOINK("o/" MODE "/test/tool/net/redbean-tester.com");
+__static_yoink("zipos");
+__static_yoink("o/" MODE "/test/tool/net/redbean-tester");
 
-char testlib_enable_tmp_setup_teardown_once;
 int port;
 
 void SetUpOnce(void) {
-  if (IsWindows()) return;
   ssize_t n;
   char buf[1024];
   int fdin, fdout;
+  if (IsWindows())
+    return;
+  testlib_enable_tmp_setup_teardown_once();
   ASSERT_NE(-1, mkdir("bin", 0755));
-  ASSERT_NE(-1, (fdin = open("/zip/o/" MODE "/test/tool/net/redbean-tester.com",
+  ASSERT_NE(-1, (fdin = open("/zip/o/" MODE "/test/tool/net/redbean-tester",
                              O_RDONLY)));
-  ASSERT_NE(-1, (fdout = creat("bin/redbean-tester.com", 0755)));
+  ASSERT_NE(-1, (fdout = creat("bin/redbean-tester", 0755)));
   for (;;) {
     ASSERT_NE(-1, (n = read(fdin, buf, sizeof(buf))));
-    if (!n) break;
+    if (!n)
+      break;
     ASSERT_EQ(n, write(fdout, buf, n));
   }
   close(fdout);
@@ -82,7 +84,8 @@ char *SendHttpRequest(const char *s) {
   for (p = 0, n = 0;; n += rc) {
     p = xrealloc(p, n + 512);
     EXPECT_NE(-1, (rc = read(fd, p + n, 512)));
-    if (rc <= 0) break;
+    if (rc <= 0)
+      break;
   }
   p = xrealloc(p, n + 1);
   p[n] = 0;
@@ -101,7 +104,8 @@ bool Matches(const char *regex, const char *str) {
 }
 
 TEST(redbean, testOptions) {
-  if (IsWindows()) return;
+  if (IsWindows())
+    return;
   char portbuf[16];
   int pid, pipefds[2];
   sigset_t chldmask, savemask;
@@ -117,8 +121,8 @@ TEST(redbean, testOptions) {
     close(pipefds[0]);
     dup2(pipefds[1], 1);
     sigprocmask(SIG_SETMASK, &savemask, NULL);
-    execv("bin/redbean-tester.com",
-          (char *const[]){"bin/redbean-tester.com", "-vvszXp0", "-l127.0.0.1",
+    execv("bin/redbean-tester",
+          (char *const[]){"bin/redbean-tester", "-vvszXp0", "-l127.0.0.1",
                           __strace > 0 ? "--strace" : 0, 0});
     _exit(127);
   }
@@ -141,7 +145,8 @@ TEST(redbean, testOptions) {
 }
 
 TEST(redbean, testPipeline) {
-  if (IsWindows()) return;
+  if (IsWindows())
+    return;
   char portbuf[16];
   int pid, pipefds[2];
   sigset_t chldmask, savemask;
@@ -156,8 +161,8 @@ TEST(redbean, testPipeline) {
     close(pipefds[0]);
     dup2(pipefds[1], 1);
     sigprocmask(SIG_SETMASK, &savemask, NULL);
-    execv("bin/redbean-tester.com",
-          (char *const[]){"bin/redbean-tester.com", "-vvszXp0", "-l127.0.0.1",
+    execv("bin/redbean-tester",
+          (char *const[]){"bin/redbean-tester", "-vvszXp0", "-l127.0.0.1",
                           __strace > 0 ? "--strace" : 0, 0});
     _exit(127);
   }
@@ -189,7 +194,8 @@ TEST(redbean, testPipeline) {
 }
 
 TEST(redbean, testContentRange) {
-  if (IsWindows()) return;
+  if (IsWindows())
+    return;
   char portbuf[16];
   int pid, pipefds[2];
   sigset_t chldmask, savemask;
@@ -204,8 +210,8 @@ TEST(redbean, testContentRange) {
     close(pipefds[0]);
     dup2(pipefds[1], 1);
     sigprocmask(SIG_SETMASK, &savemask, NULL);
-    execv("bin/redbean-tester.com",
-          (char *const[]){"bin/redbean-tester.com", "-vvszXp0", "-l127.0.0.1",
+    execv("bin/redbean-tester",
+          (char *const[]){"bin/redbean-tester", "-vvszXp0", "-l127.0.0.1",
                           __strace > 0 ? "--strace" : 0, 0});
     _exit(127);
   }
@@ -256,7 +262,7 @@ Last-Modified: .*\r\n\
 Accept-Ranges: bytes\r\n\
 X-Content-Type-Options: nosniff\r\n\
 Date: .*\r\n\
-Server: redbean/2.2.0\r\n\
+Server: redbean/.*\r\n\
 Content-Length: 34\r\n\
 \r\n\
 J\n\

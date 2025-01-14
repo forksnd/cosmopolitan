@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2021 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -16,34 +16,21 @@
 │ TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR             │
 │ PERFORMANCE OF THIS SOFTWARE.                                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
-#include "libc/calls/calls.h"
-#include "libc/nt/process.h"
+#include "libc/atomic.h"
+#include "libc/fmt/internal.h"
+#include "libc/intrin/atomic.h"
+#include "libc/runtime/internal.h"
 
-static textwindows char16_t *UintToChar16Array(char16_t p[21], uint64_t x) {
-  char t;
-  size_t a, b, i = 0;
-  do {
-    p[i++] = x % 10 + '0';
-    x = x / 10;
-  } while (x > 0);
-  if (i) {
-    for (a = 0, b = i - 1; a < b; ++a, --b) {
-      t = p[a];
-      p[a] = p[b];
-      p[b] = t;
-    }
-  }
-  return p + i;
-}
-
-textwindows char16_t *CreatePipeName(char16_t *a) {
-  static long x;
+// This function is called very early by WinMain().
+textwindows char16_t *__create_pipe_name(char16_t *a) {
   char16_t *p = a;
   const char *q = "\\\\?\\pipe\\cosmo\\";
-  while (*q) *p++ = *q++;
-  p = UintToChar16Array(p, GetCurrentProcessId());
+  static atomic_uint x;
+  while (*q)
+    *p++ = *q++;
+  p = __itoa16(p, __pid);
   *p++ = '-';
-  p = UintToChar16Array(p, (x += 1));
+  p = __itoa16(p, atomic_fetch_add(&x, 1));
   *p = 0;
   return a;
 }

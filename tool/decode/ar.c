@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2020 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -19,11 +19,11 @@
 #include "libc/calls/calls.h"
 #include "libc/calls/struct/stat.h"
 #include "libc/fmt/conv.h"
-#include "libc/intrin/bits.h"
 #include "libc/log/check.h"
 #include "libc/log/log.h"
 #include "libc/mem/mem.h"
 #include "libc/runtime/runtime.h"
+#include "libc/serialize.h"
 #include "libc/stdio/stdio.h"
 #include "libc/str/str.h"
 #include "libc/sysv/consts/map.h"
@@ -36,7 +36,7 @@
 
 /**
  * ar rU doge.a NOTICE  # create archive and use non-deterministic stuff
- * o//tool/decode/ar.com doge.a
+ * o//tool/decode/ar doge.a
  */
 
 static int fd;
@@ -60,7 +60,8 @@ static void Open(void) {
     exit(1);
   }
   CHECK_NE(-1, fstat(fd, &st));
-  if (!(size = st.st_size)) exit(0);
+  if (!(size = st.st_size))
+    exit(0);
   CHECK_NE(MAP_FAILED,
            (data = mmap(NULL, size, PROT_READ, MAP_PRIVATE, fd, 0)));
   LOGIFNEG1(close(fd));
@@ -94,8 +95,8 @@ static void PrintHeader(uint8_t *p) {
 
 static void Print(void) {
   int arsize;
+  uint8_t *b, *p;
   uint64_t offset;
-  uint8_t *b, *p, *e;
   uint32_t i, n, o, table, entries, symbols, symbolslen;
   arsize = atoi((char *)(data + 8 + 48));
   CHECK_LE(4, arsize);
@@ -109,9 +110,8 @@ static void Print(void) {
   printf("\n");
   printf("\t.long\t%-*.u# %s\n", 35, entries, "symbol table entries");
   table = 8 + 60 + 4;
-  for (i = 0; i < entries; ++i) {
+  for (i = 0; i < entries; ++i)
     printf("\t.long\t%#-*.x# %u\n", 35, READ32BE(data + table + i * 4), i);
-  }
   symbols = table + entries * 4;
   symbolslen = arsize - (entries + 1) * 4;
   for (i = o = 0; o < symbolslen; ++i, o += n + 1) {
@@ -136,7 +136,8 @@ static void Print(void) {
 }
 
 int main(int argc, char *argv[]) {
-  if (argc < 2) return 1;
+  if (argc < 2)
+    return 1;
   path = argv[1];
   Open();
   Check();

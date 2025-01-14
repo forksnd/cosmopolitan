@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2020 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -26,9 +26,15 @@
 // Applies file descriptor fixups on XNU or old Linux.
 // See __fixupnewsockfd() for socket file descriptors.
 int __fixupnewfd(int fd, int flags) {
+  int file_mode;
   if (fd != -1) {
     if (flags & O_CLOEXEC) {
-      _npassert(!__sys_fcntl(fd, F_SETFD, FD_CLOEXEC));
+      unassert((file_mode = __sys_fcntl(fd, F_GETFD)) != -1);
+      unassert(!__sys_fcntl(fd, F_SETFD, file_mode | FD_CLOEXEC));
+    }
+    if (flags & O_NONBLOCK) {
+      unassert((file_mode = __sys_fcntl(fd, F_GETFL)) != -1);
+      unassert(!__sys_fcntl(fd, F_SETFL, file_mode | O_NONBLOCK));
     }
   }
   return fd;

@@ -1,12 +1,21 @@
-#ifndef COSMOPOLITAN_LIBC_VGA_VGA_INTERNAL_H_
-#define COSMOPOLITAN_LIBC_VGA_VGA_INTERNAL_H_
+#ifndef COSMOPOLITAN_LIBC_VGA_VGA_H_
+#define COSMOPOLITAN_LIBC_VGA_VGA_H_
 #include "libc/runtime/mman.internal.h"
 
-/** Preferred width of the video screen, in character units. */
+/**
+ * @internal
+ * Preferred width of the video screen, in character units.
+ */
 #define VGA_PREFER_TTY_HEIGHT 30
-/** Preferred width of the video screen, in character units. */
+/**
+ * @internal
+ * Preferred width of the video screen, in character units.
+ */
 #define VGA_PREFER_TTY_WIDTH 80
-/** Assumed height of each character in pixels, in graphics modes. */
+/**
+ * @internal
+ * Assumed height of each character in pixels, in graphics modes.
+ */
 #define VGA_ASSUME_CHAR_HEIGHT_PX 16
 /** Assumed width of each character in pixels, in graphics modes. */
 #define VGA_ASSUME_CHAR_WIDTH_PX 8
@@ -18,6 +27,7 @@
  */
 
 /**
+ * @internal
  * If VGA_USE_WCS is defined, the tty code can maintain an array of the
  * Unicode characters "underlying" the 8-bit (or 9-bit) characters that are
  * actually displayed on the text screen.  This Unicode character
@@ -33,6 +43,7 @@
  */
 #undef VGA_USE_WCS
 /**
+ * @internal
  * The VGA hardware can be configured — via the IBM BIOS, or via port I/O —
  * to either support blinking characters, or support the use of bright
  * background colors, but not both.  There is a hardware setting that
@@ -67,6 +78,7 @@
  */
 #undef VGA_USE_BLINK
 /**
+ * @internal
  * If VGA_PERSNICKETY_STATUS is defined, then when deciding how to return
  * status response codes (e.g. "\e[0n"), the tty code will pay attention to
  * the terminal's termios mode (TODO).  If undefined, the tty code will
@@ -75,7 +87,10 @@
  */
 #undef VGA_PERSNICKETY_STATUS
 
-/* Flags which are passed to _StartTty(). */
+/**
+ * @internal
+ * Flags which are passed to _StartTty().
+ */
 #define kTtyAllocWcs                       \
   0x01 /* allocate Unicode character array \
           (if VGA_USE_WCS also defined) */
@@ -85,6 +100,7 @@
           to show system messages */
 
 /**
+ * @internal
  * Flags for Tty::pr.  These govern properties of individual character cells.
  */
 #define kTtyFg      0x0001
@@ -102,6 +118,7 @@
 #define kTtyConceal 0x1000
 
 /**
+ * @internal
  * Flags for Tty::conf.  These govern the current state of the teletypewriter
  * as a whole.
  */
@@ -118,10 +135,6 @@
 #define kTtyLed4        0x400
 
 #if !(__ASSEMBLER__ + __LINKER__ + 0)
-#include "libc/calls/struct/fd.internal.h"
-#include "libc/calls/struct/iovec.h"
-#include "libc/calls/struct/iovec.internal.h"
-
 COSMOPOLITAN_C_START_
 
 struct VgaTextCharCell {
@@ -153,6 +166,10 @@ typedef union {
 typedef TtyBgrxColor TtyCanvasColor;
 struct Tty;
 
+/**
+ * @internal
+ * Video console object type.
+ */
 struct Tty {
   /**
    * Cursor position.  (y, x) = (0, 0) means the cursor is on the top left
@@ -255,8 +272,7 @@ void _TtyGraphMoveLineCells(struct Tty *, size_t, size_t, size_t, size_t,
                             size_t);
 
 /*
- * Routines that implement emergency or system console output in graphical
- * video modes.
+ * Routines that implement emergency console output in graphical video modes.
  */
 void _TtyKlog16Update(struct Tty *);
 void _TtyKlog16DrawChar(struct Tty *, size_t, size_t, wchar_t);
@@ -290,9 +306,12 @@ extern struct Tty _vga_tty;
 
 void _vga_reinit(struct Tty *, unsigned short, unsigned short, unsigned);
 void _klog_vga(const char *, size_t);
+
+struct Fd;
+struct iovec;
 ssize_t sys_readv_vga(struct Fd *, const struct iovec *, int);
 ssize_t sys_writev_vga(struct Fd *, const struct iovec *, int);
 
 COSMOPOLITAN_C_END_
 #endif /* !(__ASSEMBLER__ + __LINKER__ + 0) */
-#endif /* COSMOPOLITAN_LIBC_VGA_VGA_INTERNAL_H_ */
+#endif /* COSMOPOLITAN_LIBC_VGA_VGA_H_ */

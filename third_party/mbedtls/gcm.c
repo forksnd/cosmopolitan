@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:4;tab-width:4;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright The Mbed TLS Contributors                                          │
 │                                                                              │
@@ -15,7 +15,8 @@
 │ See the License for the specific language governing permissions and          │
 │ limitations under the License.                                               │
 ╚─────────────────────────────────────────────────────────────────────────────*/
-#include "libc/intrin/bits.h"
+#include "third_party/mbedtls/gcm.h"
+#include "libc/serialize.h"
 #include "libc/intrin/likely.h"
 #include "libc/log/log.h"
 #include "libc/nexgen32e/x86feature.h"
@@ -27,16 +28,9 @@
 #include "third_party/mbedtls/common.h"
 #include "third_party/mbedtls/endian.h"
 #include "third_party/mbedtls/error.h"
-#include "third_party/mbedtls/gcm.h"
 #include "third_party/mbedtls/platform.h"
+__static_yoink("mbedtls_notice");
 
-asm(".ident\t\"\\n\\n\
-Mbed TLS (Apache 2.0)\\n\
-Copyright ARM Limited\\n\
-Copyright Mbed TLS Contributors\"");
-asm(".include \"libc/disclaimer.inc\"");
-
-/* clang-format off */
 /*
  *  NIST SP800-38D compliant GCM implementation
  *
@@ -102,7 +96,6 @@ void mbedtls_gcm_init( mbedtls_gcm_context *ctx )
 static int gcm_gen_table( mbedtls_gcm_context *ctx )
 {
     int ret, i, j;
-    uint64_t hi, lo;
     uint64_t vl, vh;
     unsigned char h[16];
     size_t olen = 0;

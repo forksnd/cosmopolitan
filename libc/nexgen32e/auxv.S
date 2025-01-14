@@ -1,5 +1,5 @@
 /*-*- mode:unix-assembly; indent-tabs-mode:t; tab-width:8; coding:utf-8     -*-│
-│vi: set et ft=asm ts=8 sw=8 fenc=utf-8                                     :vi│
+│ vi: set noet ft=asm ts=8 sw=8 fenc=utf-8                                 :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2020 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -16,16 +16,15 @@
 │ TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR             │
 │ PERFORMANCE OF THIS SOFTWARE.                                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
-#include "libc/macros.internal.h"
-#include "libc/notice.inc"
+#include "libc/macros.h"
 
-	.initbss 300,_init_auxv
+	.initbss 250,_init_auxv
 //	Global variable holding _start(auxv) parameter.
 __auxv:	.quad	0
 	.endobj	__auxv,globl
 	.previous
 
-	.init.start 300,_init_auxv
+	.init.start 250,_init_auxv
 	mov	%r15,%rax
 	stosq
-	.init.end 300,_init_auxv
+	.init.end 250,_init_auxv

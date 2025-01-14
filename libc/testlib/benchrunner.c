@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2020 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -17,12 +17,15 @@
 │ PERFORMANCE OF THIS SOFTWARE.                                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
 #include "ape/sections.internal.h"
+#include "libc/calls/blockcancel.internal.h"
 #include "libc/calls/calls.h"
-#include "libc/calls/kntprioritycombos.internal.h"
+#include "libc/calls/syscall-sysv.internal.h"
+#include "libc/dce.h"
 #include "libc/errno.h"
 #include "libc/log/log.h"
 #include "libc/nexgen32e/x86feature.h"
 #include "libc/runtime/runtime.h"
+#include "libc/sysv/consts/at.h"
 #include "libc/sysv/consts/f.h"
 #include "libc/sysv/consts/mlock.h"
 #include "libc/sysv/consts/o.h"
@@ -39,23 +42,28 @@ void testlib_benchwarmup(void) {
         "vmovdqa\t%%ymm0,%0\n\t"
         "vzeroall"
         : "=m"(g_avx2_juiceup_quadwords_)
-        : "m"(g_avx2_juiceup_quadwords_), "r"(&_base[0]));
+        : "m"(g_avx2_juiceup_quadwords_), "r"(&__executable_start[0]));
     asm("vmovapd\t%1,%%ymm1\n\t"
         "vfmadd132pd\t(%2),%%ymm1,%%ymm1\n\t"
         "vmovapd\t%%ymm1,%0\n\t"
         "vzeroall"
         : "=m"(g_avx2_juiceup_doubles_)
-        : "m"(g_avx2_juiceup_doubles_), "r"(&_base[32]));
+        : "m"(g_avx2_juiceup_doubles_), "r"(&__executable_start[32]));
   }
 }
 
 void EnableCruiseControlForCool(void) {
   int fd, micros = 10;
-  if ((fd = open("/dev/cpu_dma_latency", O_WRONLY)) != -1) {
-    write(fd, &micros, sizeof(micros));
-    fcntl(fd, F_DUPFD_CLOEXEC, 123);
-    close(fd);
+  if (!IsLinux())
+    return;
+  BLOCK_CANCELATION;
+  if ((fd = __sys_openat(AT_FDCWD, "/dev/cpu_dma_latency", O_WRONLY, 0)) !=
+      -1) {
+    sys_write(fd, &micros, sizeof(micros));
+    sys_fcntl(fd, F_DUPFD_CLOEXEC, 123, __sys_fcntl);
+    sys_close(fd);
   }
+  ALLOW_CANCELATION;
 }
 
 /**
@@ -64,7 +72,6 @@ void EnableCruiseControlForCool(void) {
  * @see BENCH()
  */
 void testlib_runallbenchmarks(void) {
-  int e;
   __log_level = kLogWarn;
   EnableCruiseControlForCool();
   testlib_runtestcases(__bench_start, __bench_end, testlib_benchwarmup);

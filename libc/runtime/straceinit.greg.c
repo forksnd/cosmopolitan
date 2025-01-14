@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2021 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -16,10 +16,9 @@
 │ TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR             │
 │ PERFORMANCE OF THIS SOFTWARE.                                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
-#include "libc/dce.h"
-#include "libc/intrin/atomic.h"
-#include "libc/intrin/safemacros.internal.h"
-#include "libc/intrin/strace.internal.h"
+#include "libc/calls/calls.h"
+#include "libc/intrin/getenv.h"
+#include "libc/intrin/safemacros.h"
 #include "libc/log/libfatal.internal.h"
 #include "libc/runtime/internal.h"
 #include "libc/runtime/runtime.h"
@@ -30,7 +29,7 @@
 textstartup int __strace_init(int argc, char **argv, char **envp, long *auxv) {
   /* asan isn't initialized yet at runlevel 300 */
   if (__intercept_flag(&argc, argv, "--strace") ||
-      __atoul(nulltoempty(__getenv(envp, "STRACE")))) {
+      __atoul(nulltoempty(__getenv(envp, "STRACE").s))) {
     strace_enabled(+1);
   }
   return (__argc = argc);

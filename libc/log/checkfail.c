@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2020 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -18,10 +18,9 @@
 ╚─────────────────────────────────────────────────────────────────────────────*/
 #include "libc/calls/calls.h"
 #include "libc/errno.h"
-#include "libc/fmt/fmt.h"
 #include "libc/intrin/kprintf.h"
-#include "libc/intrin/safemacros.internal.h"
-#include "libc/intrin/strace.internal.h"
+#include "libc/intrin/safemacros.h"
+#include "libc/intrin/strace.h"
 #include "libc/log/check.h"
 #include "libc/log/color.internal.h"
 #include "libc/log/internal.h"
@@ -30,24 +29,26 @@
 #include "libc/runtime/memtrack.internal.h"
 #include "libc/runtime/runtime.h"
 #include "libc/stdio/stdio.h"
-
-STATIC_YOINK("strerror_wr");
+#include "libc/str/str.h"
 
 /**
  * Handles failure of CHECK_xx() macros.
  */
-relegated void __check_fail(const char *suffix, const char *opstr,
-                            uint64_t want, const char *wantstr, uint64_t got,
-                            const char *gotstr, const char *file, int line,
-                            const char *fmt, ...) {
-  int e;
-  char *p;
+relegated void __check_fail(const char *suffix,   //
+                            const char *opstr,    //
+                            uint64_t want,        //
+                            const char *wantstr,  //
+                            uint64_t got,         //
+                            const char *gotstr,   //
+                            const char *file,     //
+                            int line,             //
+                            const char *fmt,      //
+                            ...) {
   size_t i;
   va_list va;
   char hostname[32];
   strace_enabled(-1);
   ftrace_enabled(-1);
-  e = errno;
   __start_fatal(file, line);
   __stpcpy(hostname, "unknown");
   gethostname(hostname, sizeof(hostname));
@@ -66,11 +67,10 @@ relegated void __check_fail(const char *suffix, const char *opstr,
     va_end(va);
     kprintf("\n");
   }
-  kprintf("\t%m\n\t%s%s", SUBTLE, program_invocation_name);
+  kprintf("\t%s\n\t%s%s", strerror(errno), SUBTLE, program_invocation_name);
   for (i = 1; i < __argc; ++i) {
     kprintf(" %s", __argv[i]);
   }
   kprintf("%s\n", RESET);
   __die();
-  unreachable;
 }

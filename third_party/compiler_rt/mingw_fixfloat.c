@@ -1,4 +1,3 @@
-/* clang-format off */
 /* ===-- mingw_fixfloat.c - Wrap int/float conversions for arm/windows -----===
  *
  *                     The LLVM Compiler Infrastructure
@@ -9,7 +8,7 @@
  * ===----------------------------------------------------------------------===
  */
 
-STATIC_YOINK("huge_compiler_rt_license");
+__static_yoink("huge_compiler_rt_license");
 
 #include "third_party/compiler_rt/int_lib.h"
 

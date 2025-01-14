@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2020 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -38,8 +38,8 @@
  * @return 0 on success, or -1 w/ errno
  */
 ssize_t ttywrite(int fd, const void *data, size_t size) {
-  char *p;
   ssize_t rc;
+  const char *p;
   size_t wrote, n;
   p = data;
   n = size;

@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2021 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -16,23 +16,14 @@
 │ TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR             │
 │ PERFORMANCE OF THIS SOFTWARE.                                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
-#include "libc/intrin/bits.h"
 #include "libc/intrin/bsr.h"
-#include "libc/intrin/packsswb.h"
-#include "libc/intrin/pandn.h"
-#include "libc/intrin/pcmpgtb.h"
-#include "libc/intrin/pcmpgtw.h"
-#include "libc/intrin/pmovmskb.h"
-#include "libc/intrin/punpckhbw.h"
-#include "libc/intrin/punpcklbw.h"
-#include "libc/intrin/tpenc.h"
 #include "libc/mem/mem.h"
+#include "libc/serialize.h"
 #include "libc/str/str.h"
 #include "libc/str/thompike.h"
 #include "libc/str/utf16.h"
 #include "libc/x/x.h"
-
-static const int16_t kDel16[8] = {127, 127, 127, 127, 127, 127, 127, 127};
+#include "third_party/intel/emmintrin.internal.h"
 
 /**
  * Transcodes UTF-16 to UTF-8.
@@ -42,29 +33,31 @@ static const int16_t kDel16[8] = {127, 127, 127, 127, 127, 127, 127, 127};
  * @param z if non-NULL receives output length
  */
 char *utf16to8(const char16_t *p, size_t n, size_t *z) {
+  unsigned w;
   char *r, *q;
   wint_t x, y;
-  unsigned m, j, w;
   const char16_t *e;
-  int16_t v1[8], v2[8], v3[8], vz[8];
-  if (z) *z = 0;
-  if (n == -1) n = p ? strlen16(p) : 0;
+  if (z)
+    *z = 0;
+  if (n == -1)
+    n = p ? strlen16(p) : 0;
   if ((q = r = malloc(n * 4 + 8 + 1))) {
     for (e = p + n; p < e;) {
-      if (p + 8 < e) { /* 17x ascii */
-        bzero(vz, 16);
+#if defined(__x86_64__)
+      if (p + 8 < e) {
         do {
-          memcpy(v1, p, 16);
-          pcmpgtw(v2, v1, vz);
-          pcmpgtw(v3, v1, kDel16);
-          pandn((void *)v2, (void *)v3, (void *)v2);
-          if (pmovmskb((void *)v2) != 0xFFFF) break;
-          packsswb((void *)v1, v1, v1);
-          memcpy(q, v1, 8);
+          __m128i v1 = _mm_loadu_si128((__m128i *)p);
+          __m128i v2 = _mm_cmpgt_epi16(v1, _mm_setzero_si128());
+          __m128i v3 = _mm_cmpgt_epi16(v1, _mm_set1_epi16(127));
+          v2 = _mm_andnot_si128(v3, v2);
+          if (_mm_movemask_epi8(v2) != 0xFFFF)
+            break;
+          _mm_storel_epi64((__m128i *)q, _mm_packs_epi16(v1, v1));
           p += 8;
           q += 8;
         } while (p + 8 < e);
       }
+#endif
       x = *p++ & 0xffff;
       if (!IsUcs2(x)) {
         if (p < e) {
@@ -77,15 +70,17 @@ char *utf16to8(const char16_t *p, size_t n, size_t *z) {
       if (x < 0200) {
         *q++ = x;
       } else {
-        w = _tpenc(x);
+        w = tpenc(x);
         WRITE64LE(q, w);
-        q += _bsr(w) >> 3;
+        q += bsr(w) >> 3;
         q += 1;
       }
     }
-    if (z) *z = q - r;
+    if (z)
+      *z = q - r;
     *q++ = '\0';
-    if ((q = realloc(r, (q - r) * 1))) r = q;
+    if ((q = realloc(r, (q - r) * 1)))
+      r = q;
   }
   return r;
 }

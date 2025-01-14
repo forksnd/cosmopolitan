@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2021 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -19,7 +19,7 @@
 #include "libc/calls/calls.h"
 #include "libc/calls/struct/stat.h"
 #include "libc/errno.h"
-#include "libc/str/path.h"
+#include "libc/limits.h"
 #include "libc/str/str.h"
 #include "libc/sysv/consts/s.h"
 #include "libc/sysv/errfuns.h"
@@ -44,7 +44,6 @@
  * @raise ENOENT if `path` is an empty string
  * @raise ELOOP if loop was detected resolving components of `path`
  * @asyncsignalsafe
- * @threadsafe
  */
 int makedirs(const char *path, unsigned mode) {
   int c, e, i, n;
@@ -53,31 +52,42 @@ int makedirs(const char *path, unsigned mode) {
 
   e = errno;
   n = strlen(path);
-  if (n >= PATH_MAX) return enametoolong();
+  if (n >= PATH_MAX)
+    return enametoolong();
   memcpy(buf, path, n + 1);
   i = n;
 
   // descend
   while (i) {
-    if (!mkdir(buf, mode)) break;
+    if (!mkdir(buf, mode))
+      break;
     if (errno == EEXIST) {
-      if (i == n) goto CheckTop;
+      if (i == n)
+        goto CheckTop;
       break;
     }
-    if (errno != ENOENT) return -1;
-    while (i && _isdirsep(buf[i - 1])) buf[--i] = 0;
-    while (i && !_isdirsep(buf[i - 1])) buf[--i] = 0;
+    if (errno != ENOENT)
+      return -1;
+    while (i && buf[i - 1] == '/')
+      buf[--i] = 0;
+    while (i && buf[i - 1] != '/')
+      buf[--i] = 0;
   }
 
   // ascend
   for (;;) {
     if (mkdir(buf, mode)) {
-      if (errno != EEXIST) return -1;
-      if (i == n) goto CheckTop;
+      if (errno != EEXIST)
+        return -1;
+      if (i == n)
+        goto CheckTop;
     }
-    if (i == n) break;
-    while (i < n && !_isdirsep((c = path[i]))) buf[i++] = c;
-    while (i < n && _isdirsep((c = path[i]))) buf[i++] = c;
+    if (i == n)
+      break;
+    while (i < n && (c = path[i]) != '/')
+      buf[i++] = c;
+    while (i < n && (c = path[i]) == '/')
+      buf[i++] = c;
   }
 
 Finish:
@@ -85,7 +95,9 @@ Finish:
   return 0;
 
 CheckTop:
-  if (stat(path, &st)) return -1;
-  if (S_ISDIR(st.st_mode)) goto Finish;
+  if (stat(path, &st))
+    return -1;
+  if (S_ISDIR(st.st_mode))
+    goto Finish;
   return eexist();
 }

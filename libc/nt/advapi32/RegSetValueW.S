@@ -1,12 +1,13 @@
 #include "libc/nt/codegen.h"
-.imp	advapi32,__imp_RegSetValueW,RegSetValueW,1683
+.imp	advapi32,__imp_RegSetValueW,RegSetValueW
 
 	.text.windows
+	.ftrace1
 RegSetValue:
+	.ftrace2
 #ifdef __x86_64__
 	push	%rbp
 	mov	%rsp,%rbp
-	.profilable
 	mov	__imp_RegSetValueW(%rip),%rax
 	jmp	__sysv2nt6
 #elif defined(__aarch64__)

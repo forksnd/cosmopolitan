@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2021 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -18,10 +18,9 @@
 ╚─────────────────────────────────────────────────────────────────────────────*/
 #include "libc/calls/struct/sigaction.h"
 #include "libc/fmt/conv.h"
-#include "libc/intrin/tpenc.h"
 #include "libc/limits.h"
 #include "libc/log/log.h"
-#include "libc/macros.internal.h"
+#include "libc/macros.h"
 #include "libc/mem/gc.h"
 #include "libc/mem/mem.h"
 #include "libc/stdio/append.h"
@@ -29,7 +28,7 @@
 #include "libc/str/str.h"
 #include "libc/sysv/consts/sig.h"
 #include "libc/x/x.h"
-#include "third_party/getopt/getopt.h"
+#include "third_party/getopt/getopt.internal.h"
 #include "third_party/stb/stb_truetype.h"
 
 #define SQR(x) ((x) * (x))
@@ -60,7 +59,8 @@ static char *Raster(int yn, int xn, unsigned char Y[yn][xn], int *dw) {
   int y, x, i, j, k, s, w, bi, bs;
   *dw = 0;
   for (y = 0; y < yn; y += 4) {
-    if (y) appendw(&r, '\n');
+    if (y)
+      appendw(&r, '\n');
     for (w = x = 0; x < xn; x += 4) {
       for (i = 0; i < 4; ++i) {
         for (j = 0; j < 4; ++j) {
@@ -85,10 +85,11 @@ static char *Raster(int yn, int xn, unsigned char Y[yn][xn], int *dw) {
           bs = s;
         }
       }
-      appendw(&r, _tpenc(kBlocks[bi].c));
+      appendw(&r, tpenc(kBlocks[bi].c));
       ++w;
     }
-    if (w > *dw) *dw = w;
+    if (w > *dw)
+      *dw = w;
   }
   return r;
 }
@@ -105,7 +106,6 @@ int main(int argc, char *argv[]) {
   char **rasters;
   char **fasters;
   size_t ttfsize;
-  const char *dir;
   bool isdifferent;
   unsigned char **ttf;
   stbtt_fontinfo *font;
@@ -139,14 +139,14 @@ int main(int argc, char *argv[]) {
     }
   }
   m = argc - optind;
-  w = _gc(calloc(m, sizeof(*w)));
-  h = _gc(calloc(m, sizeof(*h)));
-  ttf = _gc(calloc(m, sizeof(*ttf)));
-  font = _gc(calloc(m, sizeof(*font)));
-  rasters = _gc(calloc(m, sizeof(*rasters)));
-  fasters = _gc(calloc(m, sizeof(*fasters)));
+  w = gc(calloc(m, sizeof(*w)));
+  h = gc(calloc(m, sizeof(*h)));
+  ttf = gc(calloc(m, sizeof(*ttf)));
+  font = gc(calloc(m, sizeof(*font)));
+  rasters = gc(calloc(m, sizeof(*rasters)));
+  fasters = gc(calloc(m, sizeof(*fasters)));
   for (j = 0; j < m; ++j) {
-    ttf[j] = _gc(xslurp(argv[optind + j], &ttfsize));
+    ttf[j] = gc(xslurp(argv[optind + j], &ttfsize));
     if (!ttf[j]) {
       fprintf(stderr, "%s: not found\n", argv[optind + j]);
       exit(1);
@@ -173,7 +173,8 @@ int main(int argc, char *argv[]) {
                 strcmp(rasters[j], rasters[j - 1])) {
               isdifferent = true;
             }
-            if (dw > maxw) maxw = dw;
+            if (dw > maxw)
+              maxw = dw;
           }
         }
         free(bmap);
@@ -191,7 +192,8 @@ int main(int argc, char *argv[]) {
               continue;
             }
             p = strchrnul(rasters[j], '\n');
-            if (p - rasters[j]) gotsome = true;
+            if (p - rasters[j])
+              gotsome = true;
             printf("%-*.*s    ", maxw, p - rasters[j], rasters[j]);
             rasters[j] = *p ? p + 1 : p;
           }

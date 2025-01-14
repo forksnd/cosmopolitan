@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:t;c-basic-offset:8;tab-width:8;coding:utf-8   -*-│
-│vi: set et ft=c ts=8 tw=8 fenc=utf-8                                       :vi│
+│ vi: set noet ft=c ts=8 sw=8 fenc=utf-8                                   :vi │
 ╚──────────────────────────────────────────────────────────────────────────────╝
 │                                                                              │
 │  Musl Libc                                                                   │
@@ -27,12 +27,8 @@
 ╚─────────────────────────────────────────────────────────────────────────────*/
 #include "libc/math.h"
 #include "libc/tinymath/complex.internal.h"
-
-asm(".ident\t\"\\n\\n\
-Double-precision math functions (MIT License)\\n\
-Copyright 2018 ARM Limited\"");
-asm(".include \"libc/disclaimer.inc\"");
-// clang-format off
+__static_yoink("freebsd_libm_notice");
+__static_yoink("fdlibm_notice");
 
 /* origin: FreeBSD /usr/src/lib/msun/src/e_jnf.c */
 /*
@@ -49,6 +45,9 @@ asm(".include \"libc/disclaimer.inc\"");
  * ====================================================
  */
 
+/**
+ * Returns Bessel function of 𝑥 of first kind of order 𝑛.
+ */
 float jnf(int n, float x)
 {
 	uint32_t ix;
@@ -192,6 +191,9 @@ float jnf(int n, float x)
 	return sign ? -b : b;
 }
 
+/**
+ * Returns Bessel function of 𝑥 of second kind of order 𝑛.
+ */
 float ynf(int n, float x)
 {
 	uint32_t ix, ib;

@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2020 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -33,15 +33,15 @@
  * @raise EFAULT if `req` is NULL or `req` / `rem` is a bad pointer
  * @raise ENOSYS on bare metal
  * @see clock_nanosleep()
- * @cancellationpoint
+ * @cancelationpoint
  * @norestart
  */
 int nanosleep(const struct timespec *req, struct timespec *rem) {
-  int rc;
-  if (!(rc = clock_nanosleep(CLOCK_REALTIME, 0, req, rem))) {
+  errno_t err;
+  if (!(err = clock_nanosleep(CLOCK_REALTIME, 0, req, rem))) {
     return 0;
   } else {
-    errno = rc;
+    errno = err;
     return -1;
   }
 }

@@ -1,12 +1,13 @@
 #include "libc/nt/codegen.h"
-.imp	ws2_32,__imp_WSACleanup,WSACleanup,116
+.imp	ws2_32,__imp_WSACleanup,WSACleanup
 
 	.text.windows
+	.ftrace1
 WSACleanup:
+	.ftrace2
 #ifdef __x86_64__
 	push	%rbp
 	mov	%rsp,%rbp
-	.profilable
 	sub	$32,%rsp
 	call	*__imp_WSACleanup(%rip)
 	leave

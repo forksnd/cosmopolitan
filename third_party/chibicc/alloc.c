@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2020 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -16,8 +16,8 @@
 │ TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR             │
 │ PERFORMANCE OF THIS SOFTWARE.                                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
+#include "libc/calls/calls.h"
 #include "libc/runtime/runtime.h"
-#include "libc/stdio/stdio.h"
 #include "third_party/chibicc/chibicc.h"
 
 long alloc_node_count;
@@ -26,7 +26,7 @@ long alloc_obj_count;
 long alloc_type_count;
 
 wontreturn void __oom_hook(size_t request) {
-  fprintf(stderr, "error: chibicc ran out of memory\n");
+  tinyprint(2, "error: chibicc ran out of memory\n", NULL);
   exit(1);
 }
 

@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:4;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=4 sts=4 sw=4 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=4 sts=4 sw=4 fenc=utf-8                               :vi │
 ╚─────────────────────────────────────────────────────────────────────────────*/
 /* zutil.c -- target dependent utility functions for the compression library
  * Copyright (C) 1995-2017 Jean-loup Gailly
@@ -11,11 +11,7 @@
 #include "third_party/zlib/internal.h"
 #include "third_party/zlib/zutil.internal.h"
 
-asm(".ident\t\"\\n\\n\
-zlib (zlib License)\\n\
-Copyright 1995-2017 Jean-loup Gailly and Mark Adler\"");
-asm(".include \"libc/disclaimer.inc\"");
-// clang-format off
+#pragma GCC diagnostic ignored "-Wimplicit-int"
 
 /* @(#) $Id$ */
 
@@ -318,11 +314,7 @@ voidpf ZLIB_INTERNAL zcalloc (opaque, items, size)
     unsigned size;
 {
     (void)opaque;
-    if (_weaken(malloc)) {
-        return _weaken(malloc)(items * size);
-    } else {
-        return 0;
-    }
+    return malloc(items * size);
 }
 
 void ZLIB_INTERNAL zcfree (opaque, ptr)
@@ -330,9 +322,7 @@ void ZLIB_INTERNAL zcfree (opaque, ptr)
     voidpf ptr;
 {
     (void)opaque;
-    if (_weaken(free)) {
-        _weaken(free)(ptr);
-    }
+    free(ptr);
 }
 
 #endif /* MY_ZCALLOC */

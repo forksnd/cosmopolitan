@@ -21,7 +21,6 @@
 #define UMTX_OP_WAKE_PRIVATE      16
 #define UMTX_ABSTIME              1
 
-#if !(__ASSEMBLER__ + __LINKER__ + 0)
 COSMOPOLITAN_C_START_
 
 struct rtprio {
@@ -48,8 +47,8 @@ struct _umtx_time {
   uint32_t _clockid;
 };
 
-int sys_umtx_timedwait_uint(_Atomic(int) *, int, bool, const struct timespec *);
+int sys_umtx_timedwait_uint(_Atomic(int) *, int, bool, int,
+                            const struct timespec *);
 
 COSMOPOLITAN_C_END_
-#endif /* !(__ASSEMBLER__ + __LINKER__ + 0) */
 #endif /* COSMOPOLITAN_LIBC_THREAD_FREEBSD_INTERNAL_H_ */

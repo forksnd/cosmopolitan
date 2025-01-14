@@ -1,5 +1,5 @@
 /*-*- mode:unix-assembly; indent-tabs-mode:t; tab-width:8; coding:utf-8     -*-│
-│vi: set et ft=asm ts=8 tw=8 fenc=utf-8                                     :vi│
+│ vi: set noet ft=asm ts=8 sw=8 fenc=utf-8                                 :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2020 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -16,7 +16,7 @@
 │ TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR             │
 │ PERFORMANCE OF THIS SOFTWARE.                                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
-#include "libc/macros.internal.h"
+#include "libc/macros.h"
 .text.windows
 
 //	Translates function call from code built w/ MS-style compiler.
@@ -32,23 +32,18 @@
 __nt2sysv:
 	push	%rbp
 	mov	%rsp,%rbp
-//	TODO(jart): We should probably find some way to use our own
-//	            stack when Windows delivers signals ;_;
-	.profilable
-	sub	$0x100,%rsp
+	sub	$256,%rsp
 	push	%rbx
 	push	%rdi
 	push	%rsi
-	pushf					# TODO(jart): Do we need it?
-	lea	-0x80(%rbp),%rdi
-	call	_savexmm
+	pushf					// TODO(jart): Do we need it?
+	call	__xmm_save
 	mov	%rcx,%rdi
 	mov	%rdx,%rsi
 	mov	%r8,%rdx
 	mov	%r9,%rcx
 	call	*%rax
-	lea	-0x80(%rbp),%rdi
-	call	_loadxmm
+	call	__xmm_load
 	popf
 	pop	%rsi
 	pop	%rdi

@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:t;c-basic-offset:8;tab-width:8;coding:utf-8   -*-│
-│vi: set et ft=c ts=8 tw=8 fenc=utf-8                                       :vi│
+│ vi: set noet ft=c ts=8 sw=8 fenc=utf-8                                   :vi │
 ╚──────────────────────────────────────────────────────────────────────────────╝
 │                                                                              │
 │  Musl Libc                                                                   │
@@ -29,22 +29,16 @@
 #include "libc/math.h"
 #include "libc/tinymath/internal.h"
 #include "libc/tinymath/ldshape.internal.h"
+#if !(LDBL_MANT_DIG == 53 && LDBL_MAX_EXP == 1024)
+__static_yoink("musl_libc_notice");
 
-asm(".ident\t\"\\n\\n\
-Musl libc (MIT License)\\n\
-Copyright 2005-2014 Rich Felker, et. al.\"");
-asm(".include \"libc/disclaimer.inc\"");
-/* clang-format off */
-
-#if LDBL_MANT_DIG == 53 && LDBL_MAX_EXP == 1024
+/**
+ * Returns log₂𝑥 exponent part of double.
+ */
 int ilogbl(long double x)
 {
-	return ilogb(x);
-}
-#elif LDBL_MANT_DIG == 64 && LDBL_MAX_EXP == 16384
-int ilogbl(long double x)
-{
-	//#pragma STDC FENV_ACCESS ON
+#if LDBL_MANT_DIG == 64 && LDBL_MAX_EXP == 16384
+// #pragma STDC FENV_ACCESS ON
 	union ldshape u = {x};
 	uint64_t m = u.i.m;
 	int e = u.i.se & 0x7fff;
@@ -63,11 +57,8 @@ int ilogbl(long double x)
 		return m<<1 ? FP_ILOGBNAN : INT_MAX;
 	}
 	return e - 0x3fff;
-}
 #elif LDBL_MANT_DIG == 113 && LDBL_MAX_EXP == 16384
-int ilogbl(long double x)
-{
-	//#pragma STDC FENV_ACCESS ON
+// #pragma STDC FENV_ACCESS ON
 	union ldshape u = {x};
 	int e = u.i.se & 0x7fff;
 
@@ -86,5 +77,7 @@ int ilogbl(long double x)
 		return u.f ? FP_ILOGBNAN : INT_MAX;
 	}
 	return e - 0x3fff;
-}
 #endif
+}
+
+#endif /* long double is long */

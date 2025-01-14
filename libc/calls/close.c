@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2020 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -16,18 +16,55 @@
 │ TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR             │
 │ PERFORMANCE OF THIS SOFTWARE.                                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
+#include "libc/assert.h"
 #include "libc/calls/calls.h"
 #include "libc/calls/internal.h"
 #include "libc/calls/state.internal.h"
-#include "libc/calls/struct/fd.internal.h"
+#include "libc/calls/struct/sigset.internal.h"
 #include "libc/calls/syscall-nt.internal.h"
 #include "libc/calls/syscall-sysv.internal.h"
 #include "libc/dce.h"
-#include "libc/intrin/strace.internal.h"
+#include "libc/errno.h"
+#include "libc/intrin/fds.h"
+#include "libc/intrin/kprintf.h"
+#include "libc/intrin/strace.h"
 #include "libc/intrin/weaken.h"
+#include "libc/runtime/zipos.internal.h"
 #include "libc/sock/syscall_fd.internal.h"
 #include "libc/sysv/errfuns.h"
-#include "libc/zipos/zipos.internal.h"
+
+// for performance reasons we want to avoid holding __fds_lock()
+// while sys_close() is happening. this leaves the kernel / libc
+// having a temporarily inconsistent state. routines that obtain
+// file descriptors the way __zipos_open() does need to retry if
+// there's indication this race condition happened.
+
+static int close_impl(int fd) {
+
+  if (fd < 0) {
+    return ebadf();
+  }
+
+  // give kprintf() the opportunity to dup() stderr
+  if (fd == 2 && _weaken(kloghandle)) {
+    _weaken(kloghandle)();
+  }
+
+  if (__isfdkind(fd, kFdZip)) {
+    unassert(_weaken(__zipos_close));
+    return _weaken(__zipos_close)(fd);
+  }
+
+  if (!IsWindows() && !IsMetal()) {
+    return sys_close(fd);
+  }
+
+  if (IsWindows()) {
+    return sys_close_nt(fd, fd);
+  }
+
+  return 0;
+}
 
 /**
  * Closes file descriptor.
@@ -37,7 +74,6 @@
  * - openat()
  * - socket()
  * - accept()
- * - epoll_create()
  * - landlock_create_ruleset()
  *
  * This function should never be reattempted if an error is returned;
@@ -56,41 +92,19 @@
  */
 int close(int fd) {
   int rc;
-  if (fd == -1) {
-    rc = 0;
-  } else if (fd < 0) {
-    rc = ebadf();
-  } else {
-    // for performance reasons we want to avoid holding __fds_lock()
-    // while sys_close() is happening. this leaves the kernel / libc
-    // having a temporarily inconsistent state. routines that obtain
-    // file descriptors the way __zipos_open() does need to retry if
-    // there's indication this race condition happened.
-    if (__isfdkind(fd, kFdZip)) {
-      rc = _weaken(__zipos_close)(fd);
-    } else {
-      if (!IsWindows() && !IsMetal()) {
-        rc = sys_close(fd);
-      } else if (IsMetal()) {
-        rc = 0;
-      } else {
-        if (__isfdkind(fd, kFdEpoll)) {
-          rc = _weaken(sys_close_epoll_nt)(fd);
-        } else if (__isfdkind(fd, kFdSocket)) {
-          rc = _weaken(sys_closesocket_nt)(g_fds.p + fd);
-        } else if (__isfdkind(fd, kFdFile) ||     //
-                   __isfdkind(fd, kFdConsole) ||  //
-                   __isfdkind(fd, kFdProcess)) {  //
-          rc = sys_close_nt(g_fds.p + fd, fd);
-        } else {
-          rc = eio();
-        }
-      }
-    }
-    if (!__vforked) {
+  if (__isfdkind(fd, kFdZip)) {  // XXX IsWindows()?
+    BLOCK_SIGNALS;
+    __fds_lock();
+    rc = close_impl(fd);
+    if (!__vforked)
       __releasefd(fd);
-    }
+    __fds_unlock();
+    ALLOW_SIGNALS;
+  } else {
+    rc = close_impl(fd);
+    if (!__vforked)
+      __releasefd(fd);
   }
-  STRACE("%s(%d) → %d% m", "close", fd, rc);
+  STRACE("close(%d) → %d% m", fd, rc);
   return rc;
 }

@@ -1,5 +1,5 @@
 /*-*- mode:unix-assembly; indent-tabs-mode:t; tab-width:8; coding:utf-8     -*-│
-│vi: set et ft=asm ts=8 tw=8 fenc=utf-8                                     :vi│
+│ vi: set noet ft=asm ts=8 sw=8 fenc=utf-8                                 :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2020 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -17,10 +17,27 @@
 │ PERFORMANCE OF THIS SOFTWARE.                                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
 #include "libc/dce.h"
-#include "libc/macros.internal.h"
-#include "libc/notice.inc"
-#include "libc/runtime/internal.h"
+#include "libc/macros.h"
 .section .start,"ax",@progbits
+
+#if SupportsXnu() && defined(__x86_64__)
+//	XNU AMD64 Entrypoint
+//
+//	@note	Rosetta barely implements MAC_LC_UNIXTHREAD
+//	@note	Rosetta sets many registers to weird values
+_apple:	mov	$_HOSTXNU,%cl
+	jmp	1f
+	.endfn	_apple,weak,hidden
+#endif
+
+#if SupportsWindows() && defined(__x86_64__) && !IsTiny()
+//	implements all win32 apis on non-windows hosts
+//	it is just enough code to get a good backtrace
+__oops_win32:
+	ud2
+	nop
+	.endfn	__oops_win32
+#endif
 
 //	System Five userspace program entrypoint.
 //
@@ -32,18 +49,6 @@
 _start:
 #ifdef __x86_64__
 
-#if SupportsXnu()
-//	Hack for detecting M1 Rosetta environment.
-//	https://github.com/jart/cosmopolitan/issues/429#issuecomment-1166704377
-	cmp	$-1,%ebx
-	jne	0f
-	cmp	$+1,%edx
-	jne	0f
-	mov	$_HOSTXNU,%cl
-	xor	%edi,%edi
-0:
-#endif
-
 #if SupportsFreebsd()
 //	detect free besiyata dishmaya
 	test	%rdi,%rdi
@@ -54,7 +59,9 @@ _start:
 #endif
 
 //	set operating system when already detected
-	mov	%cl,__hostos(%rip)
+1:	mov	%cl,__hostos(%rip)
+
+	mov	%rdx,__program_executable_name(%rip)
 
 //	get startup timestamp as early as possible
 //	its used by --strace flag and kprintf() %T
@@ -68,25 +75,23 @@ _start:
 	lea	8(%rsp),%rsi			// argv
 	lea	16(%rsp,%rbx,8),%rdx		// envp
 	mov	%rsp,__oldstack(%rip)
+	mov	%rdx,__envp(%rip)
 
-//	setup a stack frame
-//	align stack to GetStackSize() so GetStackAddr() is fast
-	.weak	ape_stack_memsz
-	mov	$ape_stack_memsz,%r8d
-	neg	%r8
-	and	%r8,%rsp
+//	setup stack
 	xor	%ebp,%ebp
-//	bofram	9f
+	and	$-16,%rsp
 
-//	make win32 imps noop
+#if SupportsWindows() && !IsTiny()
+//	make win32 imps crash
 	.weak	ape_idata_iat
 	.weak	ape_idata_iatend
-	ezlea	_missingno,ax
+	ezlea	__oops_win32,ax
 	ezlea	ape_idata_iat,di
 	ezlea	ape_idata_iatend,cx
 	sub	%rdi,%rcx
 	shr	$3,%ecx
 	rep stosq
+#endif
 
 //	scan through environment varis
 //	find start of auxiliary values
@@ -110,27 +115,45 @@ _start:
 	call	cosmo
 9:	.unreachable
 
+//	strongly link main() function (discarded by linker)
+	.section .yoink
+	call	main
+	.previous
+
 ////////////////////////////////////////////////////////////////////////////////
 #elif defined(__aarch64__)
+
+#if SupportsFreebsd()
+//	save first arg
+	mov	x4,x0
+#endif
 
 //	save original stack pointer
 //	this is the first argument to cosmo() below
 	mov	x0,sp
 
-//	setup stack frame
+//	setup the stack
+	mov	x28,#0
 	mov	x29,#0
 	mov	x30,#0
+	and	sp,x0,#-16
 
-//	align stack to GetStackSize() so GetStackAddr() is fast
-	mov	x1,sp
-	.weak	ape_stack_memsz
-	ldr	x2,=ape_stack_memsz
-	neg	x2,x2
-	and	x1,x2,x1
-	mov	sp,x1
+//	second arg shall be struct Syslib passed by ape-m1.c
+//	used to talk to apple's authoritarian libraries
+//	should be set to zero on other platforms
+	mov	x1,x15
 
-//	switch to c start function
-	b	cosmo
+//	third arg is program path passed by loader
+//	fourth arg is detected os passed by loader
+
+//	switch to c code
+	bl	cosmo
+	.unreachable
+
+//	strongly link main() function (discarded by linker)
+	.section .yoink
+	bl	main
+	.previous
 
 ////////////////////////////////////////////////////////////////////////////////
 #else

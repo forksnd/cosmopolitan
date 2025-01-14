@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2020 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -16,16 +16,20 @@
 │ TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR             │
 │ PERFORMANCE OF THIS SOFTWARE.                                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
+#include "libc/assert.h"
 #include "libc/calls/calls.h"
 #include "libc/dce.h"
 #include "libc/errno.h"
+#include "libc/limits.h"
 #include "libc/runtime/runtime.h"
-#include "libc/stdio/rand.h"
-#include "libc/stdio/temp.h"
 #include "libc/str/str.h"
+#include "libc/sysv/consts/at.h"
 #include "libc/sysv/consts/o.h"
+#include "libc/temp.h"
 
-#define _O_TMPFILE 000020200000
+#define O_TMPFILE_LINUX 0x00410000
+
+int _mkstemp(char *, int);
 
 /**
  * Returns file descriptor of open anonymous file, e.g.
@@ -40,8 +44,7 @@
  *
  * This creates a secure temporary file inside $TMPDIR. If it isn't
  * defined, then /tmp is used on UNIX and GetTempPath() is used on the
- * New Technology. This resolution of $TMPDIR happens once in a ctor,
- * which is copied to the `kTmpDir` global.
+ * New Technology. This resolution of $TMPDIR happens once in a ctor.
  *
  * Once close() is called, the returned file is guaranteed to be deleted
  * automatically. On UNIX the file is unlink()'d before this function
@@ -50,7 +53,7 @@
  * On newer Linux only (c. 2013) it's possible to turn the anonymous
  * returned file back into a real file, by doing this:
  *
- *     linkat(AT_FDCWD, _gc(xasprintf("/proc/self/fd/%d", fd)),
+ *     linkat(AT_FDCWD, gc(xasprintf("/proc/self/fd/%d", fd)),
  *            AT_FDCWD, "real.txt", AT_SYMLINK_FOLLOW)
  *
  * On the New Technology, temporary files created by this function
@@ -64,52 +67,31 @@
  * @return file descriptor on success, or -1 w/ errno
  * @raise ECANCELED if thread was cancelled in masked mode
  * @raise EINTR if signal was delivered
+ * @see mkstemp() if you need a path
  * @see tmpfile() for stdio version
- * @cancellationpoint
+ * @cancelationpoint
  * @asyncsignalsafe
- * @threadsafe
  * @vforksafe
  */
 int tmpfd(void) {
-  FILE *f;
-  unsigned x;
-  int fd, i, j, e;
-  char path[PATH_MAX], *p;
-  e = errno;
-  if (IsLinux() && (fd = open(kTmpPath, O_RDWR | _O_TMPFILE, 0600)) != -1) {
-    return fd;
-  }
-  errno = e;
-  p = path;
-  p = stpcpy(p, kTmpPath);
-  p = stpcpy(p, "tmp.");
-  if (program_invocation_short_name &&
-      strlen(program_invocation_short_name) < 128) {
-    p = stpcpy(p, program_invocation_short_name);
-    *p++ = '.';
-  }
-  for (i = 0; i < 10; ++i) {
-    x = _rand64();
-    for (j = 0; j < 6; ++j) {
-      p[j] = "0123456789abcdefghijklmnopqrstuvwxyz"[x % 36];
-      x /= 36;
-    }
-    p[j] = 0;
+  int e, fd;
+  const char *prog;
+  char path[PATH_MAX + 1];
+  if (IsLinux()) {
     e = errno;
-    if ((fd = open(path,
-                   O_RDWR | O_CREAT | O_EXCL | (IsWindows() ? _O_TMPFILE : 0),
-                   0600)) != -1) {
-      if (!IsWindows()) {
-        if (unlink(path)) {
-          notpossible;
-        }
-      }
+    if ((fd = open(__get_tmpdir(), O_RDWR | O_TMPFILE_LINUX, 0600)) != -1) {
       return fd;
-    } else if (errno == EEXIST) {
-      errno = e;
     } else {
-      break;
+      errno = e;
     }
   }
-  return -1;
+  path[0] = 0;
+  strlcat(path, __get_tmpdir(), sizeof(path));
+  if (!(prog = program_invocation_short_name))
+    prog = "tmp";
+  strlcat(path, prog, sizeof(path));
+  strlcat(path, ".XXXXXX", sizeof(path));
+  if ((fd = openatemp(AT_FDCWD, path, 0, O_UNLINK, 0)) == -1)
+    return -1;
+  return fd;
 }

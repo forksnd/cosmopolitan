@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2022 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -24,8 +24,8 @@
 /**
  * Collapses repeating headers onto a single line.
  */
-char *FoldHeader(struct HttpMessage *msg, char *b, int h, size_t *z) {
-  char *p;
+char *FoldHeader(struct HttpMessage *msg, const char *b, int h, size_t *z) {
+  char *p, *p2;
   size_t i, n, m;
   struct HttpHeader *x;
   n = msg->headers[h].b - msg->headers[h].a;
@@ -35,9 +35,13 @@ char *FoldHeader(struct HttpMessage *msg, char *b, int h, size_t *z) {
       x = msg->xheaders.p + i;
       if (GetHttpHeader(b + x->k.a, x->k.b - x->k.a) == h) {
         m = x->v.b - x->v.a;
-        if (!(p = realloc(p, n + 2 + m))) abort();
-        memcpy(mempcpy(p + n, ", ", 2), b + x->v.a, m);
-        n += 2 + m;
+        if ((p2 = realloc(p, n + 2 + m))) {
+          memcpy(mempcpy((p = p2) + n, ", ", 2), b + x->v.a, m);
+          n += 2 + m;
+        } else {
+          free(p);
+          return 0;
+        }
       }
     }
     *z = n;

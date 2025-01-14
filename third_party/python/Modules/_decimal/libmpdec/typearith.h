@@ -2,7 +2,6 @@
 #define TYPEARITH_H
 #include "libc/assert.h"
 #include "third_party/python/Modules/_decimal/libmpdec/mpdecimal.h"
-/* clang-format off */
 
 #if defined(__GNUC__) && defined(__x86_64__) && !defined(__STRICT_ANSI__)
 
@@ -194,7 +193,7 @@ _mpd_divmod_pow10(mpd_uint_t *q, mpd_uint_t *r, mpd_uint_t v, mpd_uint_t exp)
             case 17: DIVMOD(q, r, v, 100000000000000000ULL); break;
             case 18: DIVMOD(q, r, v, 1000000000000000000ULL); break;
             case 19: DIVMOD(q, r, v, 10000000000000000000ULL); break;
-            default: unreachable;
+            default: __builtin_unreachable();
             }
         }
     }

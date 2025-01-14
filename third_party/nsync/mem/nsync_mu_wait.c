@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:t;c-basic-offset:8;tab-width:8;coding:utf-8   -*-│
-│vi: set et ft=c ts=8 tw=8 fenc=utf-8                                       :vi│
+│ vi: set noet ft=c ts=8 sw=8 fenc=utf-8                                   :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2016 Google Inc.                                                   │
 │                                                                              │
@@ -16,18 +16,14 @@
 │ limitations under the License.                                               │
 ╚─────────────────────────────────────────────────────────────────────────────*/
 #include "libc/calls/blockcancel.internal.h"
+#include "libc/intrin/dll.h"
 #include "third_party/nsync/atomic.h"
 #include "third_party/nsync/common.internal.h"
-#include "third_party/nsync/dll.h"
 #include "third_party/nsync/mu_semaphore.h"
 #include "third_party/nsync/races.internal.h"
+#include "libc/thread/thread.h"
 #include "third_party/nsync/wait_s.internal.h"
-
-asm(".ident\t\"\\n\\n\
-*NSYNC (Apache 2.0)\\n\
-Copyright 2016 Google, Inc.\\n\
-https://github.com/google/nsync\"");
-// clang-format off
+__static_yoink("nsync_notice");
 
 /* Attempt to remove waiter *w from *mu's
    waiter queue.  If successful, leave the lock held in mode *l_type, and
@@ -89,7 +85,7 @@ static int mu_try_acquire_after_timeout_or_cancel (nsync_mu *mu, lock_type *l_ty
 			ATM_CAS_RELACQ (&mu->word, old_word,
 					old_word|MU_WRITER_WAITING);
 		}
-		spin_attempts = nsync_spin_delay_ (spin_attempts);
+		spin_attempts = pthread_delay_np (mu, spin_attempts);
 		old_word = ATM_LOAD (&mu->word);
 	}
 	/* Check that w wasn't removed from the queue after our caller checked,
@@ -145,7 +141,7 @@ int nsync_mu_wait_with_deadline (nsync_mu *mu,
 				 int (*condition) (const void *condition_arg),
 				 const void *condition_arg,
 				 int (*condition_arg_eq) (const void *a, const void *b),
-				 nsync_time abs_deadline, nsync_note cancel_note) {
+				 int clock, nsync_time abs_deadline, nsync_note cancel_note) {
 	lock_type *l_type;
 	int first_wait;
 	int condition_is_true;
@@ -154,7 +150,7 @@ int nsync_mu_wait_with_deadline (nsync_mu *mu,
 	/* Work out in which mode the lock is held. */
 	uint32_t old_word;
 	IGNORE_RACES_START ();
-	BLOCK_CANCELLATIONS; /* not supported yet */
+	BLOCK_CANCELATION;
 	old_word = ATM_LOAD (&mu->word);
 	if ((old_word & MU_ANY_LOCK) == 0) {
 		nsync_panic_ ("nsync_mu not held in some mode when calling "
@@ -199,22 +195,20 @@ int nsync_mu_wait_with_deadline (nsync_mu *mu,
 
 		/* Acquire spinlock. */
 		old_word = nsync_spin_test_and_set_ (&mu->word, MU_SPINLOCK,
-			MU_SPINLOCK|MU_WAITING|has_condition, MU_ALL_FALSE);
+			MU_SPINLOCK|MU_WAITING|has_condition, MU_ALL_FALSE, mu);
 		had_waiters = ((old_word & (MU_DESIG_WAKER | MU_WAITING)) == MU_WAITING);
 		/* Queue the waiter. */
 		if (first_wait) {
-			nsync_maybe_merge_conditions_ (nsync_dll_last_ (mu->waiters),
+			nsync_maybe_merge_conditions_ (dll_last (mu->waiters),
 						       &w->nw.q);
 			/* first wait goes to end of queue */
-			mu->waiters = nsync_dll_make_last_in_list_ (mu->waiters,
-							            &w->nw.q);
+			dll_make_last (&mu->waiters, &w->nw.q);
 			first_wait = 0;
 		} else {
 			nsync_maybe_merge_conditions_ (&w->nw.q,
-						       nsync_dll_first_ (mu->waiters));
+						       dll_first (mu->waiters));
 			/* subsequent waits go to front of queue */
-			mu->waiters = nsync_dll_make_first_in_list_ (mu->waiters,
-							             &w->nw.q);
+			dll_make_first (&mu->waiters, &w->nw.q);
 		}
 		/* Release spinlock and *mu. */
 		do {
@@ -237,7 +231,7 @@ int nsync_mu_wait_with_deadline (nsync_mu *mu,
 		have_lock = 0;
 		while (ATM_LOAD_ACQ (&w->nw.waiting) != 0) { /* acquire load */
 			if (sem_outcome == 0) {
-				sem_outcome = nsync_sem_wait_with_cancel_ (w, abs_deadline,
+				sem_outcome = nsync_sem_wait_with_cancel_ (w, clock, abs_deadline,
 									   cancel_note);
 				if (sem_outcome != 0 && ATM_LOAD (&w->nw.waiting) != 0) {
 					/* A timeout or cancellation occurred, and no wakeup.
@@ -251,7 +245,7 @@ int nsync_mu_wait_with_deadline (nsync_mu *mu,
 			}
 
 			if (ATM_LOAD (&w->nw.waiting) != 0) {
-				attempts = nsync_spin_delay_ (attempts); /* will ultimately yield */
+				attempts = pthread_delay_np (mu, attempts); /* will ultimately yield */
 			}
 		}
 
@@ -267,7 +261,7 @@ int nsync_mu_wait_with_deadline (nsync_mu *mu,
 	if (condition_is_true) {
 		outcome = 0; /* condition is true trumps other outcomes. */
 	}
-	ALLOW_CANCELLATIONS;
+	ALLOW_CANCELATION;
 	IGNORE_RACES_END ();
 	return (outcome);
 }
@@ -286,7 +280,7 @@ void nsync_mu_wait (nsync_mu *mu, int (*condition) (const void *condition_arg),
                     const void *condition_arg,
 		    int (*condition_arg_eq) (const void *a, const void *b)) {
 	if (nsync_mu_wait_with_deadline (mu, condition, condition_arg, condition_arg_eq,
-					 nsync_time_no_deadline, NULL) != 0) {
+					 0, nsync_time_no_deadline, NULL) != 0) {
 		nsync_panic_ ("nsync_mu_wait woke but condition not true\n");
 	}
 }
@@ -321,5 +315,3 @@ void nsync_mu_unlock_without_wakeup (nsync_mu *mu) {
 	}
 	IGNORE_RACES_END ();
 }
-
-

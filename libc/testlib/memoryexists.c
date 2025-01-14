@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2022 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -22,22 +22,45 @@
 #include "libc/calls/struct/siginfo.h"
 #include "libc/calls/ucontext.h"
 #include "libc/intrin/atomic.h"
+#include "libc/intrin/kprintf.h"
 #include "libc/sysv/consts/sa.h"
 #include "libc/sysv/consts/sig.h"
 #include "libc/testlib/testlib.h"
 #include "third_party/xed/x86.h"
 
-#ifdef __x86_64__
-
 static volatile _Thread_local int gotsignal;
 
 static void ContinueOnError(int sig, siginfo_t *si, void *vctx) {
-  struct XedDecodedInst xedd;
   struct ucontext *ctx = vctx;
+  gotsignal = sig;
+#ifdef __aarch64__
+  ctx->uc_mcontext.pc += 4;
+#elif defined(__x86_64__)
+  struct XedDecodedInst xedd;
   xed_decoded_inst_zero_set_mode(&xedd, XED_MACHINE_MODE_LONG_64);
   xed_instruction_length_decode(&xedd, (void *)ctx->uc_mcontext.rip, 15);
   ctx->uc_mcontext.rip += xedd.length;
-  gotsignal = sig;
+#else
+#error "unsupported architecture"
+#endif /* __x86_64__ */
+}
+
+bool testlib_pokememory(const void *p) {
+  volatile char c;
+  const atomic_char *mem = p;
+  struct sigaction old[2];
+  struct sigaction sa = {
+      .sa_sigaction = ContinueOnError,
+      .sa_flags = SA_SIGINFO,
+  };
+  gotsignal = 0;
+  npassert(!sigaction(SIGSEGV, &sa, old + 0));
+  npassert(!sigaction(SIGBUS, &sa, old + 1));
+  c = atomic_load(mem);
+  (void)c;
+  npassert(!sigaction(SIGBUS, old + 1, 0));
+  npassert(!sigaction(SIGSEGV, old + 0, 0));
+  return !gotsignal;
 }
 
 /**
@@ -47,21 +70,8 @@ static void ContinueOnError(int sig, siginfo_t *si, void *vctx) {
  * on error. It then attempts a volatile read and if it faults, then
  * this function shall return false. The value at `p` isn't considered.
  */
-noasan bool testlib_memoryexists(const void *p) {
-  volatile char c;
-  const atomic_char *mem = p;
-  struct sigaction old[2];
-  struct sigaction sa = {
-      .sa_sigaction = ContinueOnError,
-      .sa_flags = SA_SIGINFO,
-  };
-  gotsignal = 0;
-  _npassert(!sigaction(SIGSEGV, &sa, old + 0));
-  _npassert(!sigaction(SIGBUS, &sa, old + 1));
-  c = atomic_load(mem);
-  _npassert(!sigaction(SIGBUS, old + 1, 0));
-  _npassert(!sigaction(SIGSEGV, old + 0, 0));
-  return !gotsignal;
+bool testlib_memoryexists(const void *p) {
+  if (kisdangerous(p))
+    return false;
+  return testlib_pokememory(p);
 }
-
-#endif /* __x86_64__ */

@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2020 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -17,10 +17,11 @@
 │ PERFORMANCE OF THIS SOFTWARE.                                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
 #include "tool/build/lib/interner.h"
-#include "libc/intrin/safemacros.internal.h"
+#include "libc/intrin/safemacros.h"
 #include "libc/mem/mem.h"
 #include "libc/nexgen32e/crc32.h"
 #include "libc/runtime/runtime.h"
+#include "libc/stdckdint.h"
 #include "libc/str/str.h"
 #include "libc/x/x.h"
 
@@ -32,7 +33,7 @@ struct InternerObject {
   struct InternerHash {
     unsigned hash; /* 0 means empty */
     unsigned index;
-  } * p;
+  } *p;
 };
 
 static void rehash(struct InternerObject *it) {
@@ -42,7 +43,8 @@ static void rehash(struct InternerObject *it) {
   p = it->p;
   it->p = xcalloc((it->n <<= 1), sizeof(struct InternerHash));
   for (i = 0; i < n; ++i) {
-    if (!p[i].hash) continue;
+    if (!p[i].hash)
+      continue;
     step = 0;
     do {
       j = (p[i].hash + step * ((step + 1) >> 1)) & (it->n - 1);
@@ -93,8 +95,8 @@ size_t interncount(const struct Interner *t) {
 size_t internobj(struct Interner *t, const void *data, size_t size) {
   char *p2;
   size_t n2;
-  char *item;
   unsigned hash;
+  const char *item;
   struct InternerObject *it;
   size_t i, off, step, need, bytes;
   step = 0;
@@ -119,15 +121,21 @@ size_t internobj(struct Interner *t, const void *data, size_t size) {
     } while (it->p[i].hash);
   }
   off = it->pool.i;
-  if (__builtin_add_overflow(off, size, &need)) abort();
-  if (__builtin_add_overflow(need, 1, &need)) abort();
+  if (ckd_add(&need, off, size))
+    abort();
+  if (ckd_add(&need, need, 1))
+    abort();
   if (need > it->pool.n) {
-    if (__builtin_add_overflow(it->pool.n, 1, &n2)) abort();
+    if (ckd_add(&n2, it->pool.n, 1))
+      abort();
     do {
-      if (__builtin_add_overflow(n2, n2 >> 1, &n2)) abort();
+      if (ckd_add(&n2, n2, n2 >> 1))
+        abort();
     } while (need > n2);
-    if (__builtin_mul_overflow(n2, sizeof(*it->pool.p), &bytes)) abort();
-    if (!(p2 = realloc(it->pool.p, bytes))) abort();
+    if (ckd_mul(&bytes, n2, sizeof(*it->pool.p)))
+      abort();
+    if (!(p2 = realloc(it->pool.p, bytes)))
+      abort();
     it->pool.p = p2;
     it->pool.n = n2;
   }

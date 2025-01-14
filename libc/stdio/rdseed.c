@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2020 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -27,7 +27,7 @@
  *
  * If RDSEED isn't available, we'll try RDRAND (which we automatically
  * disable for microarchitectures where it's known to be slow or buggy).
- * If RDRAND isn't available then we try getrandom(), RtlGenRandom(), or
+ * If RDRAND isn't available then we try getrandom(), ProcessPrng(), or
  * sysctl(KERN_ARND). If those aren't available then we try /dev/urandom
  * and if that fails, we use RDTSC and getpid().
  *
@@ -48,7 +48,8 @@ uint64_t rdseed(void) {
                    : CFLAG_CONSTRAINT(cf), "=r"(x)
                    : /* no inputs */
                    : "cc");
-      if (cf) return x;
+      if (cf)
+        return x;
       asm volatile("pause");
     }
   }

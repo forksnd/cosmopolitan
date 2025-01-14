@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2022 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -17,16 +17,14 @@
 │ PERFORMANCE OF THIS SOFTWARE.                                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
 #include "libc/dce.h"
-#include "libc/intrin/asan.internal.h"
-#include "libc/intrin/describeflags.internal.h"
+#include "libc/intrin/describeflags.h"
 #include "libc/intrin/kprintf.h"
-#include "libc/macros.internal.h"
+#include "libc/macros.h"
 #include "libc/nt/winsock.h"
 
-void DescribeIovNt(const struct NtIovec *iov, uint32_t iovlen, ssize_t rem) {
+void _DescribeIovNt(const struct NtIovec *iov, uint32_t iovlen, ssize_t rem) {
   int i;
-  if ((!IsAsan() && kisdangerous(iov)) ||
-      (IsAsan() && !__asan_is_valid(iov, iovlen * sizeof(struct NtIovec)))) {
+  if (kisdangerous(iov)) {
     kprintf("%p", iov);
     return;
   }

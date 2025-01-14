@@ -1,12 +1,13 @@
 #include "libc/nt/codegen.h"
-.imp	gdi32,__imp_CreateBitmap,CreateBitmap,1056
+.imp	gdi32,__imp_CreateBitmap,CreateBitmap
 
 	.text.windows
+	.ftrace1
 CreateBitmap:
+	.ftrace2
 #ifdef __x86_64__
 	push	%rbp
 	mov	%rsp,%rbp
-	.profilable
 	mov	__imp_CreateBitmap(%rip),%rax
 	jmp	__sysv2nt6
 #elif defined(__aarch64__)

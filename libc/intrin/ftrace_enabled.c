@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2022 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -25,7 +25,7 @@
  * @param delta is added to enabled state
  * @return enabled state before `delta` was applied
  */
-int ftrace_enabled(int delta) {
+dontinstrument int(ftrace_enabled)(int delta) {
   int res;
   struct CosmoTib *tib;
   if (__tls_enabled) {

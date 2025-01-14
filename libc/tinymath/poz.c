@@ -1,7 +1,6 @@
 /*-*- mode:c;indent-tabs-mode:t;c-basic-offset:4;tab-width:4;coding:utf-8   -*-│
-│vi: set et ft=c ts=4 sts=4 sw=4 fenc=utf-8                                 :vi│
+│ vi: set noet ft=c ts=4 sts=4 sw=4 fenc=utf-8                             :vi │
 ╚─────────────────────────────────────────────────────────────────────────────*/
-/* clang-format off */
 /*
 
     Compute probability of measured Chi Square value.
@@ -121,9 +120,9 @@ double pochisq(
     	    e = (even ? 0.0 : LOG_SQRT_PI);
     	    c = log(a);
     	    while (z <= x) {
-		e = log(z) + e;
-		s += ex(c * z - a - e);
-		z += 1.0;
+				e = log(z) + e;
+				s += ex(c * z - a - e);
+				z += 1.0;
     	    }
     	    return (s);
     	} else {

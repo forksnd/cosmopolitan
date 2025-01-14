@@ -1,9 +1,9 @@
 #ifndef COSMOPOLITAN_LIBC_NT_THREADS_H_
 #define COSMOPOLITAN_LIBC_NT_THREADS_H_
+#include "libc/nt/struct/context.h"
 #include "libc/nt/struct/overlapped.h"
 #include "libc/nt/struct/securityattributes.h"
 #include "libc/nt/thunk/msabi.h"
-#if !(__ASSEMBLER__ + __LINKER__ + 0)
 COSMOPOLITAN_C_START_
 /*                            ░░░░
                        ▒▒▒░░░▒▒▒▒▒▒▒▓▓▓░
@@ -30,12 +30,10 @@ COSMOPOLITAN_C_START_
 │ cosmopolitan § new technology » threads                                  ─╬─│┼
 ╚────────────────────────────────────────────────────────────────────────────│*/
 
-typedef uint32_t (*NtThreadStartRoutine)(void *lpParameter);
-
-int64_t CreateThread(struct NtSecurityAttributes *lpThreadAttributes,
-                     size_t dwStackSize, NtThreadStartRoutine lpStartAddress,
+int64_t CreateThread(const struct NtSecurityAttributes *lpThreadAttributes,
+                     size_t dwStackSize, void *lpStartAddress,
                      void *lpParameter, uint32_t dwCreationFlags,
-                     uint32_t *opt_lpThreadId);
+                     uint32_t *opt_lpThreadId) paramsnonnull((3));
 
 void ExitThread(uint32_t dwExitCode) wontreturn;
 int64_t GetCurrentThread(void);
@@ -62,9 +60,18 @@ bool32 TlsFree(uint32_t);
 bool32 TlsSetValue(uint32_t, void *);
 void *TlsGetValue(uint32_t);
 
+uint32_t SuspendThread(int64_t hThread);
+uint32_t ResumeThread(int64_t hThread);
+bool32 GetThreadContext(int64_t hThread, struct NtContext *in_out_lpContext);
+bool32 SetThreadContext(int64_t hThread, const struct NtContext *lpContext);
+
+void *SetThreadDescription(int64_t hThread,
+                           const char16_t *lpThreadDescription);
+void *GetThreadDescription(int64_t hThread,
+                           char16_t *out_ppszThreadDescription);
+
 #if ShouldUseMsabiAttribute()
 #include "libc/nt/thunk/thread.inc"
 #endif /* ShouldUseMsabiAttribute() */
 COSMOPOLITAN_C_END_
-#endif /* !(__ASSEMBLER__ + __LINKER__ + 0) */
 #endif /* COSMOPOLITAN_LIBC_NT_THREADS_H_ */

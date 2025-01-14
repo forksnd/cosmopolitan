@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2020 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -26,7 +26,8 @@ void testlib_formatbinaryashex(const char *want, const void *got, size_t n,
   size_t i;
   uint8_t b;
   char *gothex;
-  if (n == -1ul) n = strlen(want) / 2;
+  if (n == -1ul)
+    n = strlen(want) / 2;
   gothex = xmalloc(n * 2 + 1);
   gothex[n * 2] = '\0';
   for (i = 0; i < n; ++i) {

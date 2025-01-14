@@ -1,15 +1,16 @@
-#include "libc/macros.internal.h"
+#include "libc/macros.h"
 .text.unlikely
 
+	.ftrace1
 elibmax:
+	.ftrace2
 #ifdef __x86_64__
 	.leafprologue
-	.profilable
 	mov	ELIBMAX(%rip),%ecx
 	jmp	__errfun
 #elif defined(__aarch64__)
 	adrp	x1,ELIBMAX
-	ldr	w0,[x1,#:lo12:ELIBMAX]
+	ldrsw	x0,[x1,#:lo12:ELIBMAX]
 	b	__errfun
 #else
 #error "unsupported architecture"

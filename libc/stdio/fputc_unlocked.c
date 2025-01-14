@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=8 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=8 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2020 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -17,6 +17,7 @@
 │ PERFORMANCE OF THIS SOFTWARE.                                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
 #include "libc/calls/calls.h"
+#include "libc/stdio/internal.h"
 #include "libc/stdio/stdio.h"
 
 /**
@@ -32,7 +33,10 @@ int fputc_unlocked(int c, FILE *f) {
     return c & 255;
   } else {
     b = c;
-    if (!fwrite_unlocked(&b, 1, 1, f)) return -1;
+    if (!fwrite_unlocked(&b, 1, 1, f))
+      return -1;
     return b;
   }
 }
+
+__strong_reference(fputc_unlocked, putc_unlocked);

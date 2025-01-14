@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2022 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -17,26 +17,13 @@
 │ PERFORMANCE OF THIS SOFTWARE.                                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
 #include "libc/calls/state.internal.h"
-#include "libc/str/str.h"
+#include "libc/thread/posixthread.internal.h"
 #include "libc/thread/thread.h"
 
-#ifdef __fds_lock
-#undef __fds_lock
-#endif
-
-#ifdef __fds_unlock
-#undef __fds_unlock
-#endif
-
 void __fds_lock(void) {
-  pthread_mutex_lock(&__fds_lock_obj);
+  _pthread_mutex_lock(&__fds_lock_obj);
 }
 
 void __fds_unlock(void) {
-  pthread_mutex_unlock(&__fds_lock_obj);
-}
-
-void __fds_funlock(void) {
-  bzero(&__fds_lock_obj, sizeof(__fds_lock_obj));
-  __fds_lock_obj._type = PTHREAD_MUTEX_RECURSIVE;
+  _pthread_mutex_unlock(&__fds_lock_obj);
 }

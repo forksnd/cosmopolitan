@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2022 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -23,8 +23,9 @@
 #include "libc/calls/struct/rlimit.h"
 #include "libc/calls/struct/sigaction.h"
 #include "libc/errno.h"
-#include "libc/macros.internal.h"
+#include "libc/macros.h"
 #include "libc/runtime/internal.h"
+#include "libc/runtime/runtime.h"
 #include "libc/runtime/stack.h"
 #include "libc/stdio/rand.h"
 #include "libc/str/str.h"
@@ -38,19 +39,19 @@
 #include "libc/sysv/consts/sig.h"
 #include "libc/testlib/hyperion.h"
 #include "libc/testlib/testlib.h"
-#include "libc/thread/spawn.h"
 #include "libc/thread/tls.h"
-#include "libc/thread/wait0.internal.h"
-#include "libc/time/struct/tm.h"
-#include "libc/time/time.h"
+#include "libc/time.h"
 
-STATIC_YOINK("zip_uri_support");
-STATIC_YOINK("libc/testlib/hyperion.txt");
+__static_yoink("zipos");
+__static_yoink("libc/testlib/hyperion.txt");
 
 #define THREADS 8
 
 void SetUpOnce(void) {
-  __enable_threads();
+  for (int i = 3; i < 200; ++i) {
+    close(i);
+  }
+  errno = 0;
   ASSERT_SYS(0, 0, pledge("stdio rpath", 0));
 }
 
@@ -62,13 +63,17 @@ TEST(reservefd, testGrowthOfFdsDataStructure) {
   int i, n;
   struct rlimit rlim;
   n = 1700;  // pe '2**16/40' → 1638 (likely value of g_fds.n)
-  if (!getrlimit(RLIMIT_NOFILE, &rlim)) n = MIN(n, rlim.rlim_cur - 3);
-  for (i = 0; i < n; ++i) {
-    EXPECT_SYS(0, i + 3, open("/zip/usr/share/zoneinfo/UTC", O_RDONLY));
+  if (!getrlimit(RLIMIT_NOFILE, &rlim)) {
+    n = MIN(n, rlim.rlim_cur - 3);
+  } else {
+    errno = 0;
   }
-  ASSERT_GT(g_fds.n, OPEN_MAX);
   for (i = 0; i < n; ++i) {
-    EXPECT_SYS(0, 0, close(i + 3));
+    ASSERT_SYS(0, i + 3, open("/zip/usr/share/zoneinfo/GMT", O_RDONLY));
+  }
+  ASSERT_GT(g_fds.n, 16);
+  for (i = 0; i < n; ++i) {
+    ASSERT_SYS(0, 0, close(i + 3));
   }
 }
 
@@ -110,20 +115,4 @@ int Worker(void *p, int tid) {
     close(fd);
   }
   return 0;
-}
-
-TEST(reservefd, tortureTest) {
-  int i;
-  struct spawn th[THREADS];
-  struct sigaction oldsa;
-  struct itimerval oldit;
-  struct itimerval it = {{0, 10000}, {0, 100}};
-  struct sigaction sa = {.sa_sigaction = OnSigAlrm,
-                         .sa_flags = 0 /* SA_NODEFER */};
-  // ASSERT_SYS(0, 0, sigaction(SIGALRM, &sa, &oldsa));
-  // ASSERT_SYS(0, 0, setitimer(ITIMER_REAL, &it, &oldit));
-  for (i = 0; i < THREADS; ++i) _spawn(Worker, 0, th + i);
-  for (i = 0; i < THREADS; ++i) _join(th + i);
-  // EXPECT_SYS(0, 0, sigaction(SIGALRM, &oldsa, 0));
-  // EXPECT_SYS(0, 0, setitimer(ITIMER_REAL, &oldit, 0));
 }

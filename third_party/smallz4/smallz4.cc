@@ -1,5 +1,5 @@
 /*-*- mode:c++;indent-tabs-mode:t;c-basic-offset:8;tab-width:8;coding:utf-8 -*-│
-│vi: set et ft=c ts=8 tw=8 fenc=utf-8                                       :vi│
+│ vi: set noet ft=c ts=8 sw=8 fenc=utf-8                                   :vi │
 ╚──────────────────────────────────────────────────────────────────────────────╝
 │                                                                              │
 │  smallz4                                                                     │
@@ -30,7 +30,7 @@
 #include "libc/calls/weirdtypes.h"
 #include "libc/runtime/runtime.h"
 #include "libc/stdio/stdio.h"
-#include "libc/time/time.h"
+#include "libc/time.h"
 #include "third_party/smallz4/smallz4.hh"
 
 /// error handler

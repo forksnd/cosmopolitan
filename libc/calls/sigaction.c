@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2020 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -17,40 +17,37 @@
 │ PERFORMANCE OF THIS SOFTWARE.                                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
 #include "libc/calls/struct/sigaction.h"
+#include "ape/sections.internal.h"
 #include "libc/assert.h"
-#include "libc/calls/blocksigs.internal.h"
 #include "libc/calls/calls.h"
 #include "libc/calls/internal.h"
 #include "libc/calls/sig.internal.h"
 #include "libc/calls/state.internal.h"
+#include "libc/calls/struct/sigaction.h"
 #include "libc/calls/struct/sigaction.internal.h"
 #include "libc/calls/struct/siginfo.internal.h"
-#include "libc/calls/struct/sigset.h"
 #include "libc/calls/syscall-sysv.internal.h"
 #include "libc/calls/syscall_support-sysv.internal.h"
 #include "libc/calls/ucontext.h"
 #include "libc/dce.h"
-#include "libc/intrin/asan.internal.h"
-#include "libc/intrin/bits.h"
-#include "libc/intrin/describeflags.internal.h"
-#include "libc/intrin/strace.internal.h"
+#include "libc/intrin/describeflags.h"
+#include "libc/intrin/dll.h"
+#include "libc/intrin/strace.h"
 #include "libc/limits.h"
 #include "libc/log/backtrace.internal.h"
 #include "libc/log/log.h"
-#include "libc/macros.internal.h"
+#include "libc/macros.h"
 #include "libc/mem/mem.h"
 #include "libc/runtime/runtime.h"
+#include "libc/runtime/syslib.internal.h"
 #include "libc/str/str.h"
 #include "libc/sysv/consts/limits.h"
 #include "libc/sysv/consts/sa.h"
 #include "libc/sysv/consts/sig.h"
 #include "libc/sysv/errfuns.h"
-
-#undef sigaction
-
-#ifdef SYSDEBUG
-STATIC_YOINK("strsignal");  // for kprintf()
-#endif
+#include "libc/thread/posixthread.internal.h"
+#include "libc/thread/thread.h"
+#include "libc/thread/tls.h"
 
 #define SA_RESTORER 0x04000000
 
@@ -58,44 +55,48 @@ static void sigaction_cosmo2native(union metasigaction *sa) {
   void *handler;
   uint64_t flags;
   void *restorer;
-  uint32_t mask[4];
-  if (!sa) return;
+  uint32_t masklo;
+  uint32_t maskhi;
+  if (!sa)
+    return;
   flags = sa->cosmo.sa_flags;
   handler = sa->cosmo.sa_handler;
   restorer = sa->cosmo.sa_restorer;
-  mask[0] = sa->cosmo.sa_mask.__bits[0];
-  mask[1] = sa->cosmo.sa_mask.__bits[0] >> 32;
-  mask[2] = sa->cosmo.sa_mask.__bits[1];
-  mask[3] = sa->cosmo.sa_mask.__bits[1] >> 32;
+  masklo = sa->cosmo.sa_mask;
+  maskhi = sa->cosmo.sa_mask >> 32;
   if (IsLinux()) {
     sa->linux.sa_flags = flags;
     sa->linux.sa_handler = handler;
     sa->linux.sa_restorer = restorer;
-    sa->linux.sa_mask[0] = mask[0];
-    sa->linux.sa_mask[1] = mask[1];
+    sa->linux.sa_mask[0] = masklo;
+    sa->linux.sa_mask[1] = maskhi;
+  } else if (IsXnuSilicon()) {
+    sa->silicon.sa_flags = flags;
+    sa->silicon.sa_handler = handler;
+    sa->silicon.sa_mask[0] = masklo;
   } else if (IsXnu()) {
     sa->xnu_in.sa_flags = flags;
     sa->xnu_in.sa_handler = handler;
     sa->xnu_in.sa_restorer = restorer;
-    sa->xnu_in.sa_mask[0] = mask[0];
+    sa->xnu_in.sa_mask[0] = masklo;
   } else if (IsFreebsd()) {
     sa->freebsd.sa_flags = flags;
     sa->freebsd.sa_handler = handler;
-    sa->freebsd.sa_mask[0] = mask[0];
-    sa->freebsd.sa_mask[1] = mask[1];
-    sa->freebsd.sa_mask[2] = mask[2];
-    sa->freebsd.sa_mask[3] = mask[3];
+    sa->freebsd.sa_mask[0] = masklo;
+    sa->freebsd.sa_mask[1] = maskhi;
+    sa->freebsd.sa_mask[2] = 0;
+    sa->freebsd.sa_mask[3] = 0;
   } else if (IsOpenbsd()) {
     sa->openbsd.sa_flags = flags;
     sa->openbsd.sa_handler = handler;
-    sa->openbsd.sa_mask[0] = mask[0];
+    sa->openbsd.sa_mask[0] = masklo;
   } else if (IsNetbsd()) {
     sa->netbsd.sa_flags = flags;
     sa->netbsd.sa_handler = handler;
-    sa->netbsd.sa_mask[0] = mask[0];
-    sa->netbsd.sa_mask[1] = mask[1];
-    sa->netbsd.sa_mask[2] = mask[2];
-    sa->netbsd.sa_mask[3] = mask[3];
+    sa->netbsd.sa_mask[0] = masklo;
+    sa->netbsd.sa_mask[1] = maskhi;
+    sa->netbsd.sa_mask[2] = 0;
+    sa->netbsd.sa_mask[3] = 0;
   }
 }
 
@@ -103,44 +104,45 @@ static void sigaction_native2cosmo(union metasigaction *sa) {
   void *handler;
   uint64_t flags;
   void *restorer = 0;
-  uint32_t mask[4] = {0};
-  if (!sa) return;
+  uint32_t masklo;
+  uint32_t maskhi = 0;
+  if (!sa)
+    return;
   if (IsLinux()) {
     flags = sa->linux.sa_flags;
     handler = sa->linux.sa_handler;
     restorer = sa->linux.sa_restorer;
-    mask[0] = sa->linux.sa_mask[0];
-    mask[1] = sa->linux.sa_mask[1];
+    masklo = sa->linux.sa_mask[0];
+    maskhi = sa->linux.sa_mask[1];
+  } else if (IsXnu()) {
+    flags = sa->silicon.sa_flags;
+    handler = sa->silicon.sa_handler;
+    masklo = sa->silicon.sa_mask[0];
   } else if (IsXnu()) {
     flags = sa->xnu_out.sa_flags;
     handler = sa->xnu_out.sa_handler;
-    mask[0] = sa->xnu_out.sa_mask[0];
+    masklo = sa->xnu_out.sa_mask[0];
   } else if (IsFreebsd()) {
     flags = sa->freebsd.sa_flags;
     handler = sa->freebsd.sa_handler;
-    mask[0] = sa->freebsd.sa_mask[0];
-    mask[1] = sa->freebsd.sa_mask[1];
-    mask[2] = sa->freebsd.sa_mask[2];
-    mask[3] = sa->freebsd.sa_mask[3];
+    masklo = sa->freebsd.sa_mask[0];
+    maskhi = sa->freebsd.sa_mask[1];
   } else if (IsOpenbsd()) {
     flags = sa->openbsd.sa_flags;
     handler = sa->openbsd.sa_handler;
-    mask[0] = sa->openbsd.sa_mask[0];
+    masklo = sa->openbsd.sa_mask[0];
   } else if (IsNetbsd()) {
     flags = sa->netbsd.sa_flags;
     handler = sa->netbsd.sa_handler;
-    mask[0] = sa->netbsd.sa_mask[0];
-    mask[1] = sa->netbsd.sa_mask[1];
-    mask[2] = sa->netbsd.sa_mask[2];
-    mask[3] = sa->netbsd.sa_mask[3];
+    masklo = sa->netbsd.sa_mask[0];
+    maskhi = sa->netbsd.sa_mask[1];
   } else {
     return;
   }
   sa->cosmo.sa_flags = flags;
   sa->cosmo.sa_handler = handler;
   sa->cosmo.sa_restorer = restorer;
-  sa->cosmo.sa_mask.__bits[0] = mask[0] | (uint64_t)mask[1] << 32;
-  sa->cosmo.sa_mask.__bits[1] = mask[2] | (uint64_t)mask[3] << 32;
+  sa->cosmo.sa_mask = masklo | (uint64_t)maskhi << 32;
 }
 
 static int __sigaction(int sig, const struct sigaction *act,
@@ -149,6 +151,7 @@ static int __sigaction(int sig, const struct sigaction *act,
       (sizeof(struct sigaction) >= sizeof(struct sigaction_linux) &&
        sizeof(struct sigaction) >= sizeof(struct sigaction_xnu_in) &&
        sizeof(struct sigaction) >= sizeof(struct sigaction_xnu_out) &&
+       sizeof(struct sigaction) >= sizeof(struct sigaction_silicon) &&
        sizeof(struct sigaction) >= sizeof(struct sigaction_freebsd) &&
        sizeof(struct sigaction) >= sizeof(struct sigaction_openbsd) &&
        sizeof(struct sigaction) >= sizeof(struct sigaction_netbsd)),
@@ -157,20 +160,21 @@ static int __sigaction(int sig, const struct sigaction *act,
   int rc, rva, oldrva;
   sigaction_f sigenter;
   struct sigaction *ap, copy;
-  if (IsMetal()) return enosys(); /* TODO: Signals on Metal */
-  if (!(1 <= sig && sig <= _NSIG)) return einval();
-  if (sig == SIGKILL || sig == SIGSTOP) return einval();
-  if (IsAsan() && ((act && !__asan_is_valid(act, sizeof(*act))) ||
-                   (oldact && !__asan_is_valid(oldact, sizeof(*oldact))))) {
-    return efault();
-  }
+  if (IsMetal())
+    return enosys(); /* TODO: Signals on Metal */
+  if (!(1 <= sig && sig <= _NSIG))
+    return einval();
+  if (sig == SIGKILL || sig == SIGSTOP)
+    return einval();
   if (!act) {
     rva = (int32_t)(intptr_t)SIG_DFL;
   } else if ((intptr_t)act->sa_handler < kSigactionMinRva) {
     rva = (int)(intptr_t)act->sa_handler;
-  } else if ((intptr_t)act->sa_handler >= (intptr_t)&_base + kSigactionMinRva &&
-             (intptr_t)act->sa_handler < (intptr_t)&_base + INT_MAX) {
-    rva = (int)((uintptr_t)act->sa_handler - (uintptr_t)&_base);
+  } else if ((intptr_t)act->sa_handler >=
+                 (intptr_t)&__executable_start + kSigactionMinRva &&
+             (intptr_t)act->sa_handler <
+                 (intptr_t)&__executable_start + INT_MAX) {
+    rva = (int)((uintptr_t)act->sa_handler - (uintptr_t)&__executable_start);
   } else {
     return efault();
   }
@@ -187,7 +191,7 @@ static int __sigaction(int sig, const struct sigaction *act,
           ap->sa_flags |= SA_RESTORER;
           ap->sa_restorer = &__restore_rt;
         }
-        if (IsWsl1()) {
+        if (__iswsl1()) {
           sigenter = __sigenter_wsl;
         } else {
           sigenter = ap->sa_sigaction;
@@ -198,6 +202,9 @@ static int __sigaction(int sig, const struct sigaction *act,
         // mitigate Rosetta signal handling strangeness
         // https://github.com/jart/cosmopolitan/issues/455
         ap->sa_flags |= SA_SIGINFO;
+      } else if (IsXnu()) {
+        sigenter = __sigenter_xnu;
+        ap->sa_flags |= SA_SIGINFO;  // couldn't hurt
       } else if (IsNetbsd()) {
         sigenter = __sigenter_netbsd;
       } else if (IsFreebsd()) {
@@ -236,27 +243,47 @@ static int __sigaction(int sig, const struct sigaction *act,
       arg4 = 8; /* or linux whines */
       arg5 = 0;
     }
-    if ((rc = sys_sigaction(sig, ap, oldact, arg4, arg5)) != -1) {
+    if (!IsXnuSilicon()) {
+      rc = sys_sigaction(sig, ap, oldact, arg4, arg5);
+    } else {
+      rc = _sysret(__syslib->__sigaction(sig, ap, oldact));
+      // xnu silicon claims to support sa_resethand but it does nothing
+      // this can be tested, since it clears the bit from flags as well
+      if (!rc && oldact &&
+          (((struct sigaction_silicon *)oldact)->sa_flags & SA_RESETHAND)) {
+        ((struct sigaction_silicon *)oldact)->sa_flags |= SA_RESETHAND;
+      }
+    }
+    if (rc != -1) {
       sigaction_native2cosmo((union metasigaction *)oldact);
+      if (oldact &&                         //
+          oldact->sa_handler != SIG_DFL &&  //
+          oldact->sa_handler != SIG_IGN &&  //
+          (IsFreebsd() || IsOpenbsd() || IsNetbsd() || IsXnu())) {
+        oldact->sa_handler =
+            (sighandler_t)((uintptr_t)__executable_start + __sighandrvas[sig]);
+      }
     }
   } else {
     if (oldact) {
       bzero(oldact, sizeof(*oldact));
+      oldrva = __sighandrvas[sig];
+      oldact->sa_mask = __sighandmask[sig];
+      oldact->sa_flags = __sighandflags[sig];
+      oldact->sa_sigaction =
+          (sigaction_f)(oldrva < kSigactionMinRva
+                            ? oldrva
+                            : (uintptr_t)&__executable_start + oldrva);
     }
     rc = 0;
   }
   if (rc != -1 && !__vforked) {
-    if (oldact) {
-      oldrva = __sighandrvas[sig];
-      oldact->sa_sigaction =
-          (sigaction_f)(oldrva < kSigactionMinRva ? oldrva
-                                                  : (intptr_t)&_base + oldrva);
-    }
     if (act) {
       __sighandrvas[sig] = rva;
+      __sighandmask[sig] = act->sa_mask;
       __sighandflags[sig] = act->sa_flags;
-      if (IsWindows()) {
-        __sig_check_ignore(sig, rva);
+      if (IsWindows() && __sig_ignored(sig)) {
+        __sig_delete(sig);
       }
     }
   }
@@ -266,7 +293,9 @@ static int __sigaction(int sig, const struct sigaction *act,
 /**
  * Installs handler for kernel interrupt to thread, e.g.:
  *
- *     void GotCtrlC(int sig, siginfo_t *si, void *ctx);
+ *     void GotCtrlC(int sig, siginfo_t *si, void *arg) {
+ *       ucontext_t *ctx = arg;
+ *     }
  *     struct sigaction sa = {.sa_sigaction = GotCtrlC,
  *                            .sa_flags = SA_RESETHAND|SA_RESTART|SA_SIGINFO};
  *     CHECK_NE(-1, sigaction(SIGINT, &sa, NULL));
@@ -387,7 +416,7 @@ static int __sigaction(int sig, const struct sigaction *act,
  *       ctx->uc_mcontext.rip += xedd.length;
  *     }
  *
- *     void OnCrash(int sig, struct siginfo *si, void *vctx) {
+ *     void OnCrash(int sig, siginfo_t *si, void *vctx) {
  *       struct ucontext *ctx = vctx;
  *       SkipOverFaultingInstruction(ctx);
  *       ContinueOnCrash();  // reinstall here in case *rip faults
@@ -462,6 +491,15 @@ static int __sigaction(int sig, const struct sigaction *act,
  *   which can happen if your process, or the parent process that
  *   spawned your process, happened to call `setrlimit()`. Doing this is
  *   a wonderful idea.
+ *
+ * Signal handlers should avoid clobbering global variables like `errno`
+ * because most signals are asynchronous, i.e. the signal handler might
+ * be called at any assembly instruction. If something like a `SIGCHLD`
+ * handler doesn't save / restore the `errno` global when calling wait,
+ * then any i/o logic in the main program that checks `errno` will most
+ * likely break. This is rare in practice, since systems usually design
+ * signals to favor delivery from cancelation points before they block
+ * however that's not guaranteed.
  *
  * @return 0 on success or -1 w/ errno
  * @see xsigaction() for a much better api

@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:t;c-basic-offset:8;tab-width:8;coding:utf-8   -*-│
-│vi: set et ft=c ts=8 tw=8 fenc=utf-8                                       :vi│
+│ vi: set noet ft=c ts=8 sw=8 fenc=utf-8                                   :vi │
 ╚──────────────────────────────────────────────────────────────────────────────╝
 │                                                                              │
 │  Musl Libc                                                                   │
@@ -29,19 +29,8 @@
 #include "libc/math.h"
 #include "libc/tinymath/internal.h"
 #include "libc/tinymath/ldshape.internal.h"
-
-asm(".ident\t\"\\n\\n\
-Musl libc (MIT License)\\n\
-Copyright 2005-2014 Rich Felker, et. al.\"");
-asm(".include \"libc/disclaimer.inc\"");
-// clang-format off
-
-#if LDBL_MANT_DIG == 53 && LDBL_MAX_EXP == 1024
-long double sqrtl(long double x)
-{
-	return sqrt(x);
-}
-#elif (LDBL_MANT_DIG == 113 || LDBL_MANT_DIG == 64) && LDBL_MAX_EXP == 16384
+#if !(LDBL_MANT_DIG == 53 && LDBL_MAX_EXP == 1024)
+__static_yoink("musl_libc_notice");
 
 #define FENV_SUPPORT 1
 
@@ -205,14 +194,12 @@ static inline u128 mul128_tail(u128 a, u128 b)
 	return lo;
 }
 
-/* see sqrt.c for detailed comments.  */
-
 /**
  * Returns square root of 𝑥.
  */
 long double sqrtl(long double x)
 {
-#ifdef __x86__
+#if defined(__x86__)
 
 	asm("fsqrt" : "+t"(x));
 	return x;
@@ -246,7 +233,7 @@ long double sqrtl(long double x)
 	top = (top + 0x3fff) >> 1;
 
 	/* r ~ 1/sqrt(m) */
-	static const uint64_t three = 0xc0000000;
+	const uint64_t three = 0xc0000000;
 	uint64_t r, s, d, u, i;
 	i = (ix.hi >> 42) % 128;
 	r = (uint32_t)__rsqrt_tab[i] << 16;
@@ -268,7 +255,7 @@ long double sqrtl(long double x)
 	r = mul64(u, r) << 1;
 	/* |r sqrt(m) - 1| < 0x1.c001p-59, switch to 128bit */
 
-	static const u128 threel = {.hi=three<<32, .lo=0};
+	const u128 threel = {.hi=three<<32, .lo=0};
 	u128 rl, sl, dl, ul;
 	rl.hi = r;
 	rl.lo = 0;
@@ -298,6 +285,4 @@ long double sqrtl(long double x)
 #endif /* __x86__ */
 }
 
-#else
-#error unsupported long double format
-#endif
+#endif /* long double is long */

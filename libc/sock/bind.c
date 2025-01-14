@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2020 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -17,9 +17,9 @@
 │ PERFORMANCE OF THIS SOFTWARE.                                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
 #include "libc/calls/internal.h"
+#include "libc/intrin/fds.h"
 #include "libc/dce.h"
-#include "libc/intrin/asan.internal.h"
-#include "libc/intrin/strace.internal.h"
+#include "libc/intrin/strace.h"
 #include "libc/sock/internal.h"
 #include "libc/sock/sock.h"
 #include "libc/sock/struct/sockaddr.h"
@@ -32,7 +32,11 @@
  *
  *     struct sockaddr_in in = {AF_INET, htons(12345), {htonl(0x7f000001)}};
  *     int fd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
- *     bind(fd, &in, sizeof(in));
+ *     bind(fd, (struct sockaddr *)&in, sizeof(in));
+ *
+ * On Windows, Cosmopolitan's implementation of bind() takes care of
+ * always setting the WIN32-specific `SO_EXCLUSIVEADDRUSE` option on
+ * inet stream sockets in order to safeguard your servers from tests
  *
  * @param fd is the file descriptor returned by socket()
  * @param addr is usually the binary-encoded ip:port on which to listen
@@ -43,15 +47,19 @@
  */
 int bind(int fd, const struct sockaddr *addr, uint32_t addrsize) {
   int rc;
-  if (!addr || (IsAsan() && !__asan_is_valid(addr, addrsize))) {
+  if (!addr) {
     rc = efault();
   } else if (addrsize >= sizeof(struct sockaddr_in)) {
-    if (!IsWindows()) {
+    if (fd < g_fds.n && g_fds.p[fd].kind == kFdZip) {
+      rc = enotsock();
+    } else if (!IsWindows()) {
       rc = sys_bind(fd, addr, addrsize);
+    } else if (!__isfdopen(fd)) {
+      rc = ebadf();
     } else if (__isfdkind(fd, kFdSocket)) {
       rc = sys_bind_nt(&g_fds.p[fd], addr, addrsize);
     } else {
-      rc = ebadf();
+      rc = enotsock();
     }
   } else {
     rc = einval();

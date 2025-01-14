@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2016-2018 INRIA and Microsoft Corporation                          │
 │                                                                              │
@@ -15,13 +15,14 @@
 │ See the License for the specific language governing permissions and          │
 │ limitations under the License.                                               │
 ╚─────────────────────────────────────────────────────────────────────────────*/
-#include "libc/intrin/bits.h"
+#include "libc/serialize.h"
 #include "third_party/mbedtls/endian.h"
 
-asm(".ident\t\"\\n\\n\
-Everest (Apache 2.0)\\n\
-Copyright 2016-2018 INRIA and Microsoft Corporation\"");
-asm(".include \"libc/disclaimer.inc\"");
+__notice(cosmo_everest_notice, "\
+Cosmopolitan Everest (Apache 2.0)\n\
+Copyright 2024 Justine Alexndra Roberts Tunney\n\
+Copyright 2016-2018 INRIA and Microsoft Corporation\n\
+Changes: Made C code look nice and not have pointers");
 
 #define DW(x)     (uint128_t)(x)
 #define EQ(x, y)  ((((x ^ y) | (~(x ^ y) + 1)) >> 63) - 1)
@@ -171,7 +172,7 @@ static void HaclEcPointSwap(uint64_t a[2][5], uint64_t b[2][5], uint64_t m) {
   }
 }
 
-static void HaclEcFormatFexpand(uint64_t o[5], uint8_t p[32]) {
+static void HaclEcFormatFexpand(uint64_t o[5], const uint8_t p[32]) {
   o[0] = READ64LE(p + 000) >> 00 & 0x7ffffffffffff;
   o[1] = READ64LE(p + 006) >> 03 & 0x7ffffffffffff;
   o[2] = READ64LE(p + 014) >> 06 & 0x7ffffffffffff;

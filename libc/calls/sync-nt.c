@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2020 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -18,6 +18,7 @@
 ╚─────────────────────────────────────────────────────────────────────────────*/
 #include "libc/calls/calls.h"
 #include "libc/calls/internal.h"
+#include "libc/calls/struct/sigset.internal.h"
 #include "libc/calls/syscall-nt.internal.h"
 #include "libc/calls/syscall_support-nt.internal.h"
 #include "libc/nt/createfile.h"
@@ -40,9 +41,11 @@ textwindows int sys_sync_nt(void) {
     }
   }
   for (drives = GetLogicalDrives(), i = 0; i <= 'Z' - 'A'; ++i) {
-    if (!(drives & (1 << i))) continue;
+    if (!(drives & (1 << i)))
+      continue;
     path[4] = 'A' + i;
     if (ntaccesscheck(path, R_OK | W_OK) != -1) {
+      BLOCK_SIGNALS;
       if ((volume = CreateFile(
                path, kNtFileReadAttributes,
                kNtFileShareRead | kNtFileShareWrite | kNtFileShareDelete, 0,
@@ -50,6 +53,7 @@ textwindows int sys_sync_nt(void) {
         FlushFileBuffers(volume);
         CloseHandle(volume);
       }
+      ALLOW_SIGNALS;
     }
   }
   return 0;

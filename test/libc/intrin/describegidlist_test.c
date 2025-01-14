@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2022 Gavin Arthur Hayes                                            │
 │                                                                              │
@@ -17,14 +17,14 @@
 │ PERFORMANCE OF THIS SOFTWARE.                                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
 #include "libc/calls/groups.internal.h"
-#include "libc/intrin/describeflags.internal.h"
+#include "libc/intrin/describeflags.h"
 #include "libc/testlib/testlib.h"
 
 TEST(DescribeGidList, test) {
   uint32_t list[] = {8, 67, 530, 9};
   uint32_t biglist[] = {8, 67, 530, 9, 8, 67, 530, 9, 8, 67, 530, 9,
-                     8, 67, 530, 9, 8, 67, 530, 9, 8, 67, 530, 9,
-                     8, 67, 530, 9, 8, 67, 530, 9, 8, 67, 530, 9};
+                        8, 67, 530, 9, 8, 67, 530, 9, 8, 67, 530, 9,
+                        8, 67, 530, 9, 8, 67, 530, 9, 8, 67, 530, 9};
   EXPECT_STREQ("n/a",
                DescribeGidList(-1, sizeof(list) / sizeof(list[0]), list));
   EXPECT_STREQ("n/a", DescribeGidList(0, -1, list));

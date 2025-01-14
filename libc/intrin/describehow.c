@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2022 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -17,17 +17,16 @@
 │ PERFORMANCE OF THIS SOFTWARE.                                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
 #include "libc/fmt/itoa.h"
-#include "libc/intrin/describeflags.internal.h"
+#include "libc/intrin/describeflags.h"
 #include "libc/sysv/consts/sig.h"
 
-#ifdef DescribeHow
-#undef DescribeHow
-#endif
-
-const char *DescribeHow(char buf[12], int how) {
-  if (how == SIG_BLOCK) return "SIG_BLOCK";
-  if (how == SIG_UNBLOCK) return "SIG_UNBLOCK";
-  if (how == SIG_SETMASK) return "SIG_SETMASK";
+const char *_DescribeHow(char buf[12], int how) {
+  if (how == SIG_BLOCK)
+    return "SIG_BLOCK";
+  if (how == SIG_UNBLOCK)
+    return "SIG_UNBLOCK";
+  if (how == SIG_SETMASK)
+    return "SIG_SETMASK";
   FormatInt32(buf, how);
   return buf;
 }

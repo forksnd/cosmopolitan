@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=8 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=8 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2020 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -26,13 +26,13 @@
  * @param n if less than strlen(s) will truncate the string
  * @return new string or NULL w/ errno
  * @error ENOMEM
- * @threadsafe
  */
 char *strndup(const char *s, size_t n) {
   char *s2;
   size_t len = strnlen(s, n);
   if ((s2 = malloc(len + 1))) {
-    memcpy(s2, s, len);
+    if (len)
+      memcpy(s2, s, len);
     s2[len] = '\0';
     return s2;
   }

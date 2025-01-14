@@ -1,12 +1,13 @@
 #include "libc/nt/codegen.h"
-.imp	advapi32,__imp_RevertToSelf,RevertToSelf,0
+.imp	advapi32,__imp_RevertToSelf,RevertToSelf
 
 	.text.windows
+	.ftrace1
 RevertToSelf:
+	.ftrace2
 #ifdef __x86_64__
 	push	%rbp
 	mov	%rsp,%rbp
-	.profilable
 	sub	$32,%rsp
 	call	*__imp_RevertToSelf(%rip)
 	leave

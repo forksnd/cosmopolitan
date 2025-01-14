@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2022 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -16,26 +16,14 @@
 │ TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR             │
 │ PERFORMANCE OF THIS SOFTWARE.                                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
-#include "libc/errno.h"
-#include "libc/intrin/atomic.h"
 #include "libc/thread/posixthread.internal.h"
 #include "libc/thread/thread.h"
 
 /**
  * Returns system thread id of POSIX thread.
- *
  * @return 0 on success, or errno on error
  */
 errno_t pthread_getunique_np(pthread_t thread, pthread_id_np_t *out_tid) {
-  int tid;
-  struct PosixThread *pt;
-  for (pt = (struct PosixThread *)thread;;) {
-    tid = atomic_load_explicit(&pt->ptid, memory_order_acquire);
-    if (!tid) {
-      pthread_yield();
-    } else {
-      *out_tid = tid;
-      return 0;
-    }
-  }
+  *out_tid = _pthread_tid((struct PosixThread *)thread);
+  return 0;
 }

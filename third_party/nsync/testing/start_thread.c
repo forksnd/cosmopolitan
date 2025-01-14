@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:t;c-basic-offset:8;tab-width:8;coding:utf-8   -*-│
-│vi: set et ft=c ts=8 tw=8 fenc=utf-8                                       :vi│
+│ vi: set noet ft=c ts=8 sw=8 fenc=utf-8                                   :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2016 Google Inc.                                                   │
 │                                                                              │
@@ -16,8 +16,10 @@
 │ limitations under the License.                                               │
 ╚─────────────────────────────────────────────────────────────────────────────*/
 #include "libc/mem/mem.h"
+#include "libc/stdio/stdio.h"
+#include "libc/str/str.h"
+#include "libc/runtime/runtime.h"
 #include "libc/thread/thread.h"
-// clang-format off
 
 struct thd_args {
 	void (*f) (void *);
@@ -36,6 +38,10 @@ void nsync_start_thread_ (void (*f) (void *), void *arg) {
 	pthread_t t;
 	args->f = f;
 	args->arg = arg;
-	pthread_create (&t, NULL, body, args);
+	errno_t err = pthread_create (&t, NULL, body, args);
+	if (err) {
+		fprintf(stderr, "pthread_create: %s\n", strerror(err));
+		exit(1);
+	}
 	pthread_detach (t);
 }

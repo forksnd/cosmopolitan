@@ -1,4 +1,3 @@
-/* clang-format off */
 /* parser.c -- HTML Parser
 
   (c) 1998-2007 (W3C) MIT, ERCIM, Keio University
@@ -2796,6 +2795,7 @@ Node* TY_(ParseHTML)( TidyDocImpl *doc, Node *html, GetTokenMode mode )
     Node *frameset = NULL;
     Node *noframes = NULL;
     DEBUG_LOG_COUNTERS;
+    (void)head;
 
     enum parserState {
         STATE_INITIAL,                /* This is the initial state for every parser. */

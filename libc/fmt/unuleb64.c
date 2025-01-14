@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2020 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -26,7 +26,7 @@
  * @param x receives number number
  * @return bytes decoded or -1 on error
  */
-int unuleb64(char *p, size_t n, uint64_t *x) {
+int unuleb64(const char *p, size_t n, uint64_t *x) {
   int k;
   size_t i;
   uint64_t t;

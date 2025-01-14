@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2022 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -20,7 +20,6 @@
 #include "libc/calls/struct/sched_param.h"
 #include "libc/dce.h"
 #include "libc/errno.h"
-#include "libc/intrin/midpoint.h"
 #include "libc/limits.h"
 #include "libc/runtime/runtime.h"
 #include "libc/sysv/consts/sched.h"
@@ -66,8 +65,10 @@ TEST(sched_setscheduler, test) {
 }
 
 TEST(sched_setscheduler, testMidpoint) {
-  if (!CanTuneRealtimeSchedulers()) return;
-  struct sched_param p = {_midpoint(sched_get_priority_min(SCHED_FIFO),
-                                    sched_get_priority_max(SCHED_FIFO))};
+  if (!CanTuneRealtimeSchedulers())
+    return;
+  struct sched_param p = {(sched_get_priority_min(SCHED_FIFO) +
+                           sched_get_priority_max(SCHED_FIFO)) /
+                          2};
   EXPECT_SYS(0, DEFAULT_POLICY, sched_setscheduler(0, SCHED_FIFO, &p));
 }

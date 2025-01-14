@@ -2,11 +2,10 @@
 #define COSMOPOLITAN_LIBC_LOG_GDB_H_
 #include "libc/calls/calls.h"
 #include "libc/calls/struct/rusage.h"
-#include "libc/calls/wait4.h"
 #include "libc/dce.h"
+#include "libc/proc/proc.h"
 #include "libc/sysv/consts/nr.h"
 #include "libc/sysv/consts/w.h"
-#if !(__ASSEMBLER__ + __LINKER__ + 0)
 COSMOPOLITAN_C_START_
 
 /**
@@ -32,7 +31,8 @@ int AttachDebugger(intptr_t);
       while ((Rc = __inline_wait4(Pid, NULL, WNOHANG, NULL)) == 0) { \
         if (g_gdbsync) {                                             \
           g_gdbsync = 0;                                             \
-          if (Rc > 0) Pid = 0;                                       \
+          if (Rc > 0)                                                \
+            Pid = 0;                                                 \
           break;                                                     \
         } else {                                                     \
           sched_yield();                                             \
@@ -63,5 +63,4 @@ int AttachDebugger(intptr_t);
 #endif
 
 COSMOPOLITAN_C_END_
-#endif /* !(__ASSEMBLER__ + __LINKER__ + 0) */
 #endif /* COSMOPOLITAN_LIBC_LOG_GDB_H_ */

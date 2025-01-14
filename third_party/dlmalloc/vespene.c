@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2022 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -17,8 +17,6 @@
 │ PERFORMANCE OF THIS SOFTWARE.                                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
 #include "libc/dce.h"
-#include "libc/intrin/asan.internal.h"
-#include "libc/intrin/asancodes.h"
 #include "libc/runtime/runtime.h"
 #include "third_party/dlmalloc/vespene.internal.h"
 
@@ -27,11 +25,5 @@
  * @return memory map address on success, or null w/ errno
  */
 void *dlmalloc_requires_more_vespene_gas(size_t size) {
-  char *p;
-  if ((p = _mapanon(size))) {
-    if (IsAsan()) {
-      __asan_poison(p, size, kAsanHeapFree);
-    }
-  }
-  return p;
+  return _mapanon(size);
 }

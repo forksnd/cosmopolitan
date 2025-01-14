@@ -1,9 +1,10 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:4;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=4 sts=4 sw=4 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=4 sts=4 sw=4 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Python 3                                                                     │
 │ https://docs.python.org/3/license.html                                       │
 ╚─────────────────────────────────────────────────────────────────────────────*/
+#include "third_party/python/Include/object.h"
 #include "libc/intrin/likely.h"
 #include "libc/log/countbranch.h"
 #include "third_party/python/Include/abstract.h"
@@ -28,7 +29,6 @@
 #include "third_party/python/Include/memoryobject.h"
 #include "third_party/python/Include/modsupport.h"
 #include "third_party/python/Include/namespaceobject.h"
-#include "third_party/python/Include/object.h"
 #include "third_party/python/Include/objimpl.h"
 #include "third_party/python/Include/odictobject.h"
 #include "third_party/python/Include/pycapsule.h"
@@ -39,7 +39,6 @@
 #include "third_party/python/Include/sysmodule.h"
 #include "third_party/python/Include/traceback.h"
 #include "third_party/python/Include/weakrefobject.h"
-/* clang-format off */
 
 _Py_IDENTIFIER(Py_Repr);
 _Py_IDENTIFIER(__bytes__);
@@ -464,6 +463,7 @@ int
 _PyObject_IsFreed(PyObject *op)
 {
     uintptr_t ptr = (uintptr_t)op;
+    (void)ptr;
     if (_PyMem_IsFreed(&ptr, sizeof(ptr))) {
         return 1;
     }
@@ -1897,7 +1897,7 @@ _Py_NewReference(PyObject *op)
     _Py_INC_TPALLOCS(op);
 }
 
-noasan void
+void
 _Py_ForgetReference(PyObject *op)
 {
 #ifdef SLOW_UNREF_CHECK

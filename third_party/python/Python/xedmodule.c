@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2021 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -25,7 +25,6 @@
 #include "third_party/python/Include/pymacro.h"
 #include "third_party/python/Include/yoink.h"
 #include "third_party/xed/x86.h"
-/* clang-format off */
 
 PYTHON_PROVIDE("xed");
 PYTHON_PROVIDE("xed.ild");
@@ -75,7 +74,12 @@ PyInit_xed(void)
     return PyModule_Create(&xedmodule);
 }
 
-_Section(".rodata.pytab.1") const struct _inittab _PyImport_Inittab_xed = {
+#ifdef __aarch64__
+_Section(".rodata.pytab.1 //")
+#else
+_Section(".rodata.pytab.1")
+#endif
+ const struct _inittab _PyImport_Inittab_xed = {
     "xed",
     PyInit_xed,
 };

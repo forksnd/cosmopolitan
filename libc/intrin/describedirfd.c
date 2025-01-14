@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2021 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -17,15 +17,12 @@
 │ PERFORMANCE OF THIS SOFTWARE.                                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
 #include "libc/fmt/itoa.h"
-#include "libc/intrin/describeflags.internal.h"
+#include "libc/intrin/describeflags.h"
 #include "libc/sysv/consts/at.h"
 
-#ifdef DescribeDirfd
-#undef DescribeDirfd
-#endif
-
-const char *DescribeDirfd(char buf[12], int dirfd) {
-  if (dirfd == AT_FDCWD) return "AT_FDCWD";
+const char *_DescribeDirfd(char buf[12], int dirfd) {
+  if (dirfd == AT_FDCWD)
+    return "AT_FDCWD";
   FormatInt32(buf, dirfd);
   return buf;
 }

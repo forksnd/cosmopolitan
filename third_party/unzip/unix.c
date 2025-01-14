@@ -1,4 +1,3 @@
-// clang-format off
 /*
   Copyright (c) 1990-2010 Info-ZIP.  All rights reserved.
 
@@ -31,9 +30,9 @@
 #define UNZIP_INTERNAL
 #include "libc/calls/struct/dirent.h"
 #include "libc/log/log.h"
-#include "libc/time/time.h"
+#include "libc/time.h"
 #include "third_party/unzip/unzip.h"
-#include "libc/time/struct/utimbuf.h"
+#include "libc/utime.h"
 #include "third_party/unzip/globals.h"
 
 #ifdef USE_ICONV_MAPPING
@@ -1268,6 +1267,7 @@ int set_symlnk_attribs(__G__ slnk_entry)
     slinkentry *slnk_entry;
 {
     ulg z_uidgid[2];
+    (void)z_uidgid;
 
     if (slnk_entry->attriblen > 0) {
 # if (!defined(NO_LCHOWN))

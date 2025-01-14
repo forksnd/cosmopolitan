@@ -1,4 +1,3 @@
-/* clang-format off */
 /*===-- divmoddi4.c - Implement __divmoddi4 --------------------------------===
  *
  *                    The LLVM Compiler Infrastructure
@@ -13,7 +12,7 @@
  * ===----------------------------------------------------------------------===
  */
 
-STATIC_YOINK("huge_compiler_rt_license");
+__static_yoink("huge_compiler_rt_license");
 
 #include "third_party/compiler_rt/int_lib.h"
 

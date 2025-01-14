@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2021 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -19,7 +19,7 @@
 #include "libc/assert.h"
 #include "libc/dce.h"
 #include "libc/intrin/bsr.h"
-#include "libc/macros.internal.h"
+#include "libc/macros.h"
 #include "libc/mem/mem.h"
 #include "libc/stdio/append.h"
 #include "libc/str/str.h"
@@ -51,14 +51,14 @@ ssize_t appendr(char **b, size_t i) {
   char *p;
   size_t n;
   struct appendz z;
-  _unassert(b);
+  unassert(b);
   z = appendz((p = *b));
   if (i != z.i || !p) {
     n = ROUNDUP(i + 1, 8) + W;
-    if (n > z.n || _bsrl(n) < _bsrl(z.n)) {
+    if (n > z.n || bsrl(n) < bsrl(z.n)) {
       if ((p = realloc(p, n))) {
         z.n = malloc_usable_size(p);
-        _unassert(!(z.n & (W - 1)));
+        unassert(!(z.n & (W - 1)));
         *b = p;
       } else {
         return -1;

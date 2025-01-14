@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2022 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -20,24 +20,24 @@
 #include "libc/calls/calls.h"
 #include "libc/errno.h"
 #include "libc/fmt/itoa.h"
+#include "libc/fmt/magnumstrs.internal.h"
+#include "libc/limits.h"
 #include "libc/runtime/runtime.h"
 #include "libc/stdio/stdio.h"
 #include "libc/str/str.h"
-#include "libc/str/tab.internal.h"
-#include "third_party/getopt/getopt.h"
+#include "libc/str/tab.h"
+#include "third_party/getopt/getopt.internal.h"
 #include "third_party/mbedtls/sha256.h"
 
-#define PROG "sha256sum"
 #define USAGE \
-  "\
-Usage: " PROG " [-?hbctw] [PATH...]\n\
+  "[-?hbctw] [PATH...]\n\
   -h          help\n\
   -c          check mode\n\
   -b          binary mode\n\
   -t          textual mode\n\
   -w          warning mode\n\
 \n\
-cosmopolitan " PROG " v1.0\n\
+cosmopolitan sha256sum v1.1\n\
 copyright 2022 justine alexandra roberts tunney\n\
 notice licenses are embedded in the binary\n\
 https://twitter.com/justinetunney\n\
@@ -55,11 +55,17 @@ static bool g_warn;
 static char g_mode;
 static bool g_check;
 static int g_mismatches;
+static const char *prog;
+
+static wontreturn void PrintUsage(int rc, int fd) {
+  tinyprint(fd, "Usage: ", prog, USAGE, NULL);
+  exit(rc);
+}
 
 static void GetOpts(int argc, char *argv[]) {
   int opt;
   g_mode = ' ';
-  while ((opt = getopt(argc, argv, "?hbctw")) != -1) {
+  while ((opt = getopt(argc, argv, "hbctw")) != -1) {
     switch (opt) {
       case 'w':
         g_warn = true;
@@ -74,26 +80,11 @@ static void GetOpts(int argc, char *argv[]) {
         g_mode = '*';
         break;
       case 'h':
-      case '?':
-        write(1, USAGE, sizeof(USAGE) - 1);
-        exit(0);
+        PrintUsage(0, 1);
       default:
-        write(2, USAGE, sizeof(USAGE) - 1);
-        exit(64);
+        PrintUsage(1, 2);
     }
   }
-}
-
-static ssize_t Write(int fd, const char *s, ...) {
-  va_list va;
-  char buf[512];
-  buf[0] = 0;
-  va_start(va, s);
-  do {
-    strlcat(buf, s, sizeof(buf));
-  } while ((s = va_arg(va, const char *)));
-  va_end(va);
-  return write(fd, buf, strlen(buf));
 }
 
 static bool IsModeCharacter(char c) {
@@ -111,12 +102,13 @@ static bool IsSupportedPath(const char *path) {
   for (i = 0;; ++i) {
     switch (path[i]) {
       case 0:
-        if (i) return true;
+        if (i)
+          return true;
         // fallthrough
       case '\r':
       case '\n':
       case '\\':
-        Write(2, PROG, ": ", path, ": unsupported path\n", NULL);
+        tinyprint(2, prog, ": ", path, ": unsupported path\n", NULL);
         return false;
       default:
         break;
@@ -129,15 +121,15 @@ static bool GetDigest(const char *path, FILE *f, unsigned char digest[32]) {
   unsigned char buf[512];
   mbedtls_sha256_context ctx;
   mbedtls_sha256_init(&ctx);
-  _unassert(!mbedtls_sha256_starts_ret(&ctx, false));
+  unassert(!mbedtls_sha256_starts_ret(&ctx, false));
   while ((got = fread(buf, 1, sizeof(buf), f))) {
-    _unassert(!mbedtls_sha256_update_ret(&ctx, buf, got));
+    unassert(!mbedtls_sha256_update_ret(&ctx, buf, got));
   }
   if (ferror(f)) {
-    Write(2, PROG, ": ", path, ": ", _strerdoc(errno), "\n", NULL);
+    tinyprint(2, prog, ": ", path, ": ", strerror(errno), "\n", NULL);
     return false;
   }
-  _unassert(!mbedtls_sha256_finish_ret(&ctx, digest));
+  unassert(!mbedtls_sha256_finish_ret(&ctx, digest));
   mbedtls_sha256_free(&ctx);
   return true;
 }
@@ -146,10 +138,12 @@ static bool ProduceDigest(const char *path, FILE *f) {
   char hexdigest[65];
   char mode[2] = {g_mode};
   unsigned char digest[32];
-  if (!IsSupportedPath(path)) return false;
-  if (!GetDigest(path, f, digest)) return false;
+  if (!IsSupportedPath(path))
+    return false;
+  if (!GetDigest(path, f, digest))
+    return false;
   hexpcpy(hexdigest, digest, 32);
-  Write(1, hexdigest, " ", mode, path, "\n", NULL);
+  tinyprint(1, hexdigest, " ", mode, path, "\n", NULL);
   return true;
 }
 
@@ -161,17 +155,24 @@ static bool CheckDigests(const char *path, FILE *f) {
   unsigned char wantdigest[32], gotdigest[32];
   char buf[64 + 2 + PATH_MAX + 1 + 1], *p;
   for (line = 0; fgets(buf, sizeof(buf), f); ++line) {
-    if (!*_chomp(buf)) continue;
+    if (!*chomp(buf))
+      continue;
     for (p = buf, i = 0; i < 32; ++i) {
-      if ((a = kHexToInt[*p++ & 255]) == -1) goto InvalidLine;
-      if ((b = kHexToInt[*p++ & 255]) == -1) goto InvalidLine;
+      if ((a = kHexToInt[*p++ & 255]) == -1)
+        goto InvalidLine;
+      if ((b = kHexToInt[*p++ & 255]) == -1)
+        goto InvalidLine;
       wantdigest[i] = a << 4 | b;
     }
-    if (*p++ != ' ') goto InvalidLine;
-    if (!IsModeCharacter(*p++)) goto InvalidLine;
+    if (*p++ != ' ')
+      goto InvalidLine;
+    if (!IsModeCharacter(*p++))
+      goto InvalidLine;
     path2 = p;
-    if (!*path2) goto InvalidLine;
-    if (!IsSupportedPath(path2)) continue;
+    if (!*path2)
+      goto InvalidLine;
+    if (!IsSupportedPath(path2))
+      continue;
     if ((f2 = fopen(path2, "rb"))) {
       if (GetDigest(path2, f2, gotdigest)) {
         if (!memcmp(wantdigest, gotdigest, 32)) {
@@ -181,13 +182,13 @@ static bool CheckDigests(const char *path, FILE *f) {
           ++g_mismatches;
           k = false;
         }
-        Write(1, path2, ": ", status, "\n", NULL);
+        tinyprint(1, path2, ": ", status, "\n", NULL);
       } else {
         k = false;
       }
       fclose(f2);
     } else {
-      Write(2, PROG, ": ", path2, ": ", _strerdoc(errno), "\n", NULL);
+      tinyprint(2, prog, ": ", path2, ": ", strerror(errno), "\n", NULL);
       k = false;
     }
     continue;
@@ -195,12 +196,12 @@ static bool CheckDigests(const char *path, FILE *f) {
     if (g_warn) {
       char linestr[12];
       FormatInt32(linestr, line + 1);
-      Write(2, PROG, ": ", path, ":", linestr, ": ",
-            "improperly formatted checksum line", "\n", NULL);
+      tinyprint(2, prog, ": ", path, ":", linestr, ": ",
+                "improperly formatted checksum line", "\n", NULL);
     }
   }
   if (ferror(f)) {
-    Write(2, PROG, ": ", path, ": ", _strerdoc(errno), "\n", NULL);
+    tinyprint(2, prog, ": ", path, ": ", strerror(errno), "\n", NULL);
     k = false;
   }
   return k;
@@ -218,6 +219,9 @@ int main(int argc, char *argv[]) {
   int i;
   FILE *f;
   bool k = true;
+  prog = argv[0];
+  if (!prog)
+    prog = "sha256sum";
   GetOpts(argc, argv);
   if (optind == argc) {
     f = stdin;
@@ -228,7 +232,7 @@ int main(int argc, char *argv[]) {
         k &= Process(argv[i], f);
         fclose(f);
       } else {
-        Write(2, PROG, ": ", argv[i], ": ", _strerdoc(errno), "\n", NULL);
+        tinyprint(2, prog, ": ", argv[i], ": ", strerror(errno), "\n", NULL);
         k = false;
       }
     }
@@ -236,8 +240,8 @@ int main(int argc, char *argv[]) {
   if (g_mismatches) {
     char ibuf[12];
     FormatInt32(ibuf, g_mismatches);
-    Write(2, PROG, ": WARNING: ", ibuf, " computed checksum did NOT match\n",
-          NULL);
+    tinyprint(2, prog, ": WARNING: ", ibuf,
+              " computed checksum did NOT match\n", NULL);
   }
   return !k;
 }

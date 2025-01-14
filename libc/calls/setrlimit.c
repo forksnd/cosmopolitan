@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2020 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -19,10 +19,15 @@
 #include "libc/assert.h"
 #include "libc/calls/calls.h"
 #include "libc/calls/struct/rlimit.internal.h"
+#include "libc/calls/syscall-sysv.internal.h"
 #include "libc/dce.h"
-#include "libc/intrin/asan.internal.h"
-#include "libc/intrin/describeflags.internal.h"
-#include "libc/intrin/strace.internal.h"
+#include "libc/errno.h"
+#include "libc/intrin/describeflags.h"
+#include "libc/intrin/rlimit.h"
+#include "libc/intrin/strace.h"
+#include "libc/macros.h"
+#include "libc/runtime/runtime.h"
+#include "libc/runtime/syslib.internal.h"
 #include "libc/sysv/consts/rlimit.h"
 #include "libc/sysv/errfuns.h"
 
@@ -30,6 +35,12 @@
  * Sets resource limit for current process.
  *
  * The following resources are recommended:
+ *
+ * - `RLIMIT_STACK` controls how much stack memory is available to the
+ *   main thread. This setting is inherited across fork() and execve()
+ *   Please note it's only safe for Cosmopolitan programs, to set this
+ *   value to at least `PTHREAD_STACK_MIN * 2`. On Windows this cannot
+ *   be used to extend the stack, which is currently hard-coded.
  *
  * - `RLIMIT_AS` limits the size of the virtual address space. This will
  *   work on all platforms except WSL. It is emulated on XNU and Windows
@@ -68,23 +79,30 @@
  */
 int setrlimit(int resource, const struct rlimit *rlim) {
   int rc;
+  int olde = errno;
   if (resource == 127) {
     rc = einval();
-  } else if (!rlim || (IsAsan() && !__asan_is_valid(rlim, sizeof(*rlim)))) {
+  } else if (!rlim) {
     rc = efault();
-  } else if (!IsWindows()) {
+  } else if (IsXnuSilicon()) {
+    rc = _sysret(__syslib->__setrlimit(resource, rlim));
+  } else if (!IsWindows() && !(IsNetbsd() && resource == RLIMIT_AS)) {
     rc = sys_setrlimit(resource, rlim);
-    if (IsXnu() && !rc && resource == RLIMIT_AS) {
-      // TODO(jart): What's up with XNU and NetBSD?
-      __virtualmax = rlim->rlim_cur;
-    }
-  } else if (resource == RLIMIT_AS) {
-    __virtualmax = rlim->rlim_cur;
+  } else if (resource == RLIMIT_STACK) {
     rc = 0;
   } else {
     rc = einval();
+  }
+  if (!rc && resource == RLIMIT_STACK)
+    __rlimit_stack_set(*rlim);  // so __rlimit_stack_get() works on all OSes
+  if (resource == RLIMIT_AS) {
+    __virtualmax = rlim->rlim_cur;
+    errno = olde;
+    rc = 0;
   }
   STRACE("setrlimit(%s, %s) → %d% m", DescribeRlimitName(resource),
          DescribeRlimit(0, rlim), rc);
   return rc;
 }
+
+__weak_reference(setrlimit, setrlimit64);

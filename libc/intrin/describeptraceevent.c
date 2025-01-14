@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2022 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -17,22 +17,26 @@
 │ PERFORMANCE OF THIS SOFTWARE.                                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
 #include "libc/fmt/itoa.h"
-#include "libc/intrin/describeflags.internal.h"
+#include "libc/intrin/describeflags.h"
 #include "libc/sysv/consts/ptrace.h"
 
-#ifdef DescribePtraceEvent
-#undef DescribePtraceEvent
-#endif
-
-const char *DescribePtraceEvent(char buf[32], int x) {
-  if (x == PTRACE_EVENT_FORK) return "PTRACE_EVENT_FORK";
-  if (x == PTRACE_EVENT_VFORK) return "PTRACE_EVENT_VFORK";
-  if (x == PTRACE_EVENT_CLONE) return "PTRACE_EVENT_CLONE";
-  if (x == PTRACE_EVENT_EXEC) return "PTRACE_EVENT_EXEC";
-  if (x == PTRACE_EVENT_VFORK_DONE) return "PTRACE_EVENT_VFORK_DONE";
-  if (x == PTRACE_EVENT_EXIT) return "PTRACE_EVENT_EXIT";
-  if (x == PTRACE_EVENT_SECCOMP) return "PTRACE_EVENT_SECCOMP";
-  if (x == PTRACE_EVENT_STOP) return "PTRACE_EVENT_STOP";
+const char *_DescribePtraceEvent(char buf[32], int x) {
+  if (x == PTRACE_EVENT_FORK)
+    return "PTRACE_EVENT_FORK";
+  if (x == PTRACE_EVENT_VFORK)
+    return "PTRACE_EVENT_VFORK";
+  if (x == PTRACE_EVENT_CLONE)
+    return "PTRACE_EVENT_CLONE";
+  if (x == PTRACE_EVENT_EXEC)
+    return "PTRACE_EVENT_EXEC";
+  if (x == PTRACE_EVENT_VFORK_DONE)
+    return "PTRACE_EVENT_VFORK_DONE";
+  if (x == PTRACE_EVENT_EXIT)
+    return "PTRACE_EVENT_EXIT";
+  if (x == PTRACE_EVENT_SECCOMP)
+    return "PTRACE_EVENT_SECCOMP";
+  if (x == PTRACE_EVENT_STOP)
+    return "PTRACE_EVENT_STOP";
   FormatInt32(buf, x);
   return buf;
 }

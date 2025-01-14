@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:t;c-basic-offset:8;tab-width:8;coding:utf-8   -*-│
-│vi: set et ft=c ts=8 tw=8 fenc=utf-8                                       :vi│
+│ vi: set noet ft=c ts=8 sw=8 fenc=utf-8                                   :vi │
 ╚──────────────────────────────────────────────────────────────────────────────╝
 │                                                                              │
 │  Musl Libc                                                                   │
@@ -29,15 +29,10 @@
 #include "libc/tinymath/internal.h"
 #include "libc/tinymath/invtrigl.internal.h"
 #include "libc/tinymath/ldshape.internal.h"
+#if !(LDBL_MANT_DIG == 53 && LDBL_MAX_EXP == 1024)
+__static_yoink("musl_libc_notice");
+__static_yoink("fdlibm_notice");
 
-asm(".ident\t\"\\n\\n\
-fdlibm (fdlibm license)\\n\
-Copyright (C) 1993 by Sun Microsystems, Inc. All rights reserved.\"");
-asm(".ident\t\"\\n\\n\
-Musl libc (MIT License)\\n\
-Copyright 2005-2014 Rich Felker, et. al.\"");
-asm(".include \"libc/disclaimer.inc\"");
-// clang-format off
 
 /* origin: FreeBSD /usr/src/lib/msun/src/e_atan2l.c */
 /*
@@ -59,18 +54,15 @@ asm(".include \"libc/disclaimer.inc\"");
 /**
  * Returns arc tangent of 𝑦/𝑥.
  */
-long double atan2l(long double y, long double x) {
-#if LDBL_MANT_DIG == 53 && LDBL_MAX_EXP == 1024
-	return atan2(y, x);
-#elif (LDBL_MANT_DIG == 64 || LDBL_MANT_DIG == 113) && LDBL_MAX_EXP == 16384
+long double atan2l(long double y, long double x)
+{
 #ifdef __x86__
 
-	long double res;
-	asm("fpatan" 
-	    : "=t" (res)
-	    : "0"(x), "u"(y) 
+	asm("fpatan"
+	    : "=t"(x)
+	    : "0"(x), "u"(y)
 	    : "st(1)");
-	return res;
+	return x;
 
 #else
 
@@ -78,7 +70,7 @@ long double atan2l(long double y, long double x) {
 	long double z;
 	int m, ex, ey;
 
-	if (isnan(x) || isnan(y))
+	if (isunordered(x, y))
 		return x+y;
 	if (x == 1)
 		return atanl(y);
@@ -129,8 +121,7 @@ long double atan2l(long double y, long double x) {
 		return (z-2*pio2_lo)-2*pio2_hi; /* atan(-,-) */
 	}
 
-#endif /* __x86__ */
-#else
-#error "architecture unsupported"
 #endif
 }
+
+#endif /* long double is long */

@@ -1,12 +1,13 @@
 #include "libc/nt/codegen.h"
-.imp	user32,__imp_SetClassLongW,SetClassLongW,2316
+.imp	user32,__imp_SetClassLongW,SetClassLongW
 
 	.text.windows
+	.ftrace1
 SetClassLong:
+	.ftrace2
 #ifdef __x86_64__
 	push	%rbp
 	mov	%rsp,%rbp
-	.profilable
 	mov	__imp_SetClassLongW(%rip),%rax
 	jmp	__sysv2nt
 #elif defined(__aarch64__)

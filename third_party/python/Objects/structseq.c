@@ -1,17 +1,16 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:4;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=4 sts=4 sw=4 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=4 sts=4 sw=4 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Python 3                                                                     │
 │ https://docs.python.org/3/license.html                                       │
 ╚─────────────────────────────────────────────────────────────────────────────*/
+#include "third_party/python/Include/structseq.h"
 #include "third_party/python/Include/abstract.h"
 #include "third_party/python/Include/dictobject.h"
 #include "third_party/python/Include/longobject.h"
 #include "third_party/python/Include/modsupport.h"
 #include "third_party/python/Include/objimpl.h"
 #include "third_party/python/Include/structmember.h"
-#include "third_party/python/Include/structseq.h"
-/* clang-format off */
 
 /* Implementation helper: a struct that looks like a tuple.  See timemodule
    and posixmodule for example uses. */
@@ -188,6 +187,7 @@ structseq_repr(PyStructSequence *obj)
     /* "typename(", limited to  TYPE_MAXSIZE */
     len = strlen(typ->tp_name) > TYPE_MAXSIZE ? TYPE_MAXSIZE :
                             strlen(typ->tp_name);
+#pragma GCC diagnostic ignored "-Wstringop-truncation"
     strncpy(pbuf, typ->tp_name, len);
     pbuf += len;
     *pbuf++ = '(';

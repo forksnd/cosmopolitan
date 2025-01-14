@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2018 Intel Corporation                                             │
 │ Copyright 2020 Justine Alexandra Roberts Tunney                              │
@@ -18,21 +18,21 @@
 ╚─────────────────────────────────────────────────────────────────────────────*/
 #include "libc/assert.h"
 #include "libc/dce.h"
-#include "libc/intrin/bits.h"
+#include "libc/serialize.h"
 #include "libc/intrin/bsr.h"
-#include "libc/macros.internal.h"
+#include "libc/log/libfatal.internal.h"
+#include "libc/macros.h"
 #include "libc/runtime/runtime.h"
 #include "libc/str/str.h"
 #include "third_party/xed/avx512.h"
 #include "third_party/xed/private.h"
 #include "third_party/xed/x86.h"
 
-asm(".ident\t\"\\n\\n\
-Xed (Apache 2.0)\\n\
-Copyright 2018 Intel Corporation\\n\
-Copyright 2019 Justine Alexandra Roberts Tunney\\n\
-Modifications: Trimmed down to 3kb [2019-03-22 jart]\"");
-asm(".include \"libc/disclaimer.inc\"");
+__notice(xed_notice, "\
+Xed (Apache 2.0)\n\
+Copyright 2018 Intel Corporation\n\
+Copyright 2019 Justine Alexandra Roberts Tunney\n\
+Changes: Trimmed Intel's assembler down to 3kb [2019-03-22 jart]");
 
 #define XED_ILD_HASMODRM_IGNORE_MOD 2
 
@@ -878,7 +878,7 @@ privileged static void xed_evex_scanner(struct XedDecodedInst *d) {
 }
 
 privileged static uint64_t xed_read_number(uint8_t *p, size_t n, bool s) {
-  switch (s << 2 | _bsr(n)) {
+  switch (s << 2 | bsr(n)) {
     case 0b000:
       return *p;
     case 0b100:
@@ -895,12 +895,11 @@ privileged static uint64_t xed_read_number(uint8_t *p, size_t n, bool s) {
     case 0b111:
       return READ64LE(p);
     default:
-      unreachable;
+      __builtin_unreachable();
   }
 }
 
 privileged static void xed_evex_imm_scanner(struct XedDecodedInst *d) {
-  uint64_t uimm0;
   uint8_t *itext, *imm_ptr;
   xed_bits_t length, imm_bytes, imm1_bytes, max_bytes;
   imm_ptr = 0;
@@ -1161,7 +1160,7 @@ privileged static void XED_LF_DISP_BUCKET_0_l1(struct XedDecodedInst *x) {
 }
 
 privileged static void xed_disp_scanner(struct XedDecodedInst *d) {
-  xed_bits_t length, disp_width, disp_bytes, max_bytes;
+  xed_bits_t length, disp_bytes, max_bytes;
   length = d->length;
   if (d->op.map < XED_ILD_MAP2) {
     switch (xed_disp_bits_2d[d->op.map][d->op.opcode]) {
@@ -1227,7 +1226,7 @@ privileged static void xed_decode_instruction_length(
  */
 privileged struct XedDecodedInst *xed_decoded_inst_zero_set_mode(
     struct XedDecodedInst *p, int mmode) {
-  __builtin_memset(p, 0, sizeof(*p));
+  __memset(p, 0, sizeof(*p));
   xed_operands_set_mode(&p->op, mmode);
   return p;
 }
@@ -1244,7 +1243,7 @@ privileged struct XedDecodedInst *xed_decoded_inst_zero_set_mode(
  */
 privileged int xed_instruction_length_decode(struct XedDecodedInst *xedd,
                                              const void *itext, size_t bytes) {
-  __builtin_memcpy(xedd->bytes, itext, MIN(15, bytes));
+  __memcpy(xedd->bytes, itext, MIN(15, bytes));
   xedd->op.max_bytes = MIN(15, bytes);
   xed_decode_instruction_length(xedd);
   if (!xedd->op.out_of_bytes) {

@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2020 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -18,7 +18,6 @@
 ╚─────────────────────────────────────────────────────────────────────────────*/
 #include "libc/calls/calls.h"
 #include "libc/dce.h"
-#include "libc/intrin/asan.internal.h"
 #include "libc/stdio/rand.h"
 #include "libc/stdio/stdio.h"
 
@@ -41,13 +40,10 @@
  *
  * @return original buf
  */
-noasan void *rngset(void *b, size_t n, uint64_t seed(void), size_t reseed) {
+void *rngset(void *b, size_t n, uint64_t seed(void), size_t reseed) {
   size_t m;
-  uint64_t i, x, t = 0;
+  uint64_t x, t = 0;
   unsigned char *p = b;
-  if (IsAsan()) {
-    __asan_verify(b, n);
-  }
   if (!seed) {
     t = reseed;
     reseed = -1;
@@ -55,7 +51,8 @@ noasan void *rngset(void *b, size_t n, uint64_t seed(void), size_t reseed) {
     reseed = 8;
   }
   while (n) {
-    if (seed) t = seed();
+    if (seed)
+      t = seed();
     if (!seed || reseed > 8) {
       n -= (m = reseed < n ? reseed : n);
       while (m >= 8) {

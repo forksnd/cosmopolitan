@@ -1,5 +1,5 @@
 /*-*- mode:unix-assembly; indent-tabs-mode:t; tab-width:8; coding:utf-8     -*-│
-│vi: set et ft=asm ts=8 tw=8 fenc=utf-8                                     :vi│
+│ vi: set noet ft=asm ts=8 sw=8 fenc=utf-8                                 :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2020 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -17,7 +17,8 @@
 │ PERFORMANCE OF THIS SOFTWARE.                                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
 #include "libc/nt/enum/status.h"
-#include "libc/macros.internal.h"
+#include "libc/dce.h"
+#include "libc/macros.h"
 #ifdef __x86_64__
 
 //	@fileoverview NTDLL.DLL Non-Mandatory Importer
@@ -40,19 +41,25 @@ kNtdllProcRvas:
 	.init.start 202,_init_ntdll
 	push	%r12
 	push	%r13
-	lea	_ntdllmissingno(%rip),%r13
+	lea	__ntdll_not_found(%rip),%r13
 	sub	$32,%rsp
+	xor	%eax,%eax
+	testb	IsWindows()
+	jz	7f
 	loadstr	"ntdll.dll",cx
 	call	*__imp_GetModuleHandleA(%rip)
-	mov	%rax,%r12
+7:	mov	%rax,%r12
 0:	lodsq
 	test	%rax,%rax
 	jz	1f
-	.weak	_base
-	lea	_base(%rax),%rdx
+	.weak	__executable_start
+	lea	__executable_start(%rax),%rdx
+	xor	%eax,%eax
+	testb	IsWindows()
+	jz	7f
 	mov	%r12,%rcx
 	call	*__imp_GetProcAddress(%rip)
-	test	%rax,%rax
+7:	test	%rax,%rax
 	cmovz	%r13,%rax
 	stosq
 	jmp	0b
@@ -62,9 +69,13 @@ kNtdllProcRvas:
 	.init.end 202,_init_ntdll,globl,hidden
 
 	.text.windows
-_ntdllmissingno:
+	.ftrace1
+__ntdll_not_found:
+	.ftrace2
 	mov	$kNtStatusDllNotFound,%eax
 	ret
 	.previous
+
+	.weak	__hostos
 
 #endif /* __x86_64__ */

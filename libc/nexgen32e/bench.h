@@ -1,7 +1,6 @@
 #ifndef COSMOPOLITAN_LIBC_NEXGEN32E_BENCH_H_
 #define COSMOPOLITAN_LIBC_NEXGEN32E_BENCH_H_
 #include "libc/nexgen32e/rdtsc.h"
-#if !(__ASSEMBLER__ + __LINKER__ + 0)
 
 /**
  * @fileoverview NexGen32e Microbenchmarking.
@@ -43,8 +42,22 @@
     Ticks;                                               \
   })
 #else
-#define __startbench() rdtsc()
-#define __endbench()   rdtsc()
+#define __startbench()                \
+  ({                                  \
+    uint64_t _ts;                     \
+    asm volatile("isb" ::: "memory"); \
+    _ts = rdtsc();                    \
+    asm volatile("isb" ::: "memory"); \
+    _ts;                              \
+  })
+#define __endbench()                  \
+  ({                                  \
+    uint64_t _ts;                     \
+    asm volatile("isb" ::: "memory"); \
+    _ts = rdtsc();                    \
+    asm volatile("isb" ::: "memory"); \
+    _ts;                              \
+  })
 #endif
 
 #define __startbench_m() mfence_lfence_rdtsc_lfence()
@@ -59,5 +72,4 @@
     Res;                                   \
   })
 
-#endif /* !(__ASSEMBLER__ + __LINKER__ + 0) */
 #endif /* COSMOPOLITAN_LIBC_NEXGEN32E_BENCH_H_ */

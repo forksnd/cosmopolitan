@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:4;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=4 sts=4 sw=4 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=4 sts=4 sw=4 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Python 3                                                                     │
 │ https://docs.python.org/3/license.html                                       │
@@ -7,12 +7,10 @@
 #include "libc/stdio/stdio.h"
 #include "libc/str/str.h"
 #include "third_party/python/Include/pygetopt.h"
-/* clang-format off */
 
-asm(".ident\t\"\\n\\n\
-python getopt (isc license)\\n\
-Copyright 1992-1994 David Gottner\"");
-/* clang-format off */
+__notice(python_getopt_notice, "\
+python getopt (isc license)\n\
+Copyright 1992-1994 David Gottner");
 
 /*---------------------------------------------------------------------------*
  * <RCS keywords>

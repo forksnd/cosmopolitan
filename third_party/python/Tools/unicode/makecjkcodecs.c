@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2021 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -53,7 +53,6 @@ void m(const char *s, void *p, size_t n) {
   q = Deflate(p, n, &m);
   f = fopen(xstrcat("third_party/python/Modules/cjkcodecs/", s, ".c"), "wb");
   fprintf(f, "#include \"libc/x/x.h\"\n");
-  fprintf(f, "/* clang-format off */\n");
   fprintf(f, "\n");
   fprintf(f, "static _Atomic(void *) %s_ptr;\n", s);
   fprintf(f, "static const unsigned char %s_rodata[] = {", s);
@@ -86,7 +85,7 @@ void dzd(const char *s, void *p, size_t n, size_t z) {
     } else if (z == 4) {
       x = ((const uint32_t *)p)[i];
     } else {
-      unreachable;
+      __builtin_unreachable();
     }
     appendd(&r, t, zleb64(t, x - y) - t);
     y = x;
@@ -94,7 +93,6 @@ void dzd(const char *s, void *p, size_t n, size_t z) {
   q = Deflate(r, appendz(r).i, &m);
   f = fopen(xstrcat("third_party/python/Modules/cjkcodecs/", s, ".c"), "wb");
   fprintf(f, "#include \"libc/x/x.h\"\n");
-  fprintf(f, "/* clang-format off */\n");
   fprintf(f, "\n");
   fprintf(f, "static _Atomic(void *) %s_ptr;\n", s);
   fprintf(f, "static const unsigned char %s_rodata[%zu] = {", s, m);

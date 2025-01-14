@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=8 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=8 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2020 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -159,6 +159,7 @@
 #define PAGE_V    /*                                */ 0b000000000001
 #define PAGE_RW   /*                                */ 0b000000000010
 #define PAGE_U    /*                                */ 0b000000000100
+#define PAGE_PCD  /*                                */ 0b000000010000
 #define PAGE_PS   /*                                */ 0b000010000000
 #define PAGE_G    /*                                */ 0b000100000000
 #define PAGE_IGN1 /*                                */ 0b111000000000
@@ -196,6 +197,20 @@ void __ref_page(struct mman *, uint64_t *, uint64_t);
 void __ref_pages(struct mman *, uint64_t *, uint64_t, uint64_t);
 void __unref_page(struct mman *, uint64_t *, uint64_t);
 
+/**
+ * Identity maps an area of physical memory to its negative address and
+ * marks it as permanently referenced and unreclaimable (so that it will
+ * never be added to the free list).  This is useful for special-purpose
+ * physical memory regions, such as video frame buffers and memory-mapped
+ * I/O devices.
+ */
+forceinline void __invert_and_perm_ref_memory_area(struct mman *mm,
+                                                   uint64_t *pml4t, uint64_t ps,
+                                                   uint64_t size,
+                                                   uint64_t pte_flags) {
+  __invert_memory_area(mm, pml4t, ps, size, pte_flags | PAGE_REFC);
+}
+
 forceinline unsigned char inb(unsigned short port) {
   unsigned char al;
   asm volatile("inb\t%1,%0" : "=a"(al) : "dN"(port));
@@ -224,6 +239,9 @@ forceinline void outb(unsigned short port, unsigned char byte) {
     asm("mov\t%%cr3,%0" : "=r"(cr3)); \
     (uint64_t *)(BANE + cr3);         \
   })
+
+#define __get_mm()     ((struct mman *)(BANE + 0x0500))
+#define __get_mm_phy() ((struct mman *)0x0500)
 
 #endif /* !(__ASSEMBLER__ + __LINKER__ + 0) */
 #endif /* COSMOPOLITAN_LIBC_RUNTIME_PC_H_ */

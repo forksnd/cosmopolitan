@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:4;tab-width:4;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright The Mbed TLS Contributors                                          │
 │                                                                              │
@@ -15,18 +15,16 @@
 │ See the License for the specific language governing permissions and          │
 │ limitations under the License.                                               │
 ╚─────────────────────────────────────────────────────────────────────────────*/
-#include "libc/intrin/bits.h"
 #include "libc/log/backtrace.internal.h"
 #include "libc/log/check.h"
-#include "libc/macros.internal.h"
+#include "libc/macros.h"
 #include "libc/mem/mem.h"
 #include "libc/nexgen32e/x86feature.h"
 #include "third_party/mbedtls/bignum.h"
 #include "third_party/mbedtls/bignum_internal.h"
 #include "third_party/mbedtls/profile.h"
-/* clang-format off */
 
-void Mul(uint64_t *c, uint64_t *A, unsigned n, uint64_t *B, unsigned m)
+void Mul(uint64_t *c, const uint64_t *A, unsigned n, const uint64_t *B, unsigned m)
 {
     if (!m--) return;
     mbedtls_platform_zeroize(c, m * ciL);
@@ -41,8 +39,8 @@ void Mul(uint64_t *c, uint64_t *A, unsigned n, uint64_t *B, unsigned m)
 void mbedtls_mpi_mul_hlp1(size_t n, const uint64_t *s, uint64_t *d, uint64_t b)
 {
     size_t i;
+    uint64_t c;
     uint128_t x;
-    uint64_t c, t, t1, t2;
     i = c = 0;
 #if defined(__x86_64__) && !defined(__STRICT_ANSI__)
     if( X86_HAVE(BMI2) )
@@ -113,7 +111,7 @@ void mbedtls_mpi_mul_hlp1(size_t n, const uint64_t *s, uint64_t *d, uint64_t b)
 /**
  * Computes inner loop of multiplication algorithm.
  */
-void mbedtls_mpi_mul_hlp(size_t n, uint64_t *s, uint64_t *d, uint64_t b)
+void mbedtls_mpi_mul_hlp(size_t n, const uint64_t *s, uint64_t *d, uint64_t b)
 {
     size_t i;
     uint128_t x;
@@ -241,9 +239,10 @@ int mbedtls_mpi_mul_int(mbedtls_mpi *X, const mbedtls_mpi *A,
 int mbedtls_mpi_mul_mpi(mbedtls_mpi *X, const mbedtls_mpi *A,
                         const mbedtls_mpi *B)
 {
-    int i, j, t, k, ret;
+    int i, j, t, ret;
+    mbedtls_mpi TA, TB;
     mbedtls_mpi_uint *K;
-    mbedtls_mpi TA, TB, *T;
+    const mbedtls_mpi *T;
     MPI_VALIDATE_RET(X);
     MPI_VALIDATE_RET(A);
     MPI_VALIDATE_RET(B);

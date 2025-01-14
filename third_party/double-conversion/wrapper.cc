@@ -1,5 +1,5 @@
 /*-*-mode:c++;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8-*-│
-│vi: set net ft=c++ ts=2 sts=2 sw=2 fenc=utf-8                              :vi│
+│ vi: set et ft=cpp ts=2 sts=2 sw=2 fenc=utf-8                             :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2022 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -16,11 +16,11 @@
 │ TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR             │
 │ PERFORMANCE OF THIS SOFTWARE.                                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
-#include "libc/intrin/bits.h"
+#include "third_party/double-conversion/wrapper.h"
+#include "libc/serialize.h"
 #include "libc/str/str.h"
 #include "third_party/double-conversion/double-conversion.h"
 #include "third_party/double-conversion/double-to-string.h"
-#include "third_party/double-conversion/wrapper.h"
 
 namespace double_conversion {
 extern "C" {
@@ -38,7 +38,7 @@ char* DoubleToJson(char buf[128], double x) {
   static const DoubleToStringConverter kDoubleToJson(
       DoubleToStringConverter::UNIQUE_ZERO |
           DoubleToStringConverter::EMIT_POSITIVE_EXPONENT_SIGN,
-      "null", "null", 'e', -6, 21, 6, 0);
+      "1e5000", "null", 'e', -6, 21, 6, 0);
   kDoubleToJson.ToShortest(x, &b);
   b.Finalize();
   if (READ32LE(buf) != READ32LE("-nul")) {
@@ -59,7 +59,7 @@ char* DoubleToLua(char buf[128], double x) {
 }
 
 double StringToDouble(const char* s, size_t n, int* out_processed) {
-  if (n == -1) n = strlen(s);
+  if (n == -1ull) n = strlen(s);
   int flags = StringToDoubleConverter::ALLOW_CASE_INSENSITIVITY |
               StringToDoubleConverter::ALLOW_LEADING_SPACES |
               StringToDoubleConverter::ALLOW_TRAILING_JUNK |

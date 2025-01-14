@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2022 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -23,7 +23,8 @@ static int CompareStrings(const void *p1, const void *p2) {
   const char *a = *(const char **)p1;
   const char *b = *(const char **)p2;
   for (; *a == *b; a++, b++) {
-    if (!*a) break;
+    if (!*a)
+      break;
   }
   return (*a & 0xff) - (*b & 0xff);
 }

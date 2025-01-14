@@ -9,6 +9,18 @@
            "_Pragma"
            "_Complex"))
 
+        (cuda
+         '("gridDim"
+           "blockIdx"
+           "blockDim"
+           "threadIdx"
+           "__device__"
+           "__forceinline__"
+           "__global__"
+           "__shared__"
+           "__host__"
+           "__constant__"))
+
         (c11
          '("_Atomic"
            "alignas"
@@ -25,11 +37,12 @@
            "_Imaginary_I"))
 
         (cosmo
-         '("__msabi"
+         '("__weak"
+           "__msabi"
+           "__funline"
            "function"
            "offsetof"
-           "microarchitecture"
-           "targetclones"
+           "_Microarchitecture"
            "forcealignargpointer"
            "textexit"
            "externinline"
@@ -50,7 +63,7 @@
            "forceinline"
            "nocallersavedregisters"
            "dontthrow"
-           "nooptimize"
+           "dontoptimize"
            "optimizesize"
            "optimizespeed"
            "alignof"
@@ -58,36 +71,30 @@
            "antiquity"
            "memcpyesque"
            "libcesque"
-           "artificial"
+           "unrollloops"
+           "__artificial"
            "returnstwice"
            "returnsaligned"
            "noprune"
            "reallocesque"
            "nullterminated"
-           "unreachable"
            "notpossible"
-           "_Hide"
            "privileged"
            "hasatleast"
            "nodebuginfo"
-           "frownedupon"
            "wontreturn"
-           "noasan"
-           "nomsan"
-           "noubsan"
+           "dontubsan"
            "nostackprotector"
-           "initarray"
            "mayalias"
-           "noinstrument"
+           "dontinstrument"
            "interruptfn"
-           "nocallback"
+           "dontcallback"
            "textstartup"
            "warnifused"
            "attributeallocsize"
            "attributeallocalign"
-           "dontdiscard"
+           "__wur"
            "nointerpose"
-           "compatfn"
            "returnsnonnull"
            "strftimeesque"
            "firstclass"
@@ -196,6 +203,9 @@
            "__section__"
            "__sentinel__"
            "__simd__"
+           "__vex"
+           "__avx2"
+           "__target_clones"
            "__target_clones__"
            "__unused__"
            "__used__"
@@ -206,10 +216,22 @@
            "__vector_size__"
            "__ms_abi__"
            "__sysv_abi__"
-           "systemfive"
            "__mode__"
            "__seg_fs"
-           "__seg_gs"))
+           "__seg_gs"
+           "__access__"
+           "__read_only__"
+           "__write_only__"
+           "__read_write__"
+           "__read_only"
+           "__write_only"
+           "__read_write"
+           "__fd_arg__"
+           "__fd_arg"
+           "__copy__"
+           "__retain__"
+           "__tainted_args__"
+           "__zero_call_used_regs__"))
 
         (clang
          '("__optnone__"
@@ -220,6 +242,7 @@
         )
     (concat "\\_<"
             (regexp-opt (append
+                         cuda
                          c11
                          gnu
                          clang

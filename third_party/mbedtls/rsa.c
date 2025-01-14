@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:4;tab-width:4;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright The Mbed TLS Contributors                                          │
 │                                                                              │
@@ -15,7 +15,8 @@
 │ See the License for the specific language governing permissions and          │
 │ limitations under the License.                                               │
 ╚─────────────────────────────────────────────────────────────────────────────*/
-#include "libc/intrin/strace.internal.h"
+#include "third_party/mbedtls/rsa.h"
+#include "libc/intrin/strace.h"
 #include "libc/runtime/runtime.h"
 #include "libc/stdio/rand.h"
 #include "third_party/mbedtls/common.h"
@@ -24,16 +25,9 @@
 #include "third_party/mbedtls/oid.h"
 #include "third_party/mbedtls/platform.h"
 #include "third_party/mbedtls/profile.h"
-#include "third_party/mbedtls/rsa.h"
 #include "third_party/mbedtls/rsa_internal.h"
 #include "third_party/mbedtls/sha1.h"
-
-asm(".ident\t\"\\n\\n\
-Mbed TLS (Apache 2.0)\\n\
-Copyright ARM Limited\\n\
-Copyright Mbed TLS Contributors\"");
-asm(".include \"libc/disclaimer.inc\"");
-/* clang-format off */
+__static_yoink("mbedtls_notice");
 
 /**
  * @fileoverview The RSA public-key cryptosystem
@@ -1353,8 +1347,8 @@ forceinline unsigned size_greater_than( size_t size, size_t max )
 forceinline unsigned if_int( unsigned cond, unsigned if1, unsigned if0 )
 {
     unsigned mask = all_or_nothing_int( cond );
-    return( ( CONCEAL( "r",  mask ) & if1 ) |
-            ( CONCEAL( "r", ~mask ) & if0 ) );
+    return( ( __conceal( "r",  mask ) & if1 ) |
+            ( __conceal( "r", ~mask ) & if0 ) );
 }
 
 /**

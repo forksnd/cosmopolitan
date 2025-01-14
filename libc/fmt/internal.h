@@ -1,16 +1,54 @@
-#ifndef COSMOPOLITAN_LIBC_FMT_INTERNAL_H_
-#define COSMOPOLITAN_LIBC_FMT_INTERNAL_H_
+#ifndef COSMOPOLITAN_LIBC_FMT_STRTOL_H_
+#define COSMOPOLITAN_LIBC_FMT_STRTOL_H_
+#include "libc/ctype.h"
+#include "libc/errno.h"
+#include "libc/nt/thunk/msabi.h"
+#include "libc/str/str.h"
 
-#define FLAGS_ZEROPAD   0x01
-#define FLAGS_LEFT      0x02
-#define FLAGS_PLUS      0x04
-#define FLAGS_SPACE     0x08
-#define FLAGS_HASH      0x10
-#define FLAGS_PRECISION 0x20
-#define FLAGS_ISSIGNED  0x40
-#define FLAGS_NOQUOTE   0x80
-#define FLAGS_QUOTE     FLAGS_SPACE
-#define FLAGS_GROUPING  FLAGS_NOQUOTE
-#define FLAGS_REPR      FLAGS_PLUS
+#define CONSUME_SPACES(t, s, c) \
+  if (endptr)                   \
+    *endptr = (t *)(s);         \
+  while (c == ' ' || c == '\t') \
+  c = *++s
 
-#endif /* COSMOPOLITAN_LIBC_FMT_INTERNAL_H_ */
+#define GET_SIGN(s, c, d)   \
+  d = c == '-' ? -1 : 1;    \
+  if (c == '-' || c == '+') \
+  c = *++s
+
+#define GET_RADIX(s, c, r)                                                 \
+  if (!r) {                                                                \
+    if (c == '0') {                                                        \
+      t |= 1;                                                              \
+      c = *++s;                                                            \
+      if ((c == 'x' || c == 'X') && isxdigit(s[1])) {                      \
+        c = *++s;                                                          \
+        r = 16;                                                            \
+      } else if ((c == 'b' || c == 'B') && (s[1] == '0' || s[1] == '1')) { \
+        c = *++s;                                                          \
+        r = 2;                                                             \
+      } else {                                                             \
+        r = 8;                                                             \
+      }                                                                    \
+    } else {                                                               \
+      r = 10;                                                              \
+    }                                                                      \
+  } else if (!(2 <= r && r <= 36)) {                                       \
+    errno = EINVAL;                                                        \
+    return 0;                                                              \
+  } else if (c == '0') {                                                   \
+    t |= 1;                                                                \
+    c = *++s;                                                              \
+    if ((r == 2 &&                                                         \
+         ((c == 'b' || c == 'B') && (s[1] == '0' || s[1] == '1'))) ||      \
+        (r == 16 && ((c == 'x' || c == 'X') && isxdigit(s[1])))) {         \
+      c = *++s;                                                            \
+    }                                                                      \
+  }
+
+int __vcscanf(int (*)(void *), int (*)(int, void *), void *, const char *,
+              va_list);
+int __fmt(void *, void *, const char *, va_list, int *);
+char16_t *__itoa16(char16_t[21], uint64_t) __msabi;
+
+#endif /* COSMOPOLITAN_LIBC_FMT_STRTOL_H_ */

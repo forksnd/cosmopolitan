@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2021 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -18,8 +18,7 @@
 ╚─────────────────────────────────────────────────────────────────────────────*/
 #include "libc/calls/calls.h"
 #include "libc/dce.h"
-#include "libc/intrin/kprintf.h"
-#include "libc/macros.internal.h"
+#include "libc/macros.h"
 #include "libc/mem/gc.h"
 #include "libc/mem/mem.h"
 #include "libc/runtime/runtime.h"
@@ -28,9 +27,8 @@
 #include "libc/thread/thread.h"
 #include "third_party/sqlite3/sqlite3.h"
 
-char testlib_enable_tmp_setup_teardown;
-
 void SetUpOnce(void) {
+  testlib_enable_tmp_setup_teardown();
   sqlite3_initialize();
 }
 
@@ -41,11 +39,14 @@ void SetUpOnce(void) {
 int DbOpen(const char *path, sqlite3 **db) {
   int i, rc;
   rc = sqlite3_open(path, db);
-  if (rc != SQLITE_OK) return rc;
+  if (rc != SQLITE_OK)
+    return rc;
   for (i = 0; i < 16; ++i) {
     rc = sqlite3_exec(*db, "PRAGMA journal_mode=WAL", 0, 0, 0);
-    if (rc == SQLITE_OK) break;
-    if (rc != SQLITE_BUSY) return rc;
+    if (rc == SQLITE_OK)
+      break;
+    if (rc != SQLITE_BUSY)
+      return rc;
     usleep(1000L << i);
   }
   return sqlite3_exec(*db, "PRAGMA synchronous=NORMAL", 0, 0, 0);
@@ -55,9 +56,12 @@ int DbStep(sqlite3_stmt *stmt) {
   int i, rc;
   for (i = 0; i < 16; ++i) {
     rc = sqlite3_step(stmt);
-    if (rc == SQLITE_ROW) break;
-    if (rc == SQLITE_DONE) break;
-    if (rc != SQLITE_BUSY) return rc;
+    if (rc == SQLITE_ROW)
+      break;
+    if (rc == SQLITE_DONE)
+      break;
+    if (rc != SQLITE_BUSY)
+      return rc;
     usleep(1000L << i);
   }
   return rc;
@@ -67,8 +71,10 @@ int DbExec(sqlite3 *db, const char *sql) {
   int i, rc;
   for (i = 0; i < 16; ++i) {
     rc = sqlite3_exec(db, sql, 0, 0, 0);
-    if (rc == SQLITE_OK) break;
-    if (rc != SQLITE_BUSY) return rc;
+    if (rc == SQLITE_OK)
+      break;
+    if (rc != SQLITE_BUSY)
+      return rc;
     usleep(1000L << i);
   }
   return rc;
@@ -102,7 +108,8 @@ void *Worker(void *arg) {
     ASSERT_EQ(SQLITE_OK, DbExec(db, "BEGIN TRANSACTION"));
     for (;;) {
       rc = DbStep(stmt[1]);
-      if (rc == SQLITE_DONE) break;
+      if (rc == SQLITE_DONE)
+        break;
       ASSERT_EQ(SQLITE_ROW, rc);
     }
     ASSERT_EQ(SQLITE_OK, sqlite3_reset(stmt[1]));
@@ -124,7 +131,7 @@ TEST(sqlite, test) {
                                   ")"));
   ASSERT_EQ(SQLITE_OK, sqlite3_close(db));
   int i, n = 4;
-  pthread_t *t = _gc(malloc(sizeof(pthread_t) * n));
+  pthread_t *t = gc(malloc(sizeof(pthread_t) * n));
   for (i = 0; i < n; ++i) {
     ASSERT_EQ(0, pthread_create(t + i, 0, Worker, 0));
   }

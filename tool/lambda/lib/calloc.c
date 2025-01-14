@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2022 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -28,14 +28,14 @@ void *Calloc(size_t a, size_t b) {
   static size_t n;
   z = a * b;
   if (!p) {
-    n = FRAMESIZE;
-    p = mmap((void *)0x300000000000, FRAMESIZE, PROT_READ | PROT_WRITE,
+    n = getgransize();
+    p = mmap((void *)0x300000000000, getgransize(), PROT_READ | PROT_WRITE,
              MAP_ANONYMOUS | MAP_PRIVATE | MAP_FIXED, -1, 0);
   }
   if (i + z > n) {
-    mmap(p + i, FRAMESIZE, PROT_READ | PROT_WRITE,
+    mmap(p + i, getgransize(), PROT_READ | PROT_WRITE,
          MAP_ANONYMOUS | MAP_PRIVATE | MAP_FIXED, -1, 0);
-    n += FRAMESIZE;
+    n += getgransize();
   }
   r = p + i;
   i += z;

@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2022 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -25,7 +25,8 @@ int AppendStrList(struct StrList *sl) {
   char **p2;
   if (sl->i == sl->n) {
     n2 = sl->n;
-    if (!n2) n2 = 2;
+    if (!n2)
+      n2 = 2;
     n2 += n2 >> 1;
     if ((p2 = realloc(sl->p, n2 * sizeof(*p2)))) {
       sl->p = p2;

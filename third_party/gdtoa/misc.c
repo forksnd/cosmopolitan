@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:t;c-basic-offset:8;tab-width:8;coding:utf-8   -*-│
-│vi: set et ft=c ts=8 tw=8 fenc=utf-8                                       :vi│
+│ vi: set noet ft=c ts=8 sw=8 fenc=utf-8                                   :vi │
 ╚──────────────────────────────────────────────────────────────────────────────╝
 │                                                                              │
 │  The author of this software is David M. Gay.                                │
@@ -30,11 +30,12 @@
 │                                                                              │
 ╚─────────────────────────────────────────────────────────────────────────────*/
 #include "libc/calls/calls.h"
-#include "libc/macros.internal.h"
+#include "libc/macros.h"
 #include "libc/runtime/runtime.h"
+#include "libc/thread/thread.h"
+#include "libc/thread/tls.h"
 #include "third_party/gdtoa/gdtoa.internal.h"
 #include "third_party/gdtoa/lock.h"
-/* clang-format off */
 
 static ThInfo TI0;
 
@@ -50,17 +51,17 @@ static void
 __gdtoa_Bclear(void)
 {
 	int i;
-	__gdtoa_lock();
+	__gdtoa_lock1();
 	for (i = 0; i < ARRAYLEN(TI0.Freelist); ++i)
 		__gdtoa_Brelease(TI0.Freelist[i]);
-	__gdtoa_lock1();
+	__gdtoa_lock();
 	__gdtoa_Brelease(TI0.P5s);
-	__gdtoa_unlock1();
-	bzero(&TI0, sizeof(TI0));
 	__gdtoa_unlock();
+	bzero(&TI0, sizeof(TI0));
+	__gdtoa_unlock1();
 }
 
-__attribute__((__constructor__)) static void
+__attribute__((__constructor__(60))) static void
 __gdtoa_Binit(void)
 {
 	atexit(__gdtoa_Bclear);
@@ -77,7 +78,6 @@ __gdtoa_Balloc(int k, ThInfo **PTI)
 {
 	int x;
 	Bigint *rv;
-	unsigned int len;
 	ThInfo *TI;
 	if (!(TI = *PTI))
 		*PTI = TI = __gdtoa_get_TI();
@@ -88,12 +88,16 @@ __gdtoa_Balloc(int k, ThInfo **PTI)
 	} else {
 		x = 1 << k;
 		rv = malloc(sizeof(Bigint) + (x-1)*sizeof(ULong));
+		if (rv == NULL)
+			goto ret;
 		rv->k = k;
 		rv->maxwds = x;
 	}
+	rv->sign = rv->wds = 0;
+
+ret:
 	if (TI == &TI0)
 		__gdtoa_unlock();
-	rv->sign = rv->wds = 0;
 	return rv;
 }
 

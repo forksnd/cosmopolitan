@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2020 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -25,7 +25,8 @@
  */
 int CloseSymbolTable(struct SymbolTable **table) {
   struct SymbolTable *t;
-  if (!*table) return 0;
+  if (!*table)
+    return 0;
   t = *table;
   *table = 0;
   return munmap(t, t->mapsize);

@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2022 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -16,49 +16,20 @@
 │ TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR             │
 │ PERFORMANCE OF THIS SOFTWARE.                                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
-#include "libc/intrin/atomic.h"
-#include "libc/intrin/kmalloc.h"
+#include "libc/mem/mem.h"
 #include "libc/stdio/internal.h"
-#include "libc/stdio/stdio.h"
-#include "libc/str/str.h"
 #include "libc/thread/thread.h"
-
-static _Atomic(FILE *) __stdio_freelist;
 
 FILE *__stdio_alloc(void) {
   FILE *f;
-  f = atomic_load_explicit(&__stdio_freelist, memory_order_acquire);
-  while (f) {
-    if (atomic_compare_exchange_weak_explicit(
-            &__stdio_freelist, &f,
-            atomic_load_explicit((_Atomic(struct FILE *) *)&f->next,
-                                 memory_order_acquire),
-            memory_order_release, memory_order_relaxed)) {
-      atomic_store_explicit((_Atomic(struct FILE *) *)&f->next, 0,
-                            memory_order_release);
-      break;
-    }
+  __stdio_lock();
+  if ((f = calloc(1, sizeof(FILE)))) {
+    f->freethis = 1;
+    f->fd = -1;
+    f->lock = (pthread_mutex_t)PTHREAD_RECURSIVE_MUTEX_INITIALIZER_NP;
+    dll_init(&f->elem);
+    dll_make_last(&__stdio.files, &f->elem);
   }
-  if (!f) {
-    f = kmalloc(sizeof(FILE));
-  }
-  if (f) {
-    ((pthread_mutex_t *)f->lock)->_type = PTHREAD_MUTEX_RECURSIVE;
-  }
+  __stdio_unlock();
   return f;
-}
-
-void __stdio_free(FILE *f) {
-  FILE *g;
-  bzero(f, sizeof(*f));
-  g = atomic_load_explicit(&__stdio_freelist, memory_order_acquire);
-  for (;;) {
-    atomic_store_explicit((_Atomic(struct FILE *) *)&f->next, g,
-                          memory_order_release);
-    if (atomic_compare_exchange_weak_explicit(&__stdio_freelist, &g, f,
-                                              memory_order_release,
-                                              memory_order_relaxed)) {
-      break;
-    }
-  }
 }

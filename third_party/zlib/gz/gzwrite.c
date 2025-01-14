@@ -1,20 +1,14 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:4;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=4 sts=4 sw=4 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=4 sts=4 sw=4 fenc=utf-8                               :vi │
 ╚─────────────────────────────────────────────────────────────────────────────*/
 /* gzwrite.c -- zlib functions for writing gzip files
  * Copyright (C) 2004-2017 Mark Adler
  * For conditions of distribution and use, see copyright notice in zlib.h
  */
 #include "libc/calls/calls.h"
-#include "libc/fmt/fmt.h"
 #include "libc/mem/mem.h"
+#include "libc/stdio/stdio.h"
 #include "third_party/zlib/gz/gzguts.inc"
-
-asm(".ident\t\"\\n\\n\
-zlib (zlib License)\\n\
-Copyright 1995-2017 Jean-loup Gailly and Mark Adler\"");
-asm(".include \"libc/disclaimer.inc\"");
-// clang-format off
 
 /* Local functions */
 local int gz_init OF((gz_statep));

@@ -1,5 +1,5 @@
 /*-*- mode:unix-assembly; indent-tabs-mode:t; tab-width:8; coding:utf-8     -*-│
-│vi: set et ft=asm ts=8 tw=8 fenc=utf-8                                     :vi│
+│ vi: set noet ft=asm ts=8 sw=8 fenc=utf-8                                 :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2020 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -16,7 +16,7 @@
 │ TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR             │
 │ PERFORMANCE OF THIS SOFTWARE.                                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
-#include "libc/macros.internal.h"
+#include "libc/macros.h"
 
 //	RII System Five system call counter.
 //
@@ -24,12 +24,15 @@
 //	for the purpose of counting non-Windows system calls. Please
 //	note wrappers may still short circuit calls sometimes, which
 //	wouldn't impact this counter.
+
 	.bss
 	.balign	8
 __syscount:
 	.quad	0
 	.endobj	__syscount,globl
 	.previous
+
+#ifdef __x86_64__
 
 	.initbss 701,_init___syscount
 __syscount_next:
@@ -49,3 +52,5 @@ syscount:
 	ezlea	syscount,ax
 	mov	%rax,__systemfive(%rip)
 	.init.end 701,_init___syscount
+
+#endif /* __x86_64__ */

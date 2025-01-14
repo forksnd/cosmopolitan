@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2022 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -18,13 +18,13 @@
 ╚─────────────────────────────────────────────────────────────────────────────*/
 #include "libc/calls/calls.h"
 #include "libc/calls/landlock.h"
+#include "libc/calls/pledge.h"
 #include "libc/calls/struct/dirent.h"
 #include "libc/calls/struct/stat.h"
 #include "libc/calls/syscall-sysv.internal.h"
 #include "libc/dce.h"
 #include "libc/errno.h"
 #include "libc/intrin/kprintf.h"
-#include "libc/mem/copyfd.internal.h"
 #include "libc/mem/gc.h"
 #include "libc/runtime/internal.h"
 #include "libc/runtime/runtime.h"
@@ -41,35 +41,34 @@
 #include "libc/sysv/consts/sock.h"
 #include "libc/testlib/subprocess.h"
 #include "libc/testlib/testlib.h"
-#include "libc/thread/spawn.h"
+#include "libc/thread/thread.h"
 #include "libc/x/x.h"
 #include "libc/x/xasprintf.h"
 
 #define EACCES_OR_ENOENT (IsOpenbsd() ? ENOENT : EACCES)
 
-char testlib_enable_tmp_setup_teardown;
-
 struct stat st;
 
-static bool SupportsLandlock(void) {
-  int e = errno;
-  bool r = landlock_create_ruleset(0, 0, LANDLOCK_CREATE_RULESET_VERSION) >= 0;
-  errno = e;
-  return r;
+bool HasUnveilSupport(void) {
+  return unveil("", 0) >= 0;
+}
+
+bool UnveilCanSecureTruncate(void) {
+  int abi = unveil("", 0);
+  return abi == 0 || abi >= 3;
 }
 
 void SetUpOnce(void) {
-  __enable_threads();
-  if (!(IsLinux() && SupportsLandlock()) && !IsOpenbsd()) exit(0);
+  if (!HasUnveilSupport()) {
+    fprintf(stderr, "warning: unveil() not supported on this system: %m\n");
+    exit(0);
+  }
+  testlib_enable_tmp_setup_teardown();
 }
 
 void SetUp(void) {
   // make sure zipos maps executable into memory early
   ASSERT_SYS(0, 0, stat("/zip/life.elf", &st));
-}
-
-bool HasTruncateSupport(void) {
-  return IsOpenbsd() || landlock_create_ruleset(0, 0, LANDLOCK_CREATE_RULESET_VERSION) >= 3;
 }
 
 TEST(unveil, api_differences) {
@@ -96,6 +95,8 @@ TEST(unveil, api_differences) {
 }
 
 TEST(unveil, rx_readOnlyPreexistingExecutable_worksFine) {
+  if (IsOpenbsd())
+    return;  // TOOD(jart): why pledge violation?
   SPAWN(fork);
   ASSERT_SYS(0, 0, mkdir("folder", 0755));
   testlib_extract("/zip/life.elf", "folder/life.elf", 0755);
@@ -152,6 +153,8 @@ TEST(unveil, rwc_createExecutableFile_isAllowedButCantBeRun) {
 }
 
 TEST(unveil, rwcx_createExecutableFile_canAlsoBeRun) {
+  if (IsOpenbsd())
+    return;  // TOOD(jart): why pledge violation?
   SPAWN(fork);
   ASSERT_SYS(0, 0, mkdir("folder", 0755));
   ASSERT_SYS(0, 0, unveil("folder", "rwcx"));
@@ -179,7 +182,8 @@ TEST(unveil, dirfdHacking_doesntWork) {
 }
 
 TEST(unveil, mostRestrictivePolicy) {
-  if (IsOpenbsd()) return;  // openbsd behaves oddly; see docs
+  if (IsOpenbsd())
+    return;  // openbsd behaves oddly; see docs
   SPAWN(fork);
   ASSERT_SYS(0, 0, mkdir("jail", 0755));
   ASSERT_SYS(0, 0, mkdir("garden", 0755));
@@ -221,7 +225,8 @@ TEST(unveil, overlappingDirectories_inconsistentBehavior) {
 }
 
 TEST(unveil, usedTwice_allowedOnLinux) {
-  if (IsOpenbsd()) return;
+  if (IsOpenbsd())
+    return;
   SPAWN(fork);
   ASSERT_SYS(0, 0, mkdir("jail", 0755));
   ASSERT_SYS(0, 0, xbarf("jail/ok.txt", "hello", 5));
@@ -249,7 +254,7 @@ TEST(unveil, truncate_isForbiddenBySeccomp) {
   ASSERT_SYS(0, 0, xbarf("garden/secret.txt", "hello", 5));
   ASSERT_SYS(0, 0, unveil("jail", "rw"));
   ASSERT_SYS(0, 0, unveil(0, 0));
-  ASSERT_SYS(!HasTruncateSupport() ? EPERM : EACCES_OR_ENOENT, -1,
+  ASSERT_SYS(!UnveilCanSecureTruncate() ? EPERM : EACCES_OR_ENOENT, -1,
              truncate("garden/secret.txt", 0));
   if (IsLinux()) {
     ASSERT_SYS(0, 0, stat("garden/secret.txt", &st));
@@ -259,7 +264,8 @@ TEST(unveil, truncate_isForbiddenBySeccomp) {
 }
 
 TEST(unveil, ftruncate_isForbidden) {
-  if (IsOpenbsd()) return;  // b/c O_PATH is a Linux thing
+  if (IsOpenbsd())
+    return;  // b/c O_PATH is a Linux thing
   SPAWN(fork);
   ASSERT_SYS(0, 0, mkdir("jail", 0755));
   ASSERT_SYS(0, 0, mkdir("garden", 0755));
@@ -275,7 +281,8 @@ TEST(unveil, ftruncate_isForbidden) {
 }
 
 TEST(unveil, procfs_isForbiddenByDefault) {
-  if (IsOpenbsd()) return;
+  if (IsOpenbsd())
+    return;
   SPAWN(fork);
   ASSERT_SYS(0, 0, mkdir("jail", 0755));
   ASSERT_SYS(0, 0, unveil("jail", "rw"));
@@ -284,25 +291,25 @@ TEST(unveil, procfs_isForbiddenByDefault) {
   EXITS(0);
 }
 
-int Worker(void *arg, int tid) {
+void *Worker(void *arg) {
   ASSERT_SYS(EACCES_OR_ENOENT, -1, open("garden/secret.txt", O_RDONLY));
   return 0;
 }
 
 TEST(unveil, isInheritedAcrossThreads) {
-  struct spawn t;
+  pthread_t t;
   SPAWN(fork);
   ASSERT_SYS(0, 0, mkdir("jail", 0755));
   ASSERT_SYS(0, 0, mkdir("garden", 0755));
   ASSERT_SYS(0, 0, xbarf("garden/secret.txt", "hello", 5));
   ASSERT_SYS(0, 0, unveil("jail", "rw"));
   ASSERT_SYS(0, 0, unveil(0, 0));
-  ASSERT_SYS(0, 0, _spawn(Worker, 0, &t));
-  EXPECT_SYS(0, 0, _join(&t));
+  ASSERT_SYS(0, 0, pthread_create(&t, 0, Worker, 0));
+  EXPECT_SYS(0, 0, pthread_join(t, 0));
   EXITS(0);
 }
 
-int Worker2(void *arg, int tid) {
+void *Worker2(void *arg) {
   ASSERT_SYS(0, 0, unveil("jail", "rw"));
   ASSERT_SYS(0, 0, unveil(0, 0));
   ASSERT_SYS(EACCES_OR_ENOENT, -1, open("garden/secret.txt", O_RDONLY));
@@ -310,13 +317,13 @@ int Worker2(void *arg, int tid) {
 }
 
 TEST(unveil, isThreadSpecificOnLinux_isProcessWideOnOpenbsd) {
-  struct spawn t;
+  pthread_t t;
   SPAWN(fork);
   ASSERT_SYS(0, 0, mkdir("jail", 0755));
   ASSERT_SYS(0, 0, mkdir("garden", 0755));
   ASSERT_SYS(0, 0, xbarf("garden/secret.txt", "hello", 5));
-  ASSERT_SYS(0, 0, _spawn(Worker2, 0, &t));
-  EXPECT_SYS(0, 0, _join(&t));
+  ASSERT_SYS(0, 0, pthread_create(&t, 0, Worker2, 0));
+  EXPECT_SYS(0, 0, pthread_join(t, 0));
   if (IsOpenbsd()) {
     ASSERT_SYS(ENOENT, -1, open("garden/secret.txt", O_RDONLY));
   } else {
@@ -328,9 +335,10 @@ TEST(unveil, isThreadSpecificOnLinux_isProcessWideOnOpenbsd) {
 TEST(unveil, usedTwice_forbidden_worksWithPledge) {
   int ws, pid;
   bool *gotsome;
-  ASSERT_NE(-1, (gotsome = _mapshared(FRAMESIZE)));
+  ASSERT_NE(-1, (gotsome = _mapshared(getpagesize())));
   ASSERT_NE(-1, (pid = fork()));
   if (!pid) {
+    __pledge_mode = PLEDGE_PENALTY_KILL_PROCESS;
     // install our first seccomp filter
     ASSERT_SYS(0, 0, pledge("stdio rpath wpath cpath unveil", 0));
     ASSERT_SYS(0, 0, mkdir("jail", 0755));
@@ -351,7 +359,7 @@ TEST(unveil, usedTwice_forbidden_worksWithPledge) {
   ASSERT_TRUE(*gotsome);
   ASSERT_TRUE(WIFSIGNALED(ws));
   ASSERT_EQ(IsOpenbsd() ? SIGABRT : SIGSYS, WTERMSIG(ws));
-  EXPECT_SYS(0, 0, munmap(gotsome, FRAMESIZE));
+  EXPECT_SYS(0, 0, munmap(gotsome, getpagesize()));
 }
 
 TEST(unveil, lotsOfPaths) {

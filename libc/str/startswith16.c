@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2020 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -24,10 +24,13 @@
  * @param s is a NUL-terminated string
  * @param prefix is also NUL-terminated
  */
-bool _startswith16(const char16_t *s, const char16_t *prefix) {
+bool32 startswith16(const char16_t *s, const char16_t *prefix) {
   for (;;) {
-    if (!*prefix) return true;
-    if (!*s) return false;
-    if (*s++ != *prefix++) return false;
+    if (!*prefix)
+      return true;
+    if (!*s)
+      return false;
+    if (*s++ != *prefix++)
+      return false;
   }
 }

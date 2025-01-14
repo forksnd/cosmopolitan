@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2022 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -19,7 +19,9 @@
 #include "tool/plinko/lib/plinko.h"
 
 nosideeffect int CountAtoms(int x, int max, int res) {
-  if (!x || res >= max) return res;
-  if (x > 0) return res + 1;
+  if (!x || res >= max)
+    return res;
+  if (x > 0)
+    return res + 1;
   return CountAtoms(Cdr(x), max, CountAtoms(Car(x), max, res));
 }

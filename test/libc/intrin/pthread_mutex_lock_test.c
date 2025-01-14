@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2022 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -20,12 +20,16 @@
 #include "libc/atomic.h"
 #include "libc/calls/calls.h"
 #include "libc/calls/state.internal.h"
+#include "libc/calls/struct/sigaction.h"
+#include "libc/cosmo.h"
 #include "libc/errno.h"
-#include "libc/intrin/strace.internal.h"
+#include "libc/intrin/kprintf.h"
+#include "libc/intrin/strace.h"
 #include "libc/log/check.h"
-#include "libc/macros.internal.h"
+#include "libc/macros.h"
 #include "libc/math.h"
-#include "libc/mem/gc.internal.h"
+#include "libc/mem/gc.h"
+#include "libc/mem/leaks.h"
 #include "libc/mem/mem.h"
 #include "libc/runtime/internal.h"
 #include "libc/runtime/runtime.h"
@@ -34,39 +38,53 @@
 #include "libc/sysv/consts/map.h"
 #include "libc/sysv/consts/prot.h"
 #include "libc/sysv/consts/rlimit.h"
+#include "libc/sysv/consts/sig.h"
 #include "libc/testlib/ezbench.h"
 #include "libc/testlib/testlib.h"
-#include "libc/thread/spawn.h"
 #include "libc/thread/thread.h"
 #include "libc/thread/tls.h"
-#include "libc/thread/wait0.internal.h"
 #include "third_party/nsync/mu.h"
 
 #define THREADS    8
 #define ITERATIONS 512
 
+#define MAX_RECURSIVE_LOCKS 64
+
 int count;
 atomic_int started;
 atomic_int finished;
+pthread_mutex_t lock;
 pthread_mutex_t mylock;
 pthread_spinlock_t slock;
-struct spawn th[THREADS];
+pthread_t th[THREADS];
 
-void SetUpOnce(void) {
-  __enable_threads();
-  ASSERT_SYS(0, 0, pledge("stdio rpath", 0));
+void ignore_signal(int sig) {
 }
 
-TEST(pthread_mutex_lock, initializer) {
-  struct sqlite3_mutex {
-    pthread_mutex_t mutex;
-  } mu[] = {{
-      PTHREAD_MUTEX_INITIALIZER,
-  }};
+void SetUpOnce(void) {
+  ASSERT_SYS(0, 0, pledge("stdio rpath", 0));
+  kprintf("running %s\n", program_invocation_name);
+  signal(SIGTRAP, ignore_signal);
+}
+
+TEST(pthread_mutex_lock, default) {
+  pthread_mutexattr_t attr;
+  ASSERT_EQ(0, pthread_mutexattr_init(&attr));
+  ASSERT_EQ(0, pthread_mutexattr_settype(&attr, PTHREAD_MUTEX_DEFAULT));
+  ASSERT_EQ(0, pthread_mutex_init(&lock, &attr));
+  ASSERT_EQ(0, pthread_mutexattr_destroy(&attr));
+  ASSERT_EQ(0, pthread_mutex_init(&lock, 0));
+  ASSERT_EQ(0, pthread_mutex_lock(&lock));
+  ASSERT_EQ(EBUSY, pthread_mutex_trylock(&lock));
+  ASSERT_EQ(0, pthread_mutex_unlock(&lock));
+  ASSERT_EQ(0, pthread_mutex_trylock(&lock));
+  ASSERT_EQ(0, pthread_mutex_unlock(&lock));
+  ASSERT_EQ(0, pthread_mutex_lock(&lock));
+  ASSERT_EQ(0, pthread_mutex_unlock(&lock));
+  ASSERT_EQ(0, pthread_mutex_destroy(&lock));
 }
 
 TEST(pthread_mutex_lock, normal) {
-  pthread_mutex_t lock;
   pthread_mutexattr_t attr;
   ASSERT_EQ(0, pthread_mutexattr_init(&attr));
   ASSERT_EQ(0, pthread_mutexattr_settype(&attr, PTHREAD_MUTEX_NORMAL));
@@ -84,38 +102,43 @@ TEST(pthread_mutex_lock, normal) {
 }
 
 TEST(pthread_mutex_lock, recursive) {
-  pthread_mutex_t lock;
   pthread_mutexattr_t attr;
   ASSERT_EQ(0, pthread_mutexattr_init(&attr));
   ASSERT_EQ(0, pthread_mutexattr_settype(&attr, PTHREAD_MUTEX_RECURSIVE));
   ASSERT_EQ(0, pthread_mutex_init(&lock, &attr));
   ASSERT_EQ(0, pthread_mutexattr_destroy(&attr));
+  for (int i = 0; i < MAX_RECURSIVE_LOCKS; ++i) {
+    if (i & 1) {
+      ASSERT_EQ(0, pthread_mutex_lock(&lock));
+    } else {
+      ASSERT_EQ(0, pthread_mutex_trylock(&lock));
+    }
+  }
+  ASSERT_EQ(EAGAIN, pthread_mutex_lock(&lock));
+  ASSERT_EQ(EAGAIN, pthread_mutex_trylock(&lock));
+  for (int i = 0; i < MAX_RECURSIVE_LOCKS; ++i) {
+    ASSERT_EQ(0, pthread_mutex_unlock(&lock));
+  }
   ASSERT_EQ(0, pthread_mutex_lock(&lock));
-  ASSERT_EQ(0, pthread_mutex_lock(&lock));
-  ASSERT_EQ(0, pthread_mutex_trylock(&lock));
-  ASSERT_EQ(0, pthread_mutex_unlock(&lock));
-  ASSERT_EQ(0, pthread_mutex_unlock(&lock));
-  ASSERT_EQ(0, pthread_mutex_lock(&lock));
-  ASSERT_EQ(0, pthread_mutex_unlock(&lock));
   ASSERT_EQ(0, pthread_mutex_unlock(&lock));
   ASSERT_EQ(0, pthread_mutex_destroy(&lock));
 }
 
 TEST(pthread_mutex_lock, errorcheck) {
-  pthread_mutex_t lock;
   pthread_mutexattr_t attr;
   ASSERT_EQ(0, pthread_mutexattr_init(&attr));
   ASSERT_EQ(0, pthread_mutexattr_settype(&attr, PTHREAD_MUTEX_ERRORCHECK));
   ASSERT_EQ(0, pthread_mutex_init(&lock, &attr));
   ASSERT_EQ(0, pthread_mutexattr_destroy(&attr));
   ASSERT_EQ(0, pthread_mutex_lock(&lock));
+  ASSERT_EQ(1, __deadlock_tracked(&lock));
   ASSERT_EQ(EDEADLK, pthread_mutex_lock(&lock));
   ASSERT_EQ(EBUSY, pthread_mutex_trylock(&lock));
   ASSERT_EQ(0, pthread_mutex_unlock(&lock));
   ASSERT_EQ(0, pthread_mutex_destroy(&lock));
 }
 
-int MutexWorker(void *p, int tid) {
+void *MutexWorker(void *p) {
   int i;
   ++started;
   for (i = 0; i < ITERATIONS; ++i) {
@@ -133,17 +156,18 @@ TEST(pthread_mutex_lock, contention) {
   int i;
   pthread_mutexattr_t attr;
   pthread_mutexattr_init(&attr);
-  pthread_mutexattr_settype(&attr, PTHREAD_MUTEX_NORMAL);
+  pthread_mutexattr_settype(&attr, PTHREAD_MUTEX_DEFAULT);
   pthread_mutex_init(&mylock, &attr);
   pthread_mutexattr_destroy(&attr);
   count = 0;
   started = 0;
   finished = 0;
   for (i = 0; i < THREADS; ++i) {
-    ASSERT_SYS(0, 0, _spawn(MutexWorker, (void *)(intptr_t)i, th + i));
+    ASSERT_SYS(0, 0,
+               pthread_create(th + i, 0, MutexWorker, (void *)(intptr_t)i));
   }
   for (i = 0; i < THREADS; ++i) {
-    ASSERT_SYS(0, 0, _join(th + i));
+    ASSERT_SYS(0, 0, pthread_join(th[i], 0));
   }
   EXPECT_EQ(THREADS, started);
   EXPECT_EQ(THREADS, finished);
@@ -162,10 +186,10 @@ TEST(pthread_mutex_lock, rcontention) {
   started = 0;
   finished = 0;
   for (i = 0; i < THREADS; ++i) {
-    ASSERT_NE(-1, _spawn(MutexWorker, (void *)(intptr_t)i, th + i));
+    ASSERT_EQ(0, pthread_create(th + i, 0, MutexWorker, (void *)(intptr_t)i));
   }
   for (i = 0; i < THREADS; ++i) {
-    _join(th + i);
+    ASSERT_EQ(0, pthread_join(th[i], 0));
   }
   EXPECT_EQ(THREADS, started);
   EXPECT_EQ(THREADS, finished);
@@ -184,10 +208,10 @@ TEST(pthread_mutex_lock, econtention) {
   started = 0;
   finished = 0;
   for (i = 0; i < THREADS; ++i) {
-    ASSERT_NE(-1, _spawn(MutexWorker, (void *)(intptr_t)i, th + i));
+    ASSERT_NE(-1, pthread_create(th + i, 0, MutexWorker, (void *)(intptr_t)i));
   }
   for (i = 0; i < THREADS; ++i) {
-    _join(th + i);
+    pthread_join(th[i], 0);
   }
   EXPECT_EQ(THREADS, started);
   EXPECT_EQ(THREADS, finished);
@@ -195,7 +219,7 @@ TEST(pthread_mutex_lock, econtention) {
   EXPECT_EQ(0, pthread_mutex_destroy(&mylock));
 }
 
-int SpinlockWorker(void *p, int tid) {
+void *SpinlockWorker(void *p) {
   int i;
   ++started;
   for (i = 0; i < ITERATIONS; ++i) {
@@ -204,7 +228,7 @@ int SpinlockWorker(void *p, int tid) {
     pthread_spin_unlock(&slock);
   }
   ++finished;
-  STRACE("SpinlockWorker Finished %d", tid);
+  STRACE("SpinlockWorker Finished %d", gettid());
   return 0;
 }
 
@@ -221,10 +245,11 @@ TEST(pthread_spin_lock, test) {
   EXPECT_EQ(EBUSY, pthread_spin_trylock(&slock));
   EXPECT_EQ(0, pthread_spin_unlock(&slock));
   for (i = 0; i < THREADS; ++i) {
-    ASSERT_NE(-1, _spawn(SpinlockWorker, (void *)(intptr_t)i, th + i));
+    ASSERT_EQ(0,
+              pthread_create(th + i, 0, SpinlockWorker, (void *)(intptr_t)i));
   }
   for (i = 0; i < THREADS; ++i) {
-    _join(th + i);
+    ASSERT_EQ(0, pthread_join(th[i], 0));
   }
   EXPECT_EQ(THREADS, started);
   EXPECT_EQ(THREADS, finished);

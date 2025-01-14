@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2021 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -19,7 +19,7 @@
 #include "libc/log/check.h"
 #include "net/https/https.h"
 
-char *FormatX509Name(mbedtls_x509_name *name) {
+char *FormatX509Name(const mbedtls_x509_name *name) {
   char *s = calloc(1, 1000);
   CHECK_GT(mbedtls_x509_dn_gets(s, 1000, name), 0);
   return s;

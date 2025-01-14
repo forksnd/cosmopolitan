@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2021 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -19,7 +19,7 @@
 #include "libc/calls/calls.h"
 #include "libc/intrin/kprintf.h"
 #include "libc/log/countbranch.h"
-#include "libc/macros.internal.h"
+#include "libc/macros.h"
 #include "libc/math.h"
 #include "libc/mem/alg.h"
 #include "libc/runtime/runtime.h"
@@ -51,17 +51,22 @@ static int CompareCounters(const void *a, const void *b) {
   double x, y;
   x = RankCounter(a);
   y = RankCounter(b);
-  if (x > y) return +1;
-  if (x < y) return -1;
-  if (GetTotal(a) < GetTotal(b)) return +1;
-  if (GetTotal(a) > GetTotal(b)) return -1;
+  if (x > y)
+    return +1;
+  if (x < y)
+    return -1;
+  if (GetTotal(a) < GetTotal(b))
+    return +1;
+  if (GetTotal(a) > GetTotal(b))
+    return -1;
   return 0;
 }
 
 static size_t CountCounters(void) {
   size_t n;
   struct countbranch *p;
-  for (n = 0, p = countbranch_data; p->total >= 0; ++p) ++n;
+  for (n = 0, p = countbranch_data; p->total >= 0; ++p)
+    ++n;
   return n;
 }
 
@@ -96,12 +101,9 @@ void countbranch_report(void) {
   }
 }
 
-static textstartup void countbranch_init() {
+__attribute__((__constructor__(90))) static textstartup void
+countbranch_init() {
   atexit(countbranch_report);
 }
-
-const void *const countbranch_ctor[] initarray = {
-    countbranch_init,
-};
 
 #endif /* __x86_64__ */

@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2021 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -18,8 +18,8 @@
 ╚─────────────────────────────────────────────────────────────────────────────*/
 #include "libc/errno.h"
 #include "libc/fmt/itoa.h"
-#include "libc/intrin/describeflags.internal.h"
-#include "libc/macros.internal.h"
+#include "libc/intrin/describeflags.h"
+#include "libc/macros.h"
 #include "libc/sock/sock.h"
 #include "libc/sock/struct/sockaddr.h"
 #include "libc/sock/struct/sockaddr6.h"
@@ -28,11 +28,10 @@
 #include "libc/sysv/consts/ipproto.h"
 #include "libc/sysv/consts/sock.h"
 
-const char *(DescribeSockaddr)(char buf[128], const struct sockaddr *sa,
-                               size_t sasize) {
+const char *_DescribeSockaddr(char buf[128], const struct sockaddr *sa,
+                              size_t sasize) {
   int e;
   size_t n;
-  uint16_t port;
   char *p, ip[72];
   e = errno;
   stpcpy(buf, "NULL");
@@ -57,7 +56,7 @@ const char *(DescribeSockaddr)(char buf[128], const struct sockaddr *sa,
         p = stpcpy(p, ip);
         *p++ = ']';
         *p++ = ':';
-        p = FormatUint32(p, in6->sin6_port);
+        p = FormatUint32(p, ntohs(in6->sin6_port));
       }
     } else if (sa->sa_family == AF_UNIX &&
                sasize >= sizeof(struct sockaddr_un)) {
@@ -65,7 +64,8 @@ const char *(DescribeSockaddr)(char buf[128], const struct sockaddr *sa,
       unix = (const struct sockaddr_un *)sa;
       n = strnlen(unix->sun_path, sizeof(unix->sun_path));
       n = MIN(n, 128 - 1);
-      memcpy(buf, unix->sun_path, n);
+      if (n)
+        memcpy(buf, unix->sun_path, n);
       buf[n] = 0;
     }
   }

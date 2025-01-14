@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:t;c-basic-offset:8;tab-width:8;coding:utf-8   -*-│
-│vi: set et ft=c ts=8 tw=8 fenc=utf-8                                       :vi│
+│ vi: set noet ft=c ts=8 sw=8 fenc=utf-8                                   :vi │
 ╚──────────────────────────────────────────────────────────────────────────────╝
 │                                                                              │
 │  Musl Libc                                                                   │
@@ -26,12 +26,9 @@
 │                                                                              │
 ╚─────────────────────────────────────────────────────────────────────────────*/
 #include "libc/math.h"
-
-asm(".ident\t\"\\n\\n\
-Musl libc (MIT License)\\n\
-Copyright 2005-2014 Rich Felker, et. al.\"");
-asm(".include \"libc/disclaimer.inc\"");
-/* clang-format off */
+__static_yoink("fdlibm_notice");
+__static_yoink("musl_libc_notice");
+__static_yoink("freebsd_libm_notice");
 
 /* origin: FreeBSD /usr/src/lib/msun/src/e_asin.c */
 /*
@@ -119,7 +116,7 @@ double asin(double x)
 	/* |x| >= 1 or nan */
 	if (ix >= 0x3ff00000) {
 		lx = u.i;
-		if (!(ix-0x3ff00000 | lx))
+		if (!((ix-0x3ff00000) | lx))
 			/* asin(1) = +-pi/2 with inexact */
 			return x*pio2_hi + 0x1p-120f;
 		return 0/(x-x);
@@ -147,3 +144,7 @@ double asin(double x)
 	}
 	return ng ? -x : x;
 }
+
+#if LDBL_MANT_DIG == 53 && LDBL_MAX_EXP == 1024
+__weak_reference(asin, asinl);
+#endif

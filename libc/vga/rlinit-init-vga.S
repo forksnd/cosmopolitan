@@ -1,5 +1,5 @@
 /*-*- mode:unix-assembly; indent-tabs-mode:t; tab-width:8; coding:utf-8     -*-│
-│vi: set et ft=asm ts=8 tw=8 fenc=utf-8                                     :vi│
+│ vi: set noet ft=asm ts=8 sw=8 fenc=utf-8                                 :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ This is free and unencumbered software released into the public domain.      │
 │                                                                              │
@@ -24,7 +24,7 @@
 │ ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR        │
 │ OTHER DEALINGS IN THE SOFTWARE.                                              │
 ╚─────────────────────────────────────────────────────────────────────────────*/
-#include "libc/macros.internal.h"
+#include "libc/macros.h"
 #include "libc/runtime/mman.internal.h"
 #include "libc/vga/vga.internal.h"
 
@@ -91,12 +91,12 @@
 vga_console:
 	.endobj	vga_console,globl,hidden
 	.previous
-	.init.start 305,_init_vga
+	.init.start 101,_init_vga
 	push	%rdi
 	push	%rsi
 	call	_vga_init
 	pop	%rsi
 	pop	%rdi
-	.init.end 305,_init_vga
+	.init.end 101,_init_vga
 	.yoink	sys_writev_vga
 	.yoink	sys_readv_vga

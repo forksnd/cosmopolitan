@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2020 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -17,7 +17,7 @@
 │ PERFORMANCE OF THIS SOFTWARE.                                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
 #include "libc/str/str.h"
-#include "libc/str/tab.internal.h"
+#include "libc/str/tab.h"
 #include "libc/testlib/testlib.h"
 
 /**
@@ -30,11 +30,15 @@
 bool testlib_binequals(const char16_t *want, const void *got, size_t n) {
   size_t i;
   const unsigned char *p = (const unsigned char *)got;
-  if (!got) return false;
+  if (!got)
+    return false;
   for (i = 0; i < n; ++i) {
-    if (!want[i]) break;
-    if (i == n) break;
-    if (want[i] != kCp437[p[i]]) return false;
+    if (!want[i])
+      break;
+    if (i == n)
+      break;
+    if (want[i] != kCp437[p[i]])
+      return false;
   }
   return true;
 }

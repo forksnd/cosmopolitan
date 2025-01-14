@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2017 Google LLC                                                    │
 │                                                                              │
@@ -16,12 +16,11 @@
 │ limitations under the License.                                               │
 ╚─────────────────────────────────────────────────────────────────────────────*/
 #include "libc/str/highwayhash64.h"
-#include "libc/intrin/bits.h"
+#include "libc/serialize.h"
 
-asm(".ident\t\"\\n\\n\
-HighwayHash (Apache 2.0)\\n\
-Copyright 2017 Google LLC\"");
-asm(".include \"libc/disclaimer.inc\"");
+__notice(highwayhash_notice, "\
+HighwayHash (Apache 2.0)\n\
+Copyright 2017 Google LLC");
 
 typedef struct {
   uint64_t v0[4];
@@ -138,7 +137,8 @@ static void PermuteAndUpdate(HighwayHashState *state) {
 
 static uint64_t HighwayHashFinalize64(HighwayHashState *state) {
   int i;
-  for (i = 0; i < 4; i++) PermuteAndUpdate(state);
+  for (i = 0; i < 4; i++)
+    PermuteAndUpdate(state);
   return state->v0[0] + state->v1[0] + state->mul0[0] + state->mul1[0];
 }
 
@@ -149,7 +149,8 @@ static void ProcessAll(const uint8_t *data, size_t size, const uint64_t key[4],
   for (i = 0; i + 32 <= size; i += 32) {
     HighwayHashUpdatePacket(data + i, state);
   }
-  if ((size & 31) != 0) HighwayHashUpdateRemainder(data + i, size & 31, state);
+  if ((size & 31) != 0)
+    HighwayHashUpdateRemainder(data + i, size & 31, state);
 }
 
 /**

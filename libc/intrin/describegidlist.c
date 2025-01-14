@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2021 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -18,25 +18,22 @@
 ╚─────────────────────────────────────────────────────────────────────────────*/
 #include "libc/calls/groups.internal.h"
 #include "libc/dce.h"
-#include "libc/intrin/asan.internal.h"
 #include "libc/intrin/kprintf.h"
 #include "libc/intrin/popcnt.h"
-#include "libc/macros.internal.h"
+#include "libc/macros.h"
 #include "libc/str/str.h"
-
-#ifdef DescribeGidList
-#undef DescribeGidList
-#endif
 
 #define N 128
 
-const char *DescribeGidList(char buf[N], int rc, int size,
-                            const uint32_t list[]) {
-  if ((rc == -1) || (size < 0)) return "n/a";
-  if (!size) return "{}";
-  if (!list) return "NULL";
-  if ((!IsAsan() && kisdangerous(list)) ||
-      (IsAsan() && !__asan_is_valid(list, size * sizeof(list[0])))) {
+const char *_DescribeGidList(char buf[N], int rc, int size,
+                             const uint32_t list[]) {
+  if ((rc == -1) || (size < 0))
+    return "n/a";
+  if (!size)
+    return "{}";
+  if (!list)
+    return "NULL";
+  if (kisdangerous(list)) {
     ksnprintf(buf, N, "%p", list);
     return buf;
   }
@@ -47,8 +44,10 @@ const char *DescribeGidList(char buf[N], int rc, int size,
     i += ksnprintf(buf + i, MAX(0, n - i), "%u, ", list[c]);
   }
   if (c == size) {
-    if (buf[i - 1] == ' ') i--;
-    if (buf[i - 1] == ',') i--;
+    if (buf[i - 1] == ' ')
+      i--;
+    if (buf[i - 1] == ',')
+      i--;
     i += ksnprintf(buf + i, MAX(0, n - i), "}");
   }
   return buf;

@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:t;c-basic-offset:8;tab-width:8;coding:utf-8   -*-│
-│vi: set et ft=c ts=8 tw=8 fenc=utf-8                                       :vi│
+│ vi: set noet ft=c ts=8 sw=8 fenc=utf-8                                   :vi │
 ╚──────────────────────────────────────────────────────────────────────────────╝
 │                                                                              │
 │  Musl Libc                                                                   │
@@ -28,20 +28,16 @@
 #include "libc/math.h"
 #include "libc/runtime/fenv.h"
 #include "libc/tinymath/internal.h"
+#ifndef __llvm__
 #include "third_party/intel/smmintrin.internal.h"
-
-asm(".ident\t\"\\n\\n\
-Musl libc (MIT License)\\n\
-Copyright 2005-2014 Rich Felker, et. al.\"");
-asm(".include \"libc/disclaimer.inc\"");
-// clang-format off
+#endif
+__static_yoink("musl_libc_notice");
 
 #if FLT_EVAL_METHOD==0 || FLT_EVAL_METHOD==1
 #define EPS DBL_EPSILON
 #elif FLT_EVAL_METHOD==2
 #define EPS LDBL_EPSILON
 #endif
-static const double_t toint = 1/EPS;
 
 /**
  * Returns smallest integral value not less than 𝑥.
@@ -63,7 +59,7 @@ double ceil(double x)
 	asm("fidbra\t%0,6,%1,4" : "=f"(x) : "f"(x));
 	return x;
 
-#elif defined(__x86_64__) && defined(__SSE4_1__)
+#elif defined(__x86_64__) && defined(__SSE4_1__) && !defined(__llvm__) && !defined(__chibicc__)
 
 	asm("roundsd\t%2,%1,%0"
 	    : "=x"(x)
@@ -72,6 +68,7 @@ double ceil(double x)
 
 #else
 
+	static const double_t toint = 1/EPS;
 	union {double f; uint64_t i;} u = {x};
 	int e = u.i >> 52 & 0x7ff;
 	double_t y;

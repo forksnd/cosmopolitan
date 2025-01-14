@@ -1,12 +1,13 @@
 #include "libc/nt/codegen.h"
-.imp	pdh,__imp_PdhGetFormattedCounterValue,PdhGetFormattedCounterValue,0
+.imp	pdh,__imp_PdhGetFormattedCounterValue,PdhGetFormattedCounterValue
 
 	.text.windows
+	.ftrace1
 PdhGetFormattedCounterValue:
+	.ftrace2
 #ifdef __x86_64__
 	push	%rbp
 	mov	%rsp,%rbp
-	.profilable
 	mov	__imp_PdhGetFormattedCounterValue(%rip),%rax
 	jmp	__sysv2nt
 #elif defined(__aarch64__)

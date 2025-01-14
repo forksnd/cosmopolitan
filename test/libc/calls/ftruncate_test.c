@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2020 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -21,9 +21,9 @@
 #include "libc/calls/struct/stat.h"
 #include "libc/dce.h"
 #include "libc/errno.h"
-#include "libc/intrin/safemacros.internal.h"
+#include "libc/intrin/safemacros.h"
 #include "libc/limits.h"
-#include "libc/mem/gc.internal.h"
+#include "libc/mem/gc.h"
 #include "libc/nexgen32e/vendor.internal.h"
 #include "libc/runtime/runtime.h"
 #include "libc/stdio/stdio.h"
@@ -35,9 +35,8 @@
 
 struct stat st;
 
-char testlib_enable_tmp_setup_teardown;
-
 void SetUpOnce(void) {
+  testlib_enable_tmp_setup_teardown();
   ASSERT_SYS(0, 0, pledge("stdio rpath wpath cpath", 0));
 }
 
@@ -71,7 +70,8 @@ TEST(ftruncate, pipeFd_einval) {
 
 TEST(ftruncate, efbig) {
   // FreeBSD and RHEL7 return 0 (why??)
-  if (IsLinux() || IsFreebsd()) return;
+  if (IsLinux() || IsFreebsd())
+    return;
   sighandler_t old = signal(SIGXFSZ, SIG_IGN);
   ASSERT_SYS(0, 3, creat("foo", 0755));
   ASSERT_SYS(IsWindows() ? EINVAL : EFBIG, -1, ftruncate(3, INT64_MAX));
@@ -107,5 +107,24 @@ TEST(ftruncate, test) {
   ASSERT_SYS(0, 0, pread(3, got, 512, 0));
   ASSERT_SYS(0, 0, read(3, got, 512));
   ASSERT_SYS(0, 10, lseek(3, 0, SEEK_CUR));  // position stays past eof
+  ASSERT_SYS(0, 0, close(3));
+}
+
+TEST(ftruncate, isConsistentWithLseek) {
+  ASSERT_SYS(0, 3, creat("foo", 0666));
+  ASSERT_SYS(0, 0, lseek(3, 0, SEEK_END));
+  ASSERT_SYS(0, 0, ftruncate(3, 10));
+  ASSERT_SYS(0, 10, lseek(3, 0, SEEK_END));
+  ASSERT_SYS(0, 0, close(3));
+}
+
+TEST(ftruncate, isConsistentWithFstat) {
+  struct stat st;
+  ASSERT_SYS(0, 3, creat("foo", 0666));
+  ASSERT_SYS(0, 0, fstat(3, &st));
+  ASSERT_EQ(0, st.st_size);
+  ASSERT_SYS(0, 0, ftruncate(3, 10));
+  ASSERT_SYS(0, 0, fstat(3, &st));
+  ASSERT_EQ(10, st.st_size);
   ASSERT_SYS(0, 0, close(3));
 }

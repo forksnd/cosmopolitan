@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2022 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -19,16 +19,11 @@
 #include "libc/calls/calls.h"
 #include "libc/calls/pledge.h"
 #include "libc/calls/pledge.internal.h"
-#include "libc/intrin/promises.internal.h"
+#include "libc/intrin/promises.h"
 #include "libc/runtime/runtime.h"
 
-/*
- * runs pledge at glibc executable load time, e.g.
- * strace -vff bash -c '_PLEDGE=4194303,0 LD_PRELOAD=$HOME/sandbox.so ls'
- */
-
-_Hide uint8_t __privileged_start[1];
-_Hide uint8_t __privileged_end[1];
+// runs pledge at glibc executable load time, e.g.
+// strace -vff bash -c '_PLEDGE=4194303,0 LD_PRELOAD=$HOME/sandbox.so ls'
 
 __attribute__((__constructor__)) void init(void) {
   int c, i, j;
@@ -38,7 +33,7 @@ __attribute__((__constructor__)) void init(void) {
   for (i = j = 0; i < 2; ++i) {
     while ((c = s[j] & 255)) {
       ++j;
-      if ('0' <= c & c <= '9') {
+      if ('0' <= c && c <= '9') {
         arg[i] *= 10;
         arg[i] += c - '0';
       } else {

@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2023 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -29,7 +29,7 @@ double nearbyint(double x) {
   asm("fidbra\t%0,0,%1,4" : "=f"(x) : "f"(x));
 #else
 #ifdef FE_INEXACT
-  // #pragma STDC FENV_ACCESS ON
+  /* #pragma STDC FENV_ACCESS ON */
   int e;
   e = fetestexcept(FE_INEXACT);
 #endif
@@ -40,3 +40,7 @@ double nearbyint(double x) {
 #endif /* __aarch64__ */
   return x;
 }
+
+#if LDBL_MANT_DIG == 53 && LDBL_MAX_EXP == 1024
+__weak_reference(nearbyint, nearbyintl);
+#endif

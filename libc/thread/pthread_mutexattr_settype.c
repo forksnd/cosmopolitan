@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2022 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -17,14 +17,15 @@
 │ PERFORMANCE OF THIS SOFTWARE.                                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
 #include "libc/errno.h"
+#include "libc/thread/lock.h"
 #include "libc/thread/thread.h"
 
 /**
  * Sets mutex type.
  *
  * @param type can be one of
- *     - `PTHREAD_MUTEX_NORMAL`
  *     - `PTHREAD_MUTEX_DEFAULT`
+ *     - `PTHREAD_MUTEX_NORMAL`
  *     - `PTHREAD_MUTEX_RECURSIVE`
  *     - `PTHREAD_MUTEX_ERRORCHECK`
  * @return 0 on success, or error on failure
@@ -32,10 +33,11 @@
  */
 errno_t pthread_mutexattr_settype(pthread_mutexattr_t *attr, int type) {
   switch (type) {
+    case PTHREAD_MUTEX_DEFAULT:
     case PTHREAD_MUTEX_NORMAL:
     case PTHREAD_MUTEX_RECURSIVE:
     case PTHREAD_MUTEX_ERRORCHECK:
-      attr->_type = type;
+      attr->_word = MUTEX_SET_TYPE(attr->_word, type);
       return 0;
     default:
       return EINVAL;

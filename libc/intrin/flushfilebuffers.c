@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2022 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -17,10 +17,12 @@
 │ PERFORMANCE OF THIS SOFTWARE.                                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
 #include "libc/calls/syscall_support-nt.internal.h"
-#include "libc/intrin/strace.internal.h"
+#include "libc/intrin/strace.h"
 #include "libc/nt/files.h"
+#include "libc/nt/runtime.h"
 
 __msabi extern typeof(FlushFileBuffers) *const __imp_FlushFileBuffers;
+__msabi extern typeof(GetLastError) *const __imp_GetLastError;
 
 /**
  * Flushes buffers of specified file to disk.
@@ -30,14 +32,13 @@ __msabi extern typeof(FlushFileBuffers) *const __imp_FlushFileBuffers;
  * file is opened in a direct non-caching mode. One main advantage here
  * seems to be coherency.
  *
- * @note this wrapper takes care of ABI, STRACE(), and __winerr()
  * @note consider buying a ups
  * @see FlushViewOfFile()
  */
 textwindows bool32 FlushFileBuffers(int64_t hFile) {
   bool32 ok;
   ok = __imp_FlushFileBuffers(hFile);
-  if (!ok) __winerr();
-  NTTRACE("FlushFileBuffers(%ld) → %hhhd% m", hFile, ok);
+  NTTRACE("FlushFileBuffers(%ld) → {%hhhd, %d}", hFile, ok,
+          __imp_GetLastError());
   return ok;
 }

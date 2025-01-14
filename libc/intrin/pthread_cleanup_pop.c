@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2022 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -23,9 +23,9 @@
 
 void(pthread_cleanup_pop)(struct _pthread_cleanup_buffer *cb, int execute) {
   struct PosixThread *pt;
-  if (__tls_enabled && (pt = (struct PosixThread *)__get_tls()->tib_pthread)) {
-    _unassert(cb == pt->cleanup);
-    pt->cleanup = cb->__prev;
+  if (__tls_enabled && (pt = _pthread_self())) {
+    unassert(cb == pt->pt_cleanup);
+    pt->pt_cleanup = cb->__prev;
   }
   if (execute) {
     cb->__routine(cb->__arg);

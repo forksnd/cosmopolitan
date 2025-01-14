@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2022 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -16,29 +16,68 @@
 │ TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR             │
 │ PERFORMANCE OF THIS SOFTWARE.                                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
-#include "libc/intrin/describebacktrace.internal.h"
+#include "libc/intrin/describebacktrace.h"
+#include "libc/intrin/iscall.h"
 #include "libc/intrin/kprintf.h"
+#include "libc/intrin/weaken.h"
 #include "libc/nexgen32e/stackframe.h"
 
-#ifdef DescribeBacktrace
-#undef DescribeBacktrace
-#endif
+#define N 160
 
-#define N 64
+#define ABI privileged optimizesize
 
-#define append(...) o += ksnprintf(buf + o, N - o, __VA_ARGS__)
+ABI static bool IsDangerous(const void *ptr) {
+  if (_weaken(kisdangerous))
+    return _weaken(kisdangerous)(ptr);
+  return false;
+}
 
-const char *DescribeBacktrace(char buf[N], struct StackFrame *fr) {
-  int o = 0;
+ABI static char *FormatHex(char *p, unsigned long x) {
+  int k = x ? (__builtin_clzl(x) ^ 63) + 1 : 1;
+  k = (k + 3) & -4;
+  while (k > 0)
+    *p++ = "0123456789abcdef"[(x >> (k -= 4)) & 15];
+  *p = '\0';
+  return p;
+}
+
+ABI const char *_DescribeBacktrace(char buf[N], const struct StackFrame *fr) {
+  char *p = buf;
+  char *pe = p + N;
   bool gotsome = false;
   while (fr) {
-    if (gotsome) {
-      append(" ");
-    } else {
-      gotsome = true;
+    if (IsDangerous(fr)) {
+      if (p + 1 + 1 + 1 < pe) {
+        if (gotsome)
+          *p++ = ' ';
+        *p = '!';
+        if (p + 16 + 1 < pe) {
+          *p++ = ' ';
+          p = FormatHex(p, (long)fr);
+        }
+      }
+      break;
     }
-    append("%x", fr->addr);
+    if (p + 16 + 1 < pe) {
+      unsigned char *ip = (unsigned char *)fr->addr;
+#ifdef __x86_64__
+      // x86 advances the progrem counter before an instruction
+      // begins executing. return addresses in backtraces shall
+      // point to code after the call, which means addr2line is
+      // going to print unrelated code unless we fixup the addr
+      if (!IsDangerous(ip))
+        ip -= __is_call(ip);
+#endif
+      if (gotsome)
+        *p++ = ' ';
+      else
+        gotsome = true;
+      p = FormatHex(p, (long)ip);
+    } else {
+      break;
+    }
     fr = fr->next;
   }
+  *p = '\0';
   return buf;
 }

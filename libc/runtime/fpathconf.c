@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2022 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -24,27 +24,48 @@
 #include "libc/sysv/errfuns.h"
 
 long fpathconf(int fd, int name) {
-  if (name == _PC_LINK_MAX) return _POSIX_LINK_MAX;
-  if (name == _PC_MAX_CANON) return _POSIX_MAX_CANON;
-  if (name == _PC_MAX_INPUT) return _POSIX_MAX_INPUT;
-  if (name == _PC_NAME_MAX) return NAME_MAX;
-  if (name == _PC_PATH_MAX) return PATH_MAX;
-  if (name == _PC_PIPE_BUF) return PIPE_BUF;
-  if (name == _PC_CHOWN_RESTRICTED) return 1;
-  if (name == _PC_NO_TRUNC) return 1;
-  if (name == _PC_VDISABLE) return 0;
-  if (name == _PC_SYNC_IO) return 1;
-  if (name == _PC_ASYNC_IO) return -1;
-  if (name == _PC_PRIO_IO) return -1;
-  if (name == _PC_SOCK_MAXBUF) return -1;
-  if (name == _PC_FILESIZEBITS) return FILESIZEBITS;
-  if (name == _PC_REC_INCR_XFER_SIZE) return 4096;
-  if (name == _PC_REC_MAX_XFER_SIZE) return 4096;
-  if (name == _PC_REC_MIN_XFER_SIZE) return 4096;
-  if (name == _PC_REC_XFER_ALIGN) return 4096;
-  if (name == _PC_ALLOC_SIZE_MIN) return 4096;
-  if (name == _PC_SYMLINK_MAX) return -1;
-  if (name == _PC_2_SYMLINKS) return 1;
+  if (name == _PC_LINK_MAX)
+    return _POSIX_LINK_MAX;
+  if (name == _PC_MAX_CANON)
+    return _POSIX_MAX_CANON;
+  if (name == _PC_MAX_INPUT)
+    return _POSIX_MAX_INPUT;
+  if (name == _PC_NAME_MAX)
+    return NAME_MAX;
+  if (name == _PC_PATH_MAX)
+    return PATH_MAX;
+  if (name == _PC_PIPE_BUF)
+    return PIPE_BUF;
+  if (name == _PC_CHOWN_RESTRICTED)
+    return 1;
+  if (name == _PC_NO_TRUNC)
+    return 1;
+  if (name == _PC_VDISABLE)
+    return 0;
+  if (name == _PC_SYNC_IO)
+    return 1;
+  if (name == _PC_ASYNC_IO)
+    return -1;
+  if (name == _PC_PRIO_IO)
+    return -1;
+  if (name == _PC_SOCK_MAXBUF)
+    return -1;
+  if (name == _PC_FILESIZEBITS)
+    return FILESIZEBITS;
+  if (name == _PC_REC_INCR_XFER_SIZE)
+    return 4096;
+  if (name == _PC_REC_MAX_XFER_SIZE)
+    return 4096;
+  if (name == _PC_REC_MIN_XFER_SIZE)
+    return 4096;
+  if (name == _PC_REC_XFER_ALIGN)
+    return 4096;
+  if (name == _PC_ALLOC_SIZE_MIN)
+    return 4096;
+  if (name == _PC_SYMLINK_MAX)
+    return -1;
+  if (name == _PC_2_SYMLINKS)
+    return 1;
   return einval();
 }
 

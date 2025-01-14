@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2022 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -17,10 +17,12 @@
 │ PERFORMANCE OF THIS SOFTWARE.                                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
 #include "libc/calls/state.internal.h"
-#include "libc/intrin/describeflags.internal.h"
+#include "libc/fmt/itoa.h"
+#include "libc/intrin/describeflags.h"
 #include "libc/nt/struct/securityattributes.h"
 
-const char *DescribeNtSecurityAttributes(struct NtSecurityAttributes *p) {
-  if (p == &kNtIsInheritable) return "&kNtIsInheritable";
-  return "0";
+const char *_DescribeNtSecurityAttributes(
+    char buf[32], const struct NtSecurityAttributes *p) {
+  FormatInt64(buf, (uintptr_t)p);
+  return buf;
 }

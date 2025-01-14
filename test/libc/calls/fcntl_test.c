@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2021 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -21,9 +21,8 @@
 #include "libc/calls/struct/sigaction.h"
 #include "libc/dce.h"
 #include "libc/errno.h"
-#include "libc/fmt/fmt.h"
 #include "libc/log/check.h"
-#include "libc/macros.internal.h"
+#include "libc/macros.h"
 #include "libc/runtime/runtime.h"
 #include "libc/sysv/consts/f.h"
 #include "libc/sysv/consts/fd.h"
@@ -32,6 +31,9 @@
 #include "libc/testlib/testlib.h"
 #include "libc/thread/thread.h"
 #include "libc/x/x.h"
+
+__static_yoink("libc/testlib/hyperion.txt");
+__static_yoink("zipos");
 
 int Lock(int fd, int type, long start, long len) {
   int e;
@@ -53,7 +55,9 @@ int Lock(int fd, int type, long start, long len) {
   return 0;
 }
 
-char testlib_enable_tmp_setup_teardown;
+void SetUpOnce(void) {
+  testlib_enable_tmp_setup_teardown();
+}
 
 TEST(fcntl_getfl, testRemembersAccessMode) {
   int fd;
@@ -65,8 +69,25 @@ TEST(fcntl_getfl, testRemembersAccessMode) {
   EXPECT_NE(-1, close(fd));
 }
 
-TEST(fcntl_setfl, testChangeAppendStatus) {
-  if (IsWindows()) return;  // Can't ReOpenFile() w/ O_APPEND
+TEST(fcntl_setfl, testChangeAppendStatus_proper) {
+  char buf[8] = {0};
+  ASSERT_SYS(0, 3, open("foo", O_CREAT | O_WRONLY, 0644));
+  // F_GETFL on XNU reports FWASWRITTEN (0x00010000) after write()
+  int old = fcntl(3, F_GETFL);
+  EXPECT_SYS(0, 3, write(3, "foo", 3));
+  EXPECT_SYS(0, 0, lseek(3, 0, SEEK_SET));
+  EXPECT_SYS(0, 0, fcntl(3, F_SETFL, old | O_APPEND));
+  EXPECT_SYS(0, 3, write(3, "bar", 3));
+  EXPECT_SYS(0, 0, lseek(3, 0, SEEK_SET));
+  EXPECT_SYS(0, 0, fcntl(3, F_SETFL, old));
+  EXPECT_SYS(0, 0, close(3));
+  ASSERT_SYS(0, 3, open("foo", 0));
+  EXPECT_SYS(0, 6, read(3, buf, 6));
+  EXPECT_STREQ("foobar", buf);
+  EXPECT_SYS(0, 0, close(3));
+}
+
+TEST(fcntl_setfl, testChangeAppendStatus_sloppy) {
   char buf[8] = {0};
   ASSERT_SYS(0, 3, open("foo", O_CREAT | O_WRONLY, 0644));
   EXPECT_SYS(0, 3, write(3, "foo", 3));
@@ -103,11 +124,25 @@ TEST(fcntl, F_DUPFD_CLOEXEC) {
   ASSERT_SYS(0, 0, close(3));
 }
 
+TEST(fcntl, ziposDupFd) {
+  char b[8];
+  ASSERT_SYS(0, 3, open("/zip/libc/testlib/hyperion.txt", O_RDONLY));
+  ASSERT_SYS(0, 4, fcntl(3, F_DUPFD, 4));
+  ASSERT_SYS(0, 8, read(3, b, 8));
+  ASSERT_SYS(0, 0, lseek(4, 0, SEEK_SET));
+  ASSERT_SYS(0, 8, read(4, b, 8));
+  ASSERT_SYS(0, 0, close(3));
+  ASSERT_SYS(0, 0, close(4));
+}
+
 void OnSig(int sig) {
 }
 
 TEST(posixAdvisoryLocks, twoProcesses) {
-  if (IsWindows()) return;  // due to signals
+  if (IsWindows())
+    return;  // due to signals
+  if (IsNetbsd())
+    return;  // TODO: why does sigusr1 kill runitd?
 
   int ws, pid;
   struct flock lock;
@@ -195,4 +230,16 @@ TEST(posixAdvisoryLocks, twoProcesses) {
   ASSERT_SYS(0, 0, close(3));
   ASSERT_SYS(0, 0, sigaction(SIGUSR1, &oldsa, 0));
   ASSERT_SYS(0, 0, sigprocmask(SIG_SETMASK, &oldss, 0));
+}
+
+TEST(fcntl, nonblock) {
+  int pfds[2];
+  char buf[8];
+  ASSERT_SYS(0, 0, pipe(pfds));
+  ASSERT_SYS(0, 0, fcntl(pfds[0], F_SETFL, O_RDONLY));
+  ASSERT_SYS(0, 0, fcntl(pfds[0], F_SETFL, O_RDONLY | O_NONBLOCK));
+  ASSERT_SYS(EAGAIN, -1, read(pfds[0], buf, 8));
+  ASSERT_SYS(0, 0, fcntl(pfds[0], F_SETFL, O_RDONLY));
+  ASSERT_SYS(0, 0, close(pfds[1]));
+  ASSERT_SYS(0, 0, close(pfds[0]));
 }

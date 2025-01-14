@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2021 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -21,8 +21,8 @@
 /**
  * Returns comment of zip central directory.
  */
-void *GetZipCdirComment(const uint8_t *eocd) {
-  if (READ32LE(eocd) == kZipCdir64HdrMagic && ZIP_CDIR64_COMMENTSIZE(eocd)) {
+const void *GetZipCdirComment(const uint8_t *eocd) {
+  if (ZIP_READ32(eocd) == kZipCdir64HdrMagic && ZIP_CDIR64_COMMENTSIZE(eocd)) {
     return ZIP_CDIR64_COMMENT(eocd);
   } else {
     return ZIP_CDIR_COMMENT(eocd);

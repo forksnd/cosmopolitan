@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2022 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -17,17 +17,16 @@
 │ PERFORMANCE OF THIS SOFTWARE.                                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
 #include "libc/fmt/itoa.h"
-#include "libc/intrin/describeflags.internal.h"
+#include "libc/intrin/describeflags.h"
 #include "libc/sysv/consts/af.h"
 
-#ifdef DescribeSocketFamily
-#undef DescribeSocketFamily
-#endif
-
-const char *DescribeSocketFamily(char buf[12], int family) {
-  if (family == AF_UNIX) return "AF_UNIX";
-  if (family == AF_INET) return "AF_INET";
-  if (family == AF_INET6) return "AF_INET6";
+const char *_DescribeSocketFamily(char buf[12], int family) {
+  if (family == AF_UNIX)
+    return "AF_UNIX";
+  if (family == AF_INET)
+    return "AF_INET";
+  if (family == AF_INET6)
+    return "AF_INET6";
   FormatInt32(buf, family);
   return buf;
 }

@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2021 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -16,8 +16,10 @@
 │ TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR             │
 │ PERFORMANCE OF THIS SOFTWARE.                                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
-#include "libc/macros.internal.h"
+#include "libc/errno.h"
 #include "libc/mem/mem.h"
+#include "libc/runtime/runtime.h"
+#include "libc/stdckdint.h"
 
 /**
  * Allocates granular aligned memory of granular size, i.e.
@@ -28,8 +30,11 @@
  * @param n number of bytes needed
  * @return memory address, or NULL w/ errno
  * @see valloc()
- * @threadsafe
  */
 void *pvalloc(size_t n) {
-  return memalign(FRAMESIZE, ROUNDUP(n, FRAMESIZE));
+  if (ckd_add(&n, n, __pagesize - 1)) {
+    errno = ENOMEM;
+    return 0;
+  }
+  return memalign(__pagesize, n & -__pagesize);
 }

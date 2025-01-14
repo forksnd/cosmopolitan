@@ -14,8 +14,8 @@
 #include "libc/mem/mem.h"
 #include "libc/stdio/stdio.h"
 #include "libc/str/str.h"
+#include "libc/ctype.h"
 #include "third_party/ctags/readtags.h"
-// clang-format off
 
 /*
 *   MACROS

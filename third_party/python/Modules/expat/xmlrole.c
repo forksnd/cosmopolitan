@@ -1,4 +1,3 @@
-/* clang-format off */
 /*
                             __  __            _
                          ___\ \/ /_ __   __ _| |_
@@ -30,12 +29,6 @@
    OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE
    USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
-
-asm(".ident\t\"\\n\\n\
-expat (MIT License)\\n\
-Copyright (c) 1997-2000 Thai Open Source Software Center Ltd\\n\
-Copyright (c) 2000-2017 Expat development team\"");
-asm(".include \"libc/disclaimer.inc\"");
 
 #include "third_party/python/Modules/expat/expat_config.h"
 #include "third_party/python/Modules/expat/expat_external.h"

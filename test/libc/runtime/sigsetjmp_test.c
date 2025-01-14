@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2022 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -35,7 +35,6 @@ void OnSignal(int sig, siginfo_t *si, void *ctx) {
 }
 
 TEST(sigsetjmp, test) {
-  if (IsWindows()) return;  // no sigusr1 support
   sigset_t ss;
   int i, n = 1000;
   struct sigaction sa = {.sa_sigaction = OnSignal};

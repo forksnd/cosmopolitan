@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2020 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -16,8 +16,7 @@
 │ TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR             │
 │ PERFORMANCE OF THIS SOFTWARE.                                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
-#include "libc/intrin/safemacros.internal.h"
-#include "libc/str/path.h"
+#include "libc/intrin/safemacros.h"
 #include "libc/str/str.h"
 #include "libc/x/x.h"
 
@@ -38,9 +37,9 @@ char *xjoinpaths(const char *path, const char *other) {
     return xstrdup(path);
   } else if (!*path) {
     return xstrdup(other);
-  } else if (_isabspath(other) || !strcmp(path, ".")) {
+  } else if (*other == '/' || !strcmp(path, ".")) {
     return xstrdup(other);
-  } else if (_endswith(path, "/")) {
+  } else if (endswith(path, "/")) {
     return xstrcat(path, other);
   } else {
     return xstrcat(path, (uintptr_t)'/', other);

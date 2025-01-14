@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2021 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -22,9 +22,9 @@
 #include "third_party/mbedtls/ctr_drbg.h"
 
 void InitializeRng(mbedtls_ctr_drbg_context *r) {
-  volatile unsigned char b[64];
+  unsigned char b[64];
   mbedtls_ctr_drbg_init(r);
-  CHECK(getrandom(b, 64, 0) == 64);
-  CHECK(!mbedtls_ctr_drbg_seed(r, GetEntropy, 0, b, 64));
+  getrandom(b, 64, 0);
+  mbedtls_ctr_drbg_seed(r, GetEntropy, 0, b, 64);
   mbedtls_platform_zeroize(b, 64);
 }

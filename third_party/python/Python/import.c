@@ -1,15 +1,16 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:4;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=4 sts=4 sw=4 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=4 sts=4 sw=4 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Python 3                                                                     │
 │ https://docs.python.org/3/license.html                                       │
 ╚─────────────────────────────────────────────────────────────────────────────*/
+#include "third_party/python/Include/import.h"
 #include "libc/calls/calls.h"
 #include "libc/calls/struct/stat.h"
 #include "libc/calls/struct/stat.macros.h"
 #include "libc/fmt/conv.h"
-#include "libc/intrin/bits.h"
-#include "libc/macros.internal.h"
+#include "libc/fmt/libgen.h"
+#include "libc/macros.h"
 #include "libc/mem/alg.h"
 #include "libc/mem/gc.h"
 #include "libc/mem/mem.h"
@@ -27,7 +28,6 @@
 #include "third_party/python/Include/eval.h"
 #include "third_party/python/Include/fileutils.h"
 #include "third_party/python/Include/frameobject.h"
-#include "third_party/python/Include/import.h"
 #include "third_party/python/Include/listobject.h"
 #include "third_party/python/Include/longobject.h"
 #include "third_party/python/Include/marshal.h"
@@ -50,8 +50,8 @@
 #include "third_party/python/Include/warnings.h"
 #include "third_party/python/Include/weakrefobject.h"
 #include "third_party/python/Include/yoink.h"
+#include "libc/serialize.h"
 #include "third_party/python/Python/importdl.h"
-/* clang-format off */
 
 PYTHON_PROVIDE("_imp");
 PYTHON_PROVIDE("_imp.__doc__");
@@ -864,7 +864,7 @@ PyImport_ExecCodeModuleWithPathnames(const char *name, PyObject *co,
 {
     struct stat stinfo;
     PyObject *m = NULL;
-    PyObject *nameobj, *pathobj = NULL, *cpathobj = NULL, *external= NULL;
+    PyObject *nameobj, *pathobj = NULL, *cpathobj = NULL;
 
     nameobj = PyUnicode_FromString(name);
     if (nameobj == NULL)
@@ -886,7 +886,7 @@ PyImport_ExecCodeModuleWithPathnames(const char *name, PyObject *co,
     else if (cpathobj != NULL) {
         // cpathobj != NULL means cpathname != NULL
         size_t cpathlen = strlen(cpathname);
-        char *pathname2 = _gc(strdup(cpathname));
+        char *pathname2 = gc(strdup(cpathname));
         if (_endswith(pathname2, ".pyc"))
         {
             pathname2[cpathlen-2] = '\0'; // so now ends with .py
@@ -1182,7 +1182,7 @@ _imp_create_builtin(PyObject *module, PyObject *spec)
     res = bsearch(&key, Builtins_Lookup.entries, Builtins_Lookup.n, sizeof(initentry), cmp_initentry);
 
     if (res != NULL) {
-        p = res->tab;
+        p = (void *)res->tab;
         PyModuleDef *def;
         if (p->initfunc == NULL) {
             /* Cannot re-init internal module ("sys" or "builtins") */
@@ -2152,7 +2152,7 @@ static PyObject *_imp_path_isdir(PyObject *module, PyObject *arg) {
   Py_ssize_t n;
   const char *path;
   if (!PyArg_Parse(arg, "z#:_path_isdir", &path, &n)) return 0;
-  if (path == NULL) path = _gc(getcwd(NULL, 0));
+  if (path == NULL) path = gc(getcwd(NULL, 0));
   return _check_path_mode(path, S_IFDIR);
 }
 PyDoc_STRVAR(_imp_path_isdir_doc, "check if path is dir");
@@ -2172,7 +2172,7 @@ static PyObject *_imp_calc_mtime_and_size(PyObject *module, PyObject *arg) {
   Py_ssize_t n;
   const char *path;
   if (!PyArg_Parse(arg, "z#:_calc_mtime_and_size", &path, &n)) return 0;
-  if (path == NULL) path = _gc(getcwd(NULL, 0));
+  if (path == NULL) path = gc(getcwd(NULL, 0));
   if (stat(path, &stinfo))
     return PyTuple_Pack(2, PyLong_FromLong((long)-1), PyLong_FromLong((long)0));
   return PyTuple_Pack(2, PyLong_FromLong((long)stinfo.st_mtime),
@@ -2490,7 +2490,6 @@ static PyObject *SFLObject_get_code(SourcelessFileLoader *self, PyObject *arg) {
   FILE *fp = NULL;
   PyObject *res = NULL;
   char *rawbuf = NULL;
-  size_t rawlen = 0;
 
   if (!PyArg_Parse(arg, "z:get_code", &name)) return 0;
   if (!name) name = self->name;
@@ -2666,7 +2665,7 @@ static PyObject *SFLObject_is_package(SourcelessFileLoader *self,
                  self->name, name);
     return NULL;
   }
-  if (_startswith(basename(self->path), "__init__")) {
+  if (startswith(basename(self->path), "__init__")) {
     Py_RETURN_TRUE;
   }
   Py_RETURN_FALSE;
@@ -2775,7 +2774,7 @@ static PyObject *CosmoImporter_find_spec(PyObject *cls, PyObject **args,
    */
 
   newpathsize = sizeof(basepath) + cnamelen + sizeof("/__init__.pyc") + 1;
-  newpath = _gc(malloc(newpathsize));
+  newpath = gc(malloc(newpathsize));
   bzero(newpath, newpathsize);
   /* performing a memccpy sequence equivalent to:
    * snprintf(newpath, newpathsize, "/zip/.python/%s.pyc", cname); */

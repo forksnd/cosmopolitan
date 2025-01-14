@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2021 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -17,12 +17,18 @@
 │ PERFORMANCE OF THIS SOFTWARE.                                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
 #include "libc/str/str.h"
-#include "libc/str/tab.internal.h"
+#include "libc/str/tab.h"
 
-bool _startswithi(const char *s, const char *prefix) {
+/**
+ * Checks if string starts with prefix, case insensitively.
+ */
+bool32 startswithi(const char *s, const char *prefix) {
   for (;;) {
-    if (!*prefix) return true;
-    if (!*s) return false;
-    if (kToLower[*s++ & 255] != kToLower[*prefix++ & 255]) return false;
+    if (!*prefix)
+      return true;
+    if (!*s)
+      return false;
+    if (kToLower[*s++ & 255] != kToLower[*prefix++ & 255])
+      return false;
   }
 }

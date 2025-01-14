@@ -1,9 +1,9 @@
 #ifndef COSMOPOLITAN_TOOL_PLINKO_LIB_STACK_H_
 #define COSMOPOLITAN_TOOL_PLINKO_LIB_STACK_H_
 #include "libc/log/check.h"
+#include "libc/stdckdint.h"
 #include "tool/plinko/lib/error.h"
 #include "tool/plinko/lib/plinko.h"
-#if !(__ASSEMBLER__ + __LINKER__ + 0)
 COSMOPOLITAN_C_START_
 
 #define SetFrame(r, x)  \
@@ -24,7 +24,7 @@ forceinline dword GetCurrentFrame(void) {
 forceinline void Push(int x) {
   unsigned short s = sp;
   g_stack[s] = MAKE(x, ~cx);
-  if (!__builtin_add_overflow(s, 1, &s)) {
+  if (!ckd_add(&s, s, 1)) {
     sp = s;
   } else {
     StackOverflow();
@@ -44,5 +44,4 @@ forceinline void Repush(int x) {
 }
 
 COSMOPOLITAN_C_END_
-#endif /* !(__ASSEMBLER__ + __LINKER__ + 0) */
 #endif /* COSMOPOLITAN_TOOL_PLINKO_LIB_STACK_H_ */

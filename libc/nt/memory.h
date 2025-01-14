@@ -1,5 +1,6 @@
 #ifndef COSMOPOLITAN_LIBC_NT_MEMORY_H_
 #define COSMOPOLITAN_LIBC_NT_MEMORY_H_
+#include "libc/nt/struct/memextendedparameter.h"
 #include "libc/nt/struct/memorybasicinformation.h"
 #include "libc/nt/struct/memoryrangeentry.h"
 #include "libc/nt/struct/securityattributes.h"
@@ -31,7 +32,6 @@
 
 #define kNtNumaNoPreferredNode 0xffffffffu
 
-#if !(__ASSEMBLER__ + __LINKER__ + 0)
 COSMOPOLITAN_C_START_
 
 void *LocalFree(void *hMem);
@@ -66,32 +66,59 @@ void *VirtualAlloc(void *opt_lpAddress, uint64_t dwSize,
 bool32 VirtualFree(void *lpAddress, uint64_t dwSize, uint32_t dwFreeType);
 bool32 VirtualProtect(void *lpAddress, uint64_t dwSize, uint32_t flNewProtect,
                       uint32_t *lpflOldProtect) paramsnonnull();
-bool32 VirtualLock(void *lpAddress, size_t dwSize);
-bool32 VirtualUnlock(void *lpAddress, size_t dwSize);
+bool32 VirtualLock(const void *lpAddress, size_t dwSize);
+bool32 VirtualUnlock(const void *lpAddress, size_t dwSize);
 uint64_t VirtualQuery(const void *lpAddress,
                       struct NtMemoryBasicInformation *lpBuffer,
                       uint64_t dwLength);
+uint64_t VirtualQueryEx(int64_t hProcess, const void *lpAddress,
+                        struct NtMemoryBasicInformation *lpBuffer,
+                        uint64_t dwLength);
+
 void *VirtualAllocEx(int64_t hProcess, void *lpAddress, uint64_t dwSize,
                      uint32_t flAllocationType, uint32_t flProtect);
+bool32 VirtualProtectEx(int64_t hProcess, void *lpAddress, uint64_t dwSize,
+                        uint32_t flNewProtect, uint32_t *out_lpflOldProtect);
+bool32 WriteProcessMemory(int64_t hProcess, void *lpBaseAddress,
+                          const void *lpBuffer, uint64_t nSize,
+                          uint64_t *opt_out_lpNumberOfBytesWritten);
 
-bool32 PrefetchVirtualMemory(int64_t hProcess, const uint32_t *NumberOfEntries,
+int64_t GetProcessHeap(void);
+void *HeapAlloc(int64_t hHeap, uint32_t dwFlags, size_t dwBytes) __wur;
+bool32 HeapFree(int64_t hHeap, uint32_t dwFlags, void *opt_lpMem);
+void *HeapReAlloc(int64_t hHeap, uint32_t dwFlags, void *lpMem,
+                  size_t dwBytes) __wur;
+
+void *GlobalAlloc(uint32_t uFlags, uint64_t dwBytes) __wur;
+void *GlobalFree(void *hMem);
+
+/**
+ * @param AllocationType
+ *     - kNtMemReserve
+ *     - kNtMemReplacePlaceholder
+ *     - kNtMemLargePages
+ */
+void *MapViewOfFile3(
+    intptr_t FileMapping, intptr_t Process, void *opt_BaseAddress,
+    uint64_t Offset, size_t ViewSize, unsigned AllocationType,
+    unsigned PageProtection,
+    struct NtMemExtendedParameter *in_out_opt_ExtendedParameters,
+    unsigned ParameterCount);
+
+void *VirtualAlloc2(
+    intptr_t opt_Process, void *opt_BaseAddress, size_t Size,
+    unsigned AllocationType, unsigned PageProtection,
+    struct NtMemExtendedParameter *in_out_opt_ExtendedParameters,
+    unsigned ParameterCount);
+
+bool32 PrefetchVirtualMemory(int64_t hProcess, uintptr_t NumberOfEntries,
                              struct NtMemoryRangeEntry *VirtualAddresses,
                              uint32_t reserved_Flags);
 bool32 OfferVirtualMemory(void *inout_VirtualAddress, size_t Size,
                           int Priority);
 
-int64_t GetProcessHeap(void);
-void *HeapAlloc(int64_t hHeap, uint32_t dwFlags, size_t dwBytes) dontdiscard;
-bool32 HeapFree(int64_t hHeap, uint32_t dwFlags, void *opt_lpMem);
-void *HeapReAlloc(int64_t hHeap, uint32_t dwFlags, void *lpMem,
-                  size_t dwBytes) dontdiscard;
-
-void *GlobalAlloc(uint32_t uFlags, uint64_t dwBytes) dontdiscard;
-void *GlobalFree(void *hMem);
-
 #if ShouldUseMsabiAttribute()
 #include "libc/nt/thunk/memory.inc"
 #endif /* ShouldUseMsabiAttribute() */
 COSMOPOLITAN_C_END_
-#endif /* !(__ASSEMBLER__ + __LINKER__ + 0) */
 #endif /* COSMOPOLITAN_LIBC_NT_MEMORY_H_ */

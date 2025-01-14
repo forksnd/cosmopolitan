@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2021 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -22,37 +22,47 @@
 #include "libc/calls/syscall_support-nt.internal.h"
 #include "libc/calls/termios.h"
 #include "libc/dce.h"
+#include "libc/errno.h"
 #include "libc/fmt/itoa.h"
-#include "libc/intrin/strace.internal.h"
+#include "libc/intrin/fds.h"
+#include "libc/intrin/strace.h"
 #include "libc/mem/alloca.h"
 #include "libc/nt/comms.h"
+#include "libc/nt/console.h"
+#include "libc/sysv/consts/fileno.h"
+#include "libc/sysv/consts/o.h"
 #include "libc/sysv/consts/termios.h"
 #include "libc/sysv/errfuns.h"
+
+#define TCFLSH    0x0000540b
+#define TIOCFLUSH 0x80047410
 
 #define kNtPurgeTxclear 4
 #define kNtPurgeRxclear 8
 
 static const char *DescribeFlush(char buf[12], int action) {
-  if (action == TCIFLUSH) return "TCIFLUSH";
-  if (action == TCOFLUSH) return "TCOFLUSH";
-  if (action == TCIOFLUSH) return "TCIOFLUSH";
+  if (action == TCIFLUSH)
+    return "TCIFLUSH";
+  if (action == TCOFLUSH)
+    return "TCOFLUSH";
+  if (action == TCIOFLUSH)
+    return "TCIOFLUSH";
   FormatInt32(buf, action);
   return buf;
 }
 
 static dontinline textwindows int sys_tcflush_nt(int fd, int queue) {
-  bool32 ok;
-  int64_t h;
-  if (!__isfdopen(fd)) return ebadf();
-  ok = true;
-  h = g_fds.p[fd].handle;
-  if (queue == TCIFLUSH || queue == TCIOFLUSH) {
-    ok &= !!PurgeComm(h, kNtPurgeRxclear);
+#ifdef __x86_64__
+  if (!sys_isatty(fd)) {
+    return -1;  // ebadf, enotty
   }
-  if (queue == TCOFLUSH || queue == TCIOFLUSH) {
-    ok &= !!PurgeComm(h, kNtPurgeTxclear);
+  if (queue == TCOFLUSH) {
+    return 0;  // windows console output is never buffered
   }
-  return ok ? 0 : __winerr();
+  return FlushConsoleInputBytes();
+#else
+  return enosys();
+#endif
 }
 
 /**
@@ -73,12 +83,18 @@ static dontinline textwindows int sys_tcflush_nt(int fd, int queue) {
  */
 int tcflush(int fd, int queue) {
   int rc;
-  if (IsMetal()) {
-    rc = enosys();
-  } else if (!IsWindows()) {
+  if (queue != TCIFLUSH && queue != TCOFLUSH && queue != TCIOFLUSH) {
+    rc = einval();
+  } else if (fd < g_fds.n && g_fds.p[fd].kind == kFdZip) {
+    rc = enotty();
+  } else if (IsLinux()) {
     rc = sys_ioctl(fd, TCFLSH, queue);
-  } else {
+  } else if (IsBsd()) {
+    rc = sys_ioctl(fd, TIOCFLUSH, &queue);
+  } else if (IsWindows()) {
     rc = sys_tcflush_nt(fd, queue);
+  } else {
+    rc = enosys();
   }
   STRACE("tcflush(%d, %s) → %d% m", fd, DescribeFlush(alloca(12), queue), rc);
   return rc;

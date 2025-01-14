@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=8 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2020 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -16,26 +16,36 @@
 │ TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR             │
 │ PERFORMANCE OF THIS SOFTWARE.                                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
-#include "libc/calls/calls.h"
+#include "libc/calls/struct/stat.h"
+#include "libc/intrin/dll.h"
 #include "libc/stdio/internal.h"
-#include "libc/stdio/stdio.h"
 #include "libc/sysv/consts/fileno.h"
 #include "libc/sysv/consts/o.h"
+#include "libc/sysv/consts/s.h"
 #include "libc/thread/thread.h"
+
+__static_yoink("fflush");
+
+static char __stdin_buf[BUFSIZ];
+
+static FILE __stdin = {
+    .fd = STDIN_FILENO,
+    .oflags = O_RDONLY,
+    .bufmode = _IOFBF,
+    .buf = __stdin_buf,
+    .size = sizeof(__stdin_buf),
+    .lock = PTHREAD_RECURSIVE_MUTEX_INITIALIZER_NP,
+    .elem = {&__stdin.elem, &__stdin.elem},
+};
 
 /**
  * Pointer to standard input stream.
  */
-FILE *stdin;
+FILE *stdin = &__stdin;
 
-static FILE __stdin;
-
-__attribute__((__constructor__)) static void __stdin_init(void) {
-  stdin = &__stdin;
-  stdin->fd = STDIN_FILENO;
-  stdin->iomode = O_RDONLY;
-  stdin->buf = stdin->mem;
-  stdin->size = sizeof(stdin->mem);
-  ((pthread_mutex_t *)stdin->lock)->_type = PTHREAD_MUTEX_RECURSIVE;
-  __fflush_register(stdin);
+__attribute__((__constructor__(60))) static textstartup void stdin_init(void) {
+  struct stat st;
+  if (fstat(STDIN_FILENO, &st) || S_ISCHR(st.st_mode))
+    stdin->bufmode = _IONBF;
+  dll_make_last(&__stdio.files, &__stdin.elem);
 }

@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2020 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -31,10 +31,9 @@
  * @param mode is octal bits, e.g. 0644 usually
  * @return file descriptor, or -1 w/ errno
  * @see openat() for further documentation
- * @cancellationpoint
+ * @cancelationpoint
  * @asyncsignalsafe
  * @restartable
- * @threadsafe
  * @vforksafe
  */
 int creat(const char *file, uint32_t mode) {

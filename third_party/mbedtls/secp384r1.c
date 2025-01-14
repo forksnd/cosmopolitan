@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2021 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -112,6 +112,7 @@ void secp384r1(uint64_t p[12]) {
   SBB(F, F, 0, o, o);
   G -= o;
 #else
+  (void)o;
   asm volatile(/* S₁ = (0  ‖0  ‖0  ‖0  ‖0  ‖A₂₃‖A₂₂‖A₂₁‖0  ‖0  ‖0  ‖0  ) */
                "mov\t21*4(%9),%7\n\t"
                "mov\t23*4(%9),%k8\n\t"
@@ -234,7 +235,7 @@ void secp384r1(uint64_t p[12]) {
   p[4] = E;
   p[5] = F;
   p[6] = G;
-  G = CONCEAL("r", 0L);
+  G = __conceal("r", 0L);
   p[7] = G;
   p[8] = G;
   p[9] = G;

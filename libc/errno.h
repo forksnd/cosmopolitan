@@ -1,20 +1,36 @@
 #ifndef COSMOPOLITAN_LIBC_ERRNO_H_
 #define COSMOPOLITAN_LIBC_ERRNO_H_
-#if !(__ASSEMBLER__ + __LINKER__ + 0)
 COSMOPOLITAN_C_START_
 
 /**
- * @fileoverview System error codes.
- * @see libc/sysv/consts.sh for numbers
+ * @fileoverview System Five error codes.
+ *
+ * This file defines the `errno` global variable. When system calls
+ * (e.g. read(), write(), etc.) fail they return -1 to indicate the
+ * failure, and that is *the only* error return value. System calls
+ * also update `errno` too whenever -1 is returned (otherwise errno
+ * isn't changed) to be a non-zero value holding one of the numbers
+ * below, in order to indicate why the system call failed.
+ *
+ * There is only one exception to the above rule; some system calls
+ * are documented with the `@returnserrno` tag, which means they'll
+ * return the error number rather than stuffing it in a global. You
+ * can usually spot these system calls easily since most of them'll
+ * have names like `posix_foo()` or `pthread_bar()`.
+ *
+ * @see libc/sysv/consts.sh for assigned numbers
+ * @see libc/sysv/dos2errno.sh for multimapped numbers
  */
 
-#if defined(__GNUC__) && defined(__x86_64__) && defined(__MNO_RED_ZONE__) && \
-    !defined(__STRICT_ANSI__)
-#define errno                                                           \
-  (*({                                                                  \
-    errno_t *_ep;                                                       \
-    asm("call\t__errno_location" : "=a"(_ep) : /* no inputs */ : "cc"); \
-    _ep;                                                                \
+#if defined(__GNUC__) && defined(__aarch64__) && !defined(__cplusplus)
+/* this header is included by 700+ files; therefore we */
+/* hand-roll &__get_tls()->tib_errno to avoid #include */
+/* cosmopolitan uses x28 as the tls register b/c apple */
+#define errno                                       \
+  (*__extension__({                                 \
+    errno_t *__ep;                                  \
+    __asm__("sub\t%0,x28,#1024-0x3c" : "=r"(__ep)); \
+    __ep;                                           \
   }))
 #else
 #define errno (*__errno_location())
@@ -58,7 +74,7 @@ extern const errno_t EIO;
 extern const errno_t ENXIO;
 
 /**
- * Argument list too errno_t.
+ * Argument list too long.
  */
 extern const errno_t E2BIG;
 
@@ -210,7 +226,7 @@ extern const errno_t ERANGE;
 extern const errno_t EDEADLK;
 
 /**
- * Filename too errno_t.
+ * Filename too long.
  */
 extern const errno_t ENAMETOOLONG;
 
@@ -275,7 +291,7 @@ extern const errno_t ENOTSOCK;
 extern const errno_t EDESTADDRREQ;
 
 /**
- * Message too errno_t.
+ * Message too long.
  */
 extern const errno_t EMSGSIZE;
 
@@ -485,7 +501,7 @@ extern const errno_t ENOMEDIUM;
 extern const errno_t EMEDIUMTYPE;
 
 /**
- * Inappropriate file type or format. (BSD only)
+ * Inappropriate file type or format.
  */
 extern const errno_t EFTYPE;
 
@@ -505,7 +521,6 @@ extern const errno_t EPROGUNAVAIL;
 extern const errno_t EPWROFF;
 extern const errno_t ERPCMISMATCH;
 extern const errno_t ESHLIBVERS;
-
 extern const errno_t EADV;
 extern const errno_t EBADE;
 extern const errno_t EBADFD;
@@ -550,35 +565,20 @@ extern const errno_t EXFULL;
 #define EACCES          EACCES
 #define EADDRINUSE      EADDRINUSE
 #define EADDRNOTAVAIL   EADDRNOTAVAIL
-#define EADV            EADV
 #define EAFNOSUPPORT    EAFNOSUPPORT
 #define EAGAIN          EAGAIN
 #define EALREADY        EALREADY
-#define EAUTH           EAUTH
-#define EBADARCH        EBADARCH
-#define EBADE           EBADE
-#define EBADEXEC        EBADEXEC
 #define EBADF           EBADF
-#define EBADFD          EBADFD
-#define EBADMACHO       EBADMACHO
 #define EBADMSG         EBADMSG
-#define EBADR           EBADR
-#define EBADRPC         EBADRPC
-#define EBADRQC         EBADRQC
-#define EBADSLT         EBADSLT
 #define EBUSY           EBUSY
 #define ECANCELED       ECANCELED
 #define ECHILD          ECHILD
-#define ECHRNG          ECHRNG
-#define ECOMM           ECOMM
 #define ECONNABORTED    ECONNABORTED
 #define ECONNREFUSED    ECONNREFUSED
 #define ECONNRESET      ECONNRESET
 #define EDEADLK         EDEADLK
 #define EDESTADDRREQ    EDESTADDRREQ
-#define EDEVERR         EDEVERR
 #define EDOM            EDOM
-#define EDOTDOT         EDOTDOT
 #define EDQUOT          EDQUOT
 #define EEXIST          EEXIST
 #define EFAULT          EFAULT
@@ -586,7 +586,6 @@ extern const errno_t EXFULL;
 #define EFTYPE          EFTYPE
 #define EHOSTDOWN       EHOSTDOWN
 #define EHOSTUNREACH    EHOSTUNREACH
-#define EHWPOISON       EHWPOISON
 #define EIDRM           EIDRM
 #define EILSEQ          EILSEQ
 #define EINPROGRESS     EINPROGRESS
@@ -595,20 +594,6 @@ extern const errno_t EXFULL;
 #define EIO             EIO
 #define EISCONN         EISCONN
 #define EISDIR          EISDIR
-#define EISNAM          EISNAM
-#define EKEYEXPIRED     EKEYEXPIRED
-#define EKEYREJECTED    EKEYREJECTED
-#define EKEYREVOKED     EKEYREVOKED
-#define EL2HLT          EL2HLT
-#define EL2NSYNC        EL2NSYNC
-#define EL3HLT          EL3HLT
-#define EL3RST          EL3RST
-#define ELIBACC         ELIBACC
-#define ELIBBAD         ELIBBAD
-#define ELIBEXEC        ELIBEXEC
-#define ELIBMAX         ELIBMAX
-#define ELIBSCN         ELIBSCN
-#define ELNRNG          ELNRNG
 #define ELOOP           ELOOP
 #define EMEDIUMTYPE     EMEDIUMTYPE
 #define EMFILE          EMFILE
@@ -616,29 +601,21 @@ extern const errno_t EXFULL;
 #define EMSGSIZE        EMSGSIZE
 #define EMULTIHOP       EMULTIHOP
 #define ENAMETOOLONG    ENAMETOOLONG
-#define ENAVAIL         ENAVAIL
-#define ENEEDAUTH       ENEEDAUTH
 #define ENETDOWN        ENETDOWN
 #define ENETRESET       ENETRESET
 #define ENETUNREACH     ENETUNREACH
 #define ENFILE          ENFILE
-#define ENOANO          ENOANO
-#define ENOATTR         ENOATTR
 #define ENOBUFS         ENOBUFS
-#define ENOCSI          ENOCSI
 #define ENODATA         ENODATA
 #define ENODEV          ENODEV
 #define ENOENT          ENOENT
 #define ENOEXEC         ENOEXEC
-#define ENOKEY          ENOKEY
 #define ENOLCK          ENOLCK
 #define ENOLINK         ENOLINK
 #define ENOMEDIUM       ENOMEDIUM
 #define ENOMEM          ENOMEM
 #define ENOMSG          ENOMSG
 #define ENONET          ENONET
-#define ENOPKG          ENOPKG
-#define ENOPOLICY       ENOPOLICY
 #define ENOPROTOOPT     ENOPROTOOPT
 #define ENOSPC          ENOSPC
 #define ENOSR           ENOSR
@@ -648,12 +625,10 @@ extern const errno_t EXFULL;
 #define ENOTCONN        ENOTCONN
 #define ENOTDIR         ENOTDIR
 #define ENOTEMPTY       ENOTEMPTY
-#define ENOTNAM         ENOTNAM
 #define ENOTRECOVERABLE ENOTRECOVERABLE
 #define ENOTSOCK        ENOTSOCK
 #define ENOTSUP         ENOTSUP
 #define ENOTTY          ENOTTY
-#define ENOTUNIQ        ENOTUNIQ
 #define ENXIO           ENXIO
 #define EOPNOTSUPP      EOPNOTSUPP
 #define EOVERFLOW       EOVERFLOW
@@ -661,44 +636,33 @@ extern const errno_t EXFULL;
 #define EPERM           EPERM
 #define EPFNOSUPPORT    EPFNOSUPPORT
 #define EPIPE           EPIPE
-#define EPROCLIM        EPROCLIM
-#define EPROCUNAVAIL    EPROCUNAVAIL
-#define EPROGMISMATCH   EPROGMISMATCH
-#define EPROGUNAVAIL    EPROGUNAVAIL
 #define EPROTO          EPROTO
 #define EPROTONOSUPPORT EPROTONOSUPPORT
 #define EPROTOTYPE      EPROTOTYPE
-#define EPWROFF         EPWROFF
 #define ERANGE          ERANGE
-#define EREMCHG         EREMCHG
 #define EREMOTE         EREMOTE
-#define EREMOTEIO       EREMOTEIO
 #define ERESTART        ERESTART
-#define ERFKILL         ERFKILL
 #define EROFS           EROFS
-#define ERPCMISMATCH    ERPCMISMATCH
-#define ESHLIBVERS      ESHLIBVERS
 #define ESHUTDOWN       ESHUTDOWN
 #define ESOCKTNOSUPPORT ESOCKTNOSUPPORT
 #define ESPIPE          ESPIPE
 #define ESRCH           ESRCH
-#define ESRMNT          ESRMNT
 #define ESTALE          ESTALE
-#define ESTRPIPE        ESTRPIPE
 #define ETIME           ETIME
 #define ETIMEDOUT       ETIMEDOUT
 #define ETOOMANYREFS    ETOOMANYREFS
 #define ETXTBSY         ETXTBSY
-#define EUCLEAN         EUCLEAN
-#define EUNATCH         EUNATCH
 #define EUSERS          EUSERS
 #define EWOULDBLOCK     EAGAIN
 #define EXDEV           EXDEV
-#define EXFULL          EXFULL
 
 extern errno_t __errno;
-errno_t *__errno_location(void);
+errno_t *__errno_location(void) dontthrow pureconst;
+
+#if defined(_COSMO_SOURCE) || defined(_GNU_SOURCE)
+extern char *program_invocation_short_name;
+extern char *program_invocation_name;
+#endif
 
 COSMOPOLITAN_C_END_
-#endif /* !(__ASSEMBLER__ + __LINKER__ + 0) */
 #endif /* COSMOPOLITAN_LIBC_ERRNO_H_ */

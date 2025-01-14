@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2022 Gavin Arthur Hayes                                            │
 │                                                                              │
@@ -18,14 +18,16 @@
 ╚─────────────────────────────────────────────────────────────────────────────*/
 #include "libc/calls/calls.h"
 #include "libc/dce.h"
-#include "libc/macros.internal.h"
+#include "libc/macros.h"
 #include "libc/testlib/testlib.h"
 
 TEST(getgroups, test) {
   int n;
-  if (IsWindows()) return;
+  if (IsWindows())
+    return;
   uint32_t G[500];
   EXPECT_GT((n = getgroups(ARRAYLEN(G), G)), 0);
-  if (getuid()) return;  // this needs root
+  if (getuid())
+    return;  // this needs root
   EXPECT_SYS(0, 0, setgroups(n, G));
 }

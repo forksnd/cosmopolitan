@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2020 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -18,11 +18,14 @@
 ╚─────────────────────────────────────────────────────────────────────────────*/
 #include "libc/assert.h"
 #include "libc/calls/calls.h"
+#include "libc/calls/internal.h"
+#include "libc/intrin/fds.h"
 #include "libc/calls/syscall-nt.internal.h"
 #include "libc/calls/syscall-sysv.internal.h"
 #include "libc/dce.h"
 #include "libc/errno.h"
-#include "libc/intrin/strace.internal.h"
+#include "libc/fmt/magnumstrs.internal.h"
+#include "libc/intrin/strace.h"
 #include "libc/str/str.h"
 #include "libc/sysv/errfuns.h"
 
@@ -40,20 +43,22 @@ int sys_fadvise_netbsd(int, int, int64_t, int64_t, int) asm("sys_fadvise");
  * @raise EBADF if `fd` isn't a valid file descriptor
  * @raise EINVAL if `advice` is invalid or `len` is huge
  * @raise ESPIPE if `fd` refers to a pipe
+ * @raise ENOTSUP if `fd` is a /zip file
  * @raise ENOSYS on XNU and OpenBSD
  * @returnserrno
- * @threadsafe
  */
 errno_t posix_fadvise(int fd, int64_t offset, int64_t len, int advice) {
   int rc, e = errno;
-  if (IsLinux()) {
+  if (fd < g_fds.n && g_fds.p[fd].kind == kFdZip) {
+    rc = enotsup();
+  } else if (IsLinux()) {
     rc = sys_fadvise(fd, offset, len, advice);
   } else if (IsFreebsd()) {
     rc = sys_fadvise(fd, offset, len, advice);
-    _unassert(rc >= 0);
+    unassert(rc >= 0);
   } else if (IsNetbsd()) {
     rc = sys_fadvise_netbsd(fd, offset, offset, len, advice);
-    _unassert(rc >= 0);
+    unassert(rc >= 0);
   } else if (IsWindows()) {
     rc = sys_fadvise_nt(fd, offset, len, advice);
   } else {

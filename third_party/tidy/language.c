@@ -1,4 +1,3 @@
-/* clang-format off */
 /* language.c -- localization support for HTML Tidy.
 
   Copyright 2015 HTACG
@@ -8,6 +7,7 @@
 
 #include "third_party/tidy/language.h"
 #include "third_party/tidy/tmbstr.h"
+#include "libc/ctype.h"
 #include "libc/assert.h"
 
 #include "third_party/tidy/language_en.inc"
@@ -408,7 +408,7 @@ Bool TY_(tidySetLanguage)( ctmbstr languageCode )
 
     if ( strlen( wantCode ) > 2 )
     {
-        strncpy(lang, wantCode, 2);
+        strncpy(__veil("r", lang), __veil("r", wantCode), __veil("r", 2));
         lang[2] = '\0';
         dict2 = TY_(tidyTestLanguage( lang ) ); /* BACKUP language? */
     }

@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:4;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=4 sts=4 sw=4 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=4 sts=4 sw=4 fenc=utf-8                               :vi │
 ╚─────────────────────────────────────────────────────────────────────────────*/
 /* gzread.c -- zlib functions for reading gzip files
  * Copyright (C) 2004, 2005, 2010, 2011, 2012, 2013, 2016 Mark Adler
@@ -12,12 +12,6 @@
 #include "libc/str/str.h"
 #include "third_party/zlib/gz/gzguts.inc"
 #include "third_party/zlib/zlib.h"
-
-asm(".ident\t\"\\n\\n\
-zlib (zlib License)\\n\
-Copyright 1995-2017 Jean-loup Gailly and Mark Adler\"");
-asm(".include \"libc/disclaimer.inc\"");
-// clang-format off
 
 /* Local functions */
 local int gz_load OF((gz_statep, unsigned char *, unsigned, unsigned *));
@@ -457,8 +451,8 @@ z_size_t ZEXPORT gzfread(buf, size, nitems, file)
 #  undef z_gzgetc
 #else
 #  undef gzgetc
-#  ifdef Z_CR_PREFIX_SET
-#    define gzgetc Cr_z_gzgetc
+#  ifdef Z_COSMO_PREFIX_SET
+#    define gzgetc __gzgetc
 #  endif
 #endif
 

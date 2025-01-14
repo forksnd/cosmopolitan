@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2022 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -16,63 +16,44 @@
 │ TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR             │
 │ PERFORMANCE OF THIS SOFTWARE.                                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
-#include "libc/dce.h"
 #include "libc/errno.h"
-#include "libc/intrin/asan.internal.h"
+#include "libc/runtime/stack.h"
 #include "libc/thread/thread.h"
 
 /**
- * Configures custom allocated stack for thread, e.g.
+ * Configures custom stack for thread.
  *
- *     pthread_t id;
- *     pthread_attr_t attr;
- *     char *stk = _mapstack();
- *     pthread_attr_init(&attr);
- *     pthread_attr_setstack(&attr, stk, GetStackSize());
- *     pthread_create(&id, &attr, func, 0);
- *     pthread_attr_destroy(&attr);
- *     pthread_join(id, 0);
- *     _freestack(stk);
+ * Normally you want to use pthread_attr_setstacksize() and
+ * pthread_attr_setguardsize() to configure how pthread_create()
+ * allocates stack memory for newly created threads. Cosmopolitan is
+ * very good at managing stack memory. However if you still want to
+ * allocate stack memory on your own, POSIX defines this function.
  *
- * Your stack must have at least `PTHREAD_STACK_MIN` bytes, which
- * Cosmpolitan Libc defines as `GetStackSize()`. It's a link-time
- * constant used by Actually Portable Executable that's 128 kb by
- * default. See libc/runtime/stack.h for docs on your stack limit
- * since the APE ELF phdrs are the one true source of truth here.
+ * Your `stackaddr` points to the byte at the very bottom of your stack.
+ * You are responsible for this memory. Your POSIX threads runtime will
+ * not free or unmap this allocation when the thread has terminated. If
+ * `stackaddr` is null then `stacksize` is ignored and default behavior
+ * is restored, i.e. pthread_create() will manage stack allocations.
  *
- * Cosmpolitan Libc runtime magic (e.g. ftrace) and memory safety
- * (e.g. kprintf) assumes that stack sizes are two-powers and are
- * aligned to that two-power. Conformance isn't required since we
- * say caveat emptor to those who don't maintain these invariants
- * please consider using _mapstack() which always does it perfect
- * or use `mmap(0, GetStackSize() << 1, ...)` for a bigger stack.
+ * Your `stackaddr` could be created by malloc(). On OpenBSD,
+ * pthread_create() will augment your custom allocation so it's
+ * permissable by the kernel to use as a stack. You may also call
+ * Cosmopolitan APIs such NewCosmoStack() and cosmo_stack_alloc().
+ * Static memory can be used, but it won't reduce pthread footprint.
  *
- * Unlike pthread_attr_setstacksize(), this function permits just
- * about any parameters and will change the values and allocation
- * as needed to conform to the mandatory requirements of the host
- * operating system even if it doesn't meet the stricter needs of
- * Cosmopolitan Libc userspace libraries. For example with malloc
- * allocations, things like page size alignment, shall be handled
- * automatically for compatibility with existing codebases.
- *
- * @param stackaddr is address of stack allocated by caller, and
- *     may be NULL in which case default behavior is restored
- * @param stacksize is size of caller allocated stack
  * @return 0 on success, or errno on error
- * @raise EINVAL if parameters were unacceptable
+ * @raise EINVAL if `stacksize` is less than `PTHREAD_STACK_MIN`
  * @see pthread_attr_setstacksize()
  */
 errno_t pthread_attr_setstack(pthread_attr_t *attr, void *stackaddr,
                               size_t stacksize) {
   if (!stackaddr) {
     attr->__stackaddr = 0;
-    attr->__stacksize = 0;
+    attr->__stacksize = GetStackSize();
     return 0;
   }
-  if (stacksize < PTHREAD_STACK_MIN ||
-      (IsAsan() && !__asan_is_valid(stackaddr, stacksize))) {
+  if (stacksize < PTHREAD_STACK_MIN)
     return EINVAL;
-  }
   attr->__stackaddr = stackaddr;
   attr->__stacksize = stacksize;
   return 0;

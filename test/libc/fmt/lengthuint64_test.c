@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2021 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -95,10 +95,10 @@ TEST(LengthInt64Thousands, test) {
 }
 
 BENCH(LengthInt64, bench) {
-  unsigned LengthInt64_(int64_t) asm("LengthInt64");
-  unsigned LengthUint64_(uint64_t) asm("LengthUint64");
-  unsigned LengthInt64Thousands_(int64_t) asm("LengthInt64Thousands");
-  unsigned LengthUint64Thousands_(uint64_t) asm("LengthUint64Thousands");
+  unsigned LengthInt64_(int64_t) asm("__LengthInt64");
+  unsigned LengthUint64_(uint64_t) asm("__LengthUint64");
+  unsigned LengthInt64Thousands_(int64_t) asm("__LengthInt64Thousands");
+  unsigned LengthUint64Thousands_(uint64_t) asm("__LengthUint64Thousands");
   EZBENCH2("LengthInt64", donothing, LengthInt64_(INT64_MIN));
   EZBENCH2("LengthUint64", donothing, LengthUint64_(UINT64_MAX));
   EZBENCH2("LengthInt64Thousands", donothing, LengthInt64Thousands_(INT64_MIN));

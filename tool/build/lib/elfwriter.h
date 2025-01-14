@@ -6,7 +6,6 @@
 #include "libc/elf/struct/shdr.h"
 #include "libc/elf/struct/sym.h"
 #include "tool/build/lib/interner.h"
-#if !(__ASSEMBLER__ + __LINKER__ + 0)
 COSMOPOLITAN_C_START_
 
 struct ElfWriterSyms {
@@ -54,7 +53,7 @@ struct ElfWriter {
   struct Interner *shstrtab;
 };
 
-struct ElfWriter *elfwriter_open(const char *, int) dontdiscard;
+struct ElfWriter *elfwriter_open(const char *, int, int) __wur;
 void elfwriter_cargoculting(struct ElfWriter *);
 void elfwriter_close(struct ElfWriter *);
 void elfwriter_align(struct ElfWriter *, size_t, size_t);
@@ -64,6 +63,7 @@ void elfwriter_commit(struct ElfWriter *, size_t);
 void elfwriter_finishsection(struct ElfWriter *);
 void elfwriter_appendrela(struct ElfWriter *, uint64_t, struct ElfWriterSymRef,
                           uint32_t, int64_t);
+uint32_t elfwriter_relatype_pc32(const struct ElfWriter *);
 uint32_t elfwriter_relatype_abs32(const struct ElfWriter *);
 struct ElfWriterSymRef elfwriter_linksym(struct ElfWriter *, const char *, int,
                                          int);
@@ -73,8 +73,7 @@ void elfwriter_yoink(struct ElfWriter *, const char *, int);
 void elfwriter_setsection(struct ElfWriter *, struct ElfWriterSymRef, uint16_t);
 void elfwriter_zip(struct ElfWriter *, const char *, const char *, size_t,
                    const void *, size_t, uint32_t, struct timespec,
-                   struct timespec, struct timespec, bool, uint64_t, size_t);
+                   struct timespec, struct timespec, bool);
 
 COSMOPOLITAN_C_END_
-#endif /* !(__ASSEMBLER__ + __LINKER__ + 0) */
 #endif /* COSMOPOLITAN_TOOL_BUILD_LIB_ELFWRITER_H_ */

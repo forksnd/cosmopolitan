@@ -1,9 +1,9 @@
 #ifndef COSMOPOLITAN_TOOL_PLINKO_LIB_CONS_H_
 #define COSMOPOLITAN_TOOL_PLINKO_LIB_CONS_H_
+#include "libc/stdckdint.h"
 #include "tool/plinko/lib/error.h"
 #include "tool/plinko/lib/plinko.h"
 #include "tool/plinko/lib/types.h"
-#if !(__ASSEMBLER__ + __LINKER__ + 0)
 COSMOPOLITAN_C_START_
 
 forceinline void Set(int i, dword t) {
@@ -26,7 +26,7 @@ forceinline void Set(int i, dword t) {
 
 forceinline int Alloc(dword t) {
   int c = cx;
-  if (!__builtin_sub_overflow(c, 1, &c)) {
+  if (!ckd_sub(&c, c, 1)) {
     Set(c, t);
     return cx = c;
   }
@@ -63,5 +63,4 @@ int ShareCons(int, int);
 int ShareList(int, int);
 
 COSMOPOLITAN_C_END_
-#endif /* !(__ASSEMBLER__ + __LINKER__ + 0) */
 #endif /* COSMOPOLITAN_TOOL_PLINKO_LIB_CONS_H_ */

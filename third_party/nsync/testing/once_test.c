@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:t;c-basic-offset:8;tab-width:8;coding:utf-8   -*-│
-│vi: set et ft=c ts=8 tw=8 fenc=utf-8                                       :vi│
+│ vi: set noet ft=c ts=8 sw=8 fenc=utf-8                                   :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2016 Google Inc.                                                   │
 │                                                                              │
@@ -15,15 +15,14 @@
 │ See the License for the specific language governing permissions and          │
 │ limitations under the License.                                               │
 ╚─────────────────────────────────────────────────────────────────────────────*/
+#include "third_party/nsync/once.h"
 #include "libc/str/str.h"
 #include "libc/thread/thread.h"
 #include "third_party/nsync/counter.h"
 #include "third_party/nsync/mu.h"
-#include "third_party/nsync/once.h"
 #include "third_party/nsync/testing/closure.h"
 #include "third_party/nsync/testing/smprintf.h"
 #include "third_party/nsync/testing/testing.h"
-// clang-format off
 
 /* This tests nsync_once */
 
@@ -77,7 +76,7 @@ static void once_thread (struct once_test_thread_s *lott) {
 	nsync_mu_lock (&ott_s_mu);
         s = lott->s;
 	nsync_mu_unlock (&ott_s_mu);
-        nsync_time_sleep (nsync_time_s_ns (0, 1 * 1000 * 1000));
+        nsync_time_sleep (NSYNC_CLOCK, nsync_time_s_ns (0, 1 * 1000 * 1000));
         switch (lott->id & 3) {
         case 0:  nsync_run_once (&s->once, &once_func0); break;
         case 1:  nsync_run_once_spin (&s->once, &once_func1); break;
@@ -99,7 +98,7 @@ static void test_once_run (testing t) {
         for (i = 0; i != 250; i++) {
                 struct once_test_s *s =
 			(struct once_test_s *) malloc (sizeof (*s));
-                memset ((void *) s, 0, sizeof (*s));
+                bzero ((void *) s, sizeof (*s));
                 s->counter = 0;
                 s->done = nsync_counter_new (N);
                 s->t = t;
@@ -112,7 +111,7 @@ static void test_once_run (testing t) {
                         closure_fork (closure_once_thread (&once_thread,
                                                            &ott[j]));
                 }
-                if (nsync_counter_wait (s->done,
+                if (nsync_counter_wait (s->done, NSYNC_CLOCK,
                                         nsync_time_no_deadline) != 0) {
                         TEST_ERROR (t, ("s.done not decremented to 0"));
                 }

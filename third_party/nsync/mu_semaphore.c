@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:t;c-basic-offset:8;tab-width:8;coding:utf-8   -*-│
-│vi: set et ft=c ts=8 tw=8 fenc=utf-8                                       :vi│
+│ vi: set noet ft=c ts=8 sw=8 fenc=utf-8                                   :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2016 Google Inc.                                                   │
 │                                                                              │
@@ -15,18 +15,14 @@
 │ See the License for the specific language governing permissions and          │
 │ limitations under the License.                                               │
 ╚─────────────────────────────────────────────────────────────────────────────*/
+#include "third_party/nsync/mu_semaphore.internal.h"
+#include "libc/calls/cp.internal.h"
 #include "libc/dce.h"
 #include "third_party/nsync/mu_semaphore.h"
-#include "third_party/nsync/mu_semaphore.internal.h"
-
-asm(".ident\t\"\\n\\n\
-*NSYNC (Apache 2.0)\\n\
-Copyright 2016 Google, Inc.\\n\
-https://github.com/google/nsync\"");
-// clang-format off
+__static_yoink("nsync_notice");
 
 /* Initialize *s; the initial value is 0. */
-void nsync_mu_semaphore_init (nsync_semaphore *s) {
+bool nsync_mu_semaphore_init (nsync_semaphore *s) {
 	if (IsNetbsd ()) {
 		return nsync_mu_semaphore_init_sem (s);
 	} else {
@@ -34,24 +30,45 @@ void nsync_mu_semaphore_init (nsync_semaphore *s) {
 	}
 }
 
-/* Wait until the count of *s exceeds 0, and decrement it. */
-errno_t nsync_mu_semaphore_p (nsync_semaphore *s) {
+/* Destroy *s. */
+void nsync_mu_semaphore_destroy (nsync_semaphore *s) {
 	if (IsNetbsd ()) {
-		return nsync_mu_semaphore_p_sem (s);
+		return nsync_mu_semaphore_destroy_sem (s);
 	} else {
-		return nsync_mu_semaphore_p_futex (s);
+		return nsync_mu_semaphore_destroy_futex (s);
 	}
 }
 
-/* Wait until one of:
-   the count of *s is non-zero, in which case decrement *s and return 0;
-   or abs_deadline expires, in which case return ETIMEDOUT. */
-errno_t nsync_mu_semaphore_p_with_deadline (nsync_semaphore *s, nsync_time abs_deadline) {
+/* Wait until the count of *s exceeds 0, and decrement it. If POSIX cancellations
+   are currently disabled by the thread, then this function always succeeds. When
+   they're enabled in MASKED mode, this function may return ECANCELED. Otherwise,
+   cancellation will occur by unwinding cleanup handlers pushed to the stack. */
+errno_t nsync_mu_semaphore_p (nsync_semaphore *s) {
+	errno_t err;
+	BEGIN_CANCELATION_POINT;
 	if (IsNetbsd ()) {
-		return nsync_mu_semaphore_p_with_deadline_sem (s, abs_deadline);
+		err = nsync_mu_semaphore_p_sem (s);
 	} else {
-		return nsync_mu_semaphore_p_with_deadline_futex (s, abs_deadline);
+		err = nsync_mu_semaphore_p_futex (s);
 	}
+	END_CANCELATION_POINT;
+	return err;
+}
+
+/* Like nsync_mu_semaphore_p() this waits for the count of *s to exceed 0,
+   while additionally supporting a time parameter specifying at what point
+   in the future ETIMEDOUT should be returned, if neither cancelation, or
+   semaphore release happens. */
+errno_t nsync_mu_semaphore_p_with_deadline (nsync_semaphore *s, int clock, nsync_time abs_deadline) {
+	errno_t err;
+	BEGIN_CANCELATION_POINT;
+	if (IsNetbsd ()) {
+		err = nsync_mu_semaphore_p_with_deadline_sem (s, clock, abs_deadline);
+	} else {
+		err = nsync_mu_semaphore_p_with_deadline_futex (s, clock, abs_deadline);
+	}
+	END_CANCELATION_POINT;
+	return err;
 }
 
 /* Ensure that the count of *s is at least 1. */

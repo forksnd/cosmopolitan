@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2022 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -24,17 +24,20 @@
 #include "libc/fmt/itoa.h"
 #include "libc/intrin/asmflag.h"
 #include "libc/intrin/atomic.h"
-#include "libc/macros.internal.h"
+#include "libc/macros.h"
 #include "libc/str/str.h"
+#include "libc/sysv/consts/at.h"
 #include "libc/sysv/consts/o.h"
 #include "libc/sysv/consts/pr.h"
 #include "libc/thread/posixthread.internal.h"
 
-static errno_t pthread_getname_impl(pthread_t thread, char *name, size_t size) {
+static errno_t pthread_getname_impl(struct PosixThread *pt, char *name,
+                                    size_t size) {
   int e, fd, rc, tid, len;
 
-  if ((rc = pthread_getunique_np(thread, &tid))) return rc;
-  if (!size) return 0;
+  tid = _pthread_tid(pt);
+  if (!size)
+    return 0;
   bzero(name, size);
   e = errno;
 
@@ -52,7 +55,7 @@ static errno_t pthread_getname_impl(pthread_t thread, char *name, size_t size) {
       p = stpcpy(p, "/proc/self/task/");
       p = FormatUint32(p, tid);
       p = stpcpy(p, "/comm");
-      if ((fd = sys_open(path, O_RDONLY | O_CLOEXEC, 0)) == -1) {
+      if ((fd = sys_openat(AT_FDCWD, path, O_RDONLY | O_CLOEXEC, 0)) == -1) {
         rc = errno;
         errno = e;
         return rc;
@@ -64,7 +67,7 @@ static errno_t pthread_getname_impl(pthread_t thread, char *name, size_t size) {
         errno = e;
         return rc;
       }
-      _chomp(buf);
+      chomp(buf);
     }
     if ((len = strlen(buf))) {
       memcpy(name, buf, MIN(len, size - 1));
@@ -74,15 +77,22 @@ static errno_t pthread_getname_impl(pthread_t thread, char *name, size_t size) {
     }
     return 0;
 
-  } else if (IsNetbsd()) {
+  } else if (IsNetbsd() || IsOpenbsd()) {
+    int ax;
     char cf;
-    int ax, dx;
+    long dx, si;
+    if (IsNetbsd()) {
+      ax = 324;  // _lwp_getname
+    } else {
+      ax = 142;  // sys_getthrname
+    }
     // NetBSD doesn't document the subtleties of its nul-terminator
     // behavior, so like Linux we shall take the paranoid approach.
+    dx = size - 1;
+    si = (long)name;
     asm volatile(CFLAG_ASM("syscall")
-                 : CFLAG_CONSTRAINT(cf), "=a"(ax), "=d"(dx)
-                 : "1"(324 /* _lwp_getname */), "D"(tid), "S"(name),
-                   "d"(size - 1)
+                 : CFLAG_CONSTRAINT(cf), "+a"(ax), "+D"(tid), "+S"(si), "+d"(dx)
+                 : /* no outputs */
                  : "rcx", "r8", "r9", "r10", "r11", "memory");
     if (!cf) {
       // if size + our nul + kernel's nul is the buffer size, then we
@@ -115,12 +125,14 @@ static errno_t pthread_getname_impl(pthread_t thread, char *name, size_t size) {
  * @return 0 on success, or errno on error
  * @raise ERANGE if `size` wasn't large enough, in which case your
  *     result will still be returned truncated if possible
- * @raise ENOSYS on MacOS, Windows, FreeBSD, and OpenBSD
+ * @raise ENOSYS on MacOS, Windows, and FreeBSD
  */
 errno_t pthread_getname_np(pthread_t thread, char *name, size_t size) {
   errno_t rc;
-  BLOCK_CANCELLATIONS;
-  rc = pthread_getname_impl(thread, name, size);
-  ALLOW_CANCELLATIONS;
+  struct PosixThread *pt;
+  pt = (struct PosixThread *)thread;
+  BLOCK_CANCELATION;
+  rc = pthread_getname_impl(pt, name, size);
+  ALLOW_CANCELATION;
   return rc;
 }

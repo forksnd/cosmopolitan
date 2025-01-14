@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2020 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -29,6 +29,7 @@ void __stat2cosmo(struct stat *restrict st, const union metastat *ms) {
       st->st_uid = ms->linux.st_uid;
       st->st_gid = ms->linux.st_gid;
       st->st_flags = 0;
+      st->st_gen = 0;
       st->st_rdev = ms->linux.st_rdev;
       st->st_size = ms->linux.st_size;
       st->st_blksize = ms->linux.st_blksize;

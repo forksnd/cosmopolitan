@@ -1,4 +1,3 @@
-// clang-format off
 /*
 ** 2001 September 15
 **
@@ -165,9 +164,9 @@
 ** disabled.
 */
 #if defined(_HAVE_MINGW_H)
-# include "mingw.h"
+//# include "mingw.h"
 #elif defined(_HAVE__MINGW_H)
-# include "_mingw.h"
+//# include "_mingw.h"
 #endif
 
 /*
@@ -998,7 +997,8 @@ typedef INT16_TYPE LogEst;
   || (defined(__APPLE__) && defined(__MACH__)) \
   || defined(__sun) \
   || defined(__FreeBSD__) \
-  || defined(__DragonFly__)
+  || defined(__DragonFly__) \
+  || defined(__COSMOPOLITAN__)
 #   define SQLITE_MAX_MMAP_SIZE 0x7fff0000  /* 2147418112 */
 # else
 #   define SQLITE_MAX_MMAP_SIZE 0

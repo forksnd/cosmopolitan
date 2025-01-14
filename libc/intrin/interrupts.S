@@ -1,5 +1,5 @@
 /*-*- mode:unix-assembly; indent-tabs-mode:t; tab-width:8; coding:utf-8     -*-│
-│vi: set et ft=asm ts=8 tw=8 fenc=utf-8                                     :vi│
+│ vi: set noet ft=asm ts=8 sw=8 fenc=utf-8                                 :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ This is free and unencumbered software released into the public domain.      │
 │                                                                              │
@@ -25,7 +25,9 @@
 │ OTHER DEALINGS IN THE SOFTWARE.                                              │
 ╚─────────────────────────────────────────────────────────────────────────────*/
 #include "libc/dce.h"
-#include "libc/macros.internal.h"
+#include "libc/intrin/kprintf.h"
+#include "libc/macros.h"
+#include "libc/intrin/kprintf.h"
 #include "libc/runtime/pc.internal.h"
 
 //	Code and data structures for bare metal interrupt handling.
@@ -90,11 +92,12 @@ __excep0_isr:
 	mov	%eax,%ss
 	mov	%eax,%ds
 	mov	%eax,%es
+	cld				# make sure DF is reset, for C code
 	ezlea	.excep_msg,di		# stack should be 16-byte aligned now
 	xor	%eax,%eax		# kprintf is variadic, remember to
 					# pass no. of vector regs. used (= 0)
 	.weak	kprintf			# weakly link kprintf() because we
-	ezlea	kprintf,bx		# want to keep life.com tiny
+	ezlea	kprintf,bx		# want to keep examples/life tiny
 	test	%ebx,%ebx
 	jz	8f
 	call	*%rbx			# print error message

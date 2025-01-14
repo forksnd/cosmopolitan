@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:t;c-basic-offset:8;tab-width:8;coding:utf-8   -*-│
-│vi: set et ft=c ts=8 tw=8 fenc=utf-8                                       :vi│
+│ vi: set noet ft=c ts=8 sw=8 fenc=utf-8                                   :vi │
 ╚──────────────────────────────────────────────────────────────────────────────╝
 │                                                                              │
 │  Musl Libc                                                                   │
@@ -25,18 +25,15 @@
 │  SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.                      │
 │                                                                              │
 ╚─────────────────────────────────────────────────────────────────────────────*/
-#include "libc/mem/alg.h"
 #include "libc/limits.h"
 #include "libc/literal.h"
+#include "libc/mem/alg.h"
 #include "libc/str/str.h"
 #include "third_party/musl/crypt.internal.h"
 #include "third_party/musl/crypt_des.internal.h"
+__static_yoink("musl_libc_notice");
 
-asm(".ident\t\"\\n\\n\
-Musl libc (MIT License)\\n\
-Copyright 2005-2014 Rich Felker, et. al.\"");
-asm(".include \"libc/disclaimer.inc\"");
-// clang-format off
+#pragma GCC diagnostic ignored "-Wstringop-overflow"
 
 /*
  * This version has been further modified by Rich Felker, primary author
@@ -813,7 +810,7 @@ void __do_des(uint32_t l_in, uint32_t r_in,
 		unsigned int round = 16;
 		const uint32_t *kl = ekey->l;
 		const uint32_t *kr = ekey->r;
-		uint32_t f;
+		uint32_t f = 0;
 		while (round--) {
 			uint32_t r48l, r48r;
 			/*

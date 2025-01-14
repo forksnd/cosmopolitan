@@ -1,4 +1,3 @@
-/* clang-format off */
 /* entities.c -- recognize HTML ISO entities
 
   (c) 1998-2008 (W3C) MIT, ERCIM, Keio University
@@ -13,7 +12,6 @@
 #include "third_party/tidy/entities.h"
 #include "third_party/tidy/tidy-int.h"
 #include "libc/assert.h"
-#include "libc/fmt/fmt.h"
 #include "third_party/tidy/tmbstr.h"
 
 struct _entity;

@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2020 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -18,39 +18,46 @@
 ╚─────────────────────────────────────────────────────────────────────────────*/
 #include "libc/calls/calls.h"
 #include "libc/calls/cp.internal.h"
-#include "libc/calls/struct/stat.h"
+#include "libc/calls/internal.h"
 #include "libc/calls/syscall-nt.internal.h"
 #include "libc/calls/syscall-sysv.internal.h"
 #include "libc/dce.h"
-#include "libc/intrin/strace.internal.h"
+#include "libc/intrin/strace.h"
 #include "libc/runtime/runtime.h"
+#include "libc/sysv/errfuns.h"
 
 /**
  * Blocks until kernel flushes buffers for fd to disk.
  *
  * @return 0 on success, or -1 w/ errno
  * @raise ECANCELED if thread was cancelled in masked mode
+ * @raise EROFS if `fd` is on a read-only filesystem e.g. /zip
+ * @raise EINVAL if `fd` is a special file w/o synchronization
+ * @raise ENOSPC if disk space was exhausted
+ * @raise EBADF if `fd` isn't an open file
  * @raise EINTR if signal was delivered
- * @see fdatasync(), sync_file_range()
+ * @raise EIO if an i/o error happened
  * @see __nosync to secretly disable
- * @cancellationpoint
+ * @see fdatasync()
+ * @cancelationpoint
  * @asyncsignalsafe
  */
 int fsync(int fd) {
   int rc;
-  struct stat st;
-  if (__nosync != 0x5453455454534146) {
-    BEGIN_CANCELLATION_POINT;
-    if (!IsWindows()) {
+  bool fake = __nosync == 0x5453455454534146;
+  BEGIN_CANCELATION_POINT;
+  if (__isfdkind(fd, kFdZip)) {
+    rc = erofs();
+  } else if (!IsWindows()) {
+    if (!fake) {
       rc = sys_fsync(fd);
     } else {
-      rc = sys_fdatasync_nt(fd);
+      rc = sys_fsync_fake(fd);
     }
-    END_CANCELLATION_POINT;
-    STRACE("fsync(%d) → %d% m", fd, rc);
   } else {
-    rc = fstat(fd, &st);
-    STRACE("fsync_fake(%d) → %d% m", fd, rc);
+    rc = sys_fdatasync_nt(fd, fake);
   }
+  END_CANCELATION_POINT;
+  STRACE("fsync%s(%d) → %d% m", fake ? "_fake" : "", fd, rc);
   return rc;
 }

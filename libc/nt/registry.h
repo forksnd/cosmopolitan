@@ -44,7 +44,6 @@
 #define kNtHkeyDynData                  0x80000006l
 #define kNtHkeyCurrentUserLocalSettings 0x80000007l
 
-#if !(__ASSEMBLER__ + __LINKER__ + 0)
 COSMOPOLITAN_C_START_
 
 int RegOpenKey(int64_t hKey, const char16_t *opt_lpSubKey,
@@ -102,7 +101,7 @@ int RegConnectRegistryEx(const char16_t *lpMachineName, int64_t hKey,
 int RegCreateKey(int64_t hKey, const char16_t *lpSubKey, int64_t *phkResult);
 int RegCreateKeyEx(int64_t hKey, const char16_t *lpSubKey, uint32_t Reserved,
                    int16_t *lpClass, uint32_t dwOptions, int samDesired,
-                   struct NtSecurityAttributes *lpSecurityAttributes,
+                   const struct NtSecurityAttributes *lpSecurityAttributes,
                    int64_t *phkResult, uint32_t *lpdwDisposition);
 int RegDeleteKey(int64_t hKey, const char16_t *lpSubKey);
 int RegDeleteKeyEx(int64_t hKey, const char16_t *lpSubKey, int samDesired,
@@ -127,11 +126,10 @@ int RegReplaceKey(int64_t hKey, const char16_t *lpSubKey,
                   const char16_t *lpNewFile, const char16_t *lpOldFile);
 int RegRestoreKey(int64_t hKey, const char16_t *lpFile, uint32_t dwFlags);
 int RegSaveKey(int64_t hKey, const char16_t *lpFile,
-               struct NtSecurityAttributes *lpSecurityAttributes);
+               const struct NtSecurityAttributes *lpSecurityAttributes);
 int RegSetKeySecurity(int64_t hKey, uint32_t SecurityInformation,
                       void *pSecurityDescriptor);
 int RegUnLoadKey(int64_t hKey, const char16_t *lpSubKey);
 
 COSMOPOLITAN_C_END_
-#endif /* !(__ASSEMBLER__ + __LINKER__ + 0) */
 #endif /* COSMOPOLITAN_LIBC_NT_REGISTRY_H_ */

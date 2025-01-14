@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:t;c-basic-offset:8;tab-width:8;coding:utf-8   -*-│
-│vi: set et ft=c ts=8 tw=8 fenc=utf-8                                       :vi│
+│ vi: set noet ft=c ts=8 sw=8 fenc=utf-8                                   :vi │
 ╚──────────────────────────────────────────────────────────────────────────────╝
 │                                                                              │
 │  Musl Libc                                                                   │
@@ -27,17 +27,11 @@
 ╚─────────────────────────────────────────────────────────────────────────────*/
 #include "libc/calls/calls.h"
 #include "libc/errno.h"
-#include "libc/fmt/fmt.h"
 #include "libc/limits.h"
 #include "libc/stdio/stdio.h"
 #include "libc/str/str.h"
 #include "third_party/musl/mntent.h"
-
-asm(".ident\t\"\\n\\n\
-Musl libc (MIT License)\\n\
-Copyright 2005-2014 Rich Felker, et. al.\"");
-asm(".include \"libc/disclaimer.inc\"");
-// clang-format off
+__static_yoink("musl_libc_notice");
 
 static char *internal_buf;
 static size_t internal_bufsize;
@@ -53,6 +47,42 @@ int endmntent(FILE *f)
 {
 	if (f) fclose(f);
 	return 1;
+}
+
+static char *unescape_ent(char *beg)
+{
+	char *dest = beg;
+	const char *src = beg;
+	while (*src) {
+		const char *val;
+		unsigned char cval = 0;
+		if (*src != '\\') {
+			*dest++ = *src++;
+			continue;
+		}
+		if (src[1] == '\\') {
+			++src;
+			*dest++ = *src++;
+			continue;
+		}
+		val = src + 1;
+		for (int i = 0; i < 3; ++i) {
+			if (*val >= '0' && *val <= '7') {
+				cval <<= 3;
+				cval += *val++ - '0';
+			} else {
+				break;
+			}
+		}
+		if (cval) {
+			*dest++ = cval;
+			src = val;
+		} else {
+			*dest++ = *src++;
+		}
+	}
+	*dest = 0;
+	return beg;
 }
 
 struct mntent *getmntent_r(FILE *f, struct mntent *mnt, char *linebuf, int buflen)
@@ -80,7 +110,7 @@ struct mntent *getmntent_r(FILE *f, struct mntent *mnt, char *linebuf, int bufle
 		len = strlen(linebuf);
 		if (len > INT_MAX) continue;
 		for (i = 0; i < sizeof n / sizeof *n; i++) n[i] = len;
-		sscanf(linebuf, " %n%*s%n %n%*s%n %n%*s%n %n%*s%n %d %d",
+		sscanf(linebuf, " %n%*[^ \t]%n %n%*[^ \t]%n %n%*[^ \t]%n %n%*[^ \t]%n %d %d",
 			n, n+1, n+2, n+3, n+4, n+5, n+6, n+7,
 			&mnt->mnt_freq, &mnt->mnt_passno);
 	} while (linebuf[n[0]] == '#' || n[1]==len);
@@ -90,10 +120,10 @@ struct mntent *getmntent_r(FILE *f, struct mntent *mnt, char *linebuf, int bufle
 	linebuf[n[5]] = 0;
 	linebuf[n[7]] = 0;
 
-	mnt->mnt_fsname = linebuf+n[0];
-	mnt->mnt_dir = linebuf+n[2];
-	mnt->mnt_type = linebuf+n[4];
-	mnt->mnt_opts = linebuf+n[6];
+	mnt->mnt_fsname = unescape_ent(linebuf+n[0]);
+	mnt->mnt_dir = unescape_ent(linebuf+n[2]);
+	mnt->mnt_type = unescape_ent(linebuf+n[4]);
+	mnt->mnt_opts = unescape_ent(linebuf+n[6]);
 
 	return mnt;
 }

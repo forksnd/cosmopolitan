@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:4;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=4 sts=4 sw=4 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=4 sts=4 sw=4 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2021 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -23,7 +23,7 @@
 #include "libc/dce.h"
 #include "libc/errno.h"
 #include "libc/intrin/popcnt.h"
-#include "libc/macros.internal.h"
+#include "libc/macros.h"
 #include "libc/math.h"
 #include "libc/mem/mem.h"
 #include "libc/nexgen32e/crc32.h"
@@ -44,7 +44,6 @@
 #include "third_party/python/Include/structmember.h"
 #include "third_party/python/Include/yoink.h"
 #include "third_party/xed/x86.h"
-/* clang-format off */
 
 PYTHON_PROVIDE("cosmo");
 PYTHON_PROVIDE("cosmo.exit1");
@@ -53,9 +52,11 @@ PYTHON_PROVIDE("cosmo.crc32c");
 PYTHON_PROVIDE("cosmo.syscount");
 PYTHON_PROVIDE("cosmo.popcount");
 PYTHON_PROVIDE("cosmo.decimate");
+PYTHON_PROVIDE("cosmo.ftrace");
+#ifdef __x86_64__
 PYTHON_PROVIDE("cosmo.getcpucore");
 PYTHON_PROVIDE("cosmo.getcpunode");
-PYTHON_PROVIDE("cosmo.ftrace");
+#endif /* __x86_64__ */
 
 PyDoc_STRVAR(cosmo_doc,
 "Cosmopolitan Libc Module\n\
@@ -65,7 +66,6 @@ This module exposes low-level utilities from the Cosmopolitan library.\n\
 Static objects:\n\
 \n\
 MODE -- make build mode, e.g. \"\", \"tiny\", \"opt\", \"rel\", etc.\n\
-IMAGE_BASE_VIRTUAL -- base address of actually portable executable image\n\
 kernel -- o/s platform, e.g. \"linux\", \"xnu\", \"metal\", \"nt\", etc.\n\
 kStartTsc -- the rdtsc() value at process creation.");
 
@@ -98,6 +98,8 @@ cosmo_rdtsc(PyObject *self, PyObject *noargs)
     return PyLong_FromUnsignedLong(rdtsc());
 }
 
+#ifdef __x86_64__
+
 PyDoc_STRVAR(getcpucore_doc,
 "getcpucore($module)\n\
 --\n\n\
@@ -120,6 +122,8 @@ cosmo_getcpunode(PyObject *self, PyObject *noargs)
     return PyLong_FromUnsignedLong(TSC_AUX_NODE(rdpid()));
 }
 
+#endif /* __x86_64__ */
+
 PyDoc_STRVAR(crc32c_doc,
 "crc32c($module, bytes, init=0)\n\
 --\n\n\
@@ -131,13 +135,24 @@ Similar to zlib.crc32().");
 static PyObject *
 cosmo_crc32c(PyObject *self, PyObject *args)
 {
-    Py_ssize_t n;
     Py_buffer data;
     unsigned crc, init = 0;
     if (!PyArg_ParseTuple(args, "y*|I:crc32c", &data, &init)) return 0;
     crc = crc32c(init, data.buf, data.len);
     PyBuffer_Release(&data);
     return PyLong_FromUnsignedLong(crc);
+}
+
+PyDoc_STRVAR(verynice_doc,
+"verynice($module)\n\
+--\n\n\
+Makes current process as low-priority as possible.");
+
+static PyObject *
+cosmo_verynice(PyObject *self, PyObject *args)
+{
+    verynice();
+    Py_RETURN_NONE;
 }
 
 PyDoc_STRVAR(decimate_doc,
@@ -196,6 +211,7 @@ PyDoc_STRVAR(pledge_doc,
 --\n\n\
 Permits syscall operations, e.g.\n\
 \n\
+    >>> cosmo.pledge(None, None)  # assert support\n\
     >>> cosmo.pledge('stdio rpath tty', None)\n\
 \n\
 This function implements the OpenBSD pledge() API for\n\
@@ -207,7 +223,7 @@ cosmo_pledge(PyObject *self, PyObject *args)
 {
     int e = errno;
     const char *x, *y;
-    if (!PyArg_ParseTuple(args, "sz:pledge", &x, &y)) return 0;
+    if (!PyArg_ParseTuple(args, "zz:pledge", &x, &y)) return 0;
     __pledge_mode = PLEDGE_PENALTY_RETURN_EPERM;
     if (!pledge(x, y)) {
         Py_RETURN_NONE;
@@ -223,8 +239,9 @@ PyDoc_STRVAR(unveil_doc,
 --\n\n\
 Permits filesystem operations, e.g.\n\
 \n\
-    >>> cosmo.unveil('.', 'rwcx')\n\
-    >>> cosmo.unveil(None, None)\n\
+    >>> cosmo.unveil('', None)     # assert support\n\
+    >>> cosmo.unveil('.', 'rwcx')  # permit current dir\n\
+    >>> cosmo.unveil(None, None)   # commit policy\n\
 \n\
 This function implements the OpenBSD unveil() API for\n\
 OpenBSD and Linux where we use Landlock LSM. Read the\n\
@@ -233,11 +250,15 @@ Cosmopolitan Libc documentation to learn more.");
 static PyObject *
 cosmo_unveil(PyObject *self, PyObject *args)
 {
-    int e = errno;
     const char *x, *y;
+    int abi, e = errno;
     if (!PyArg_ParseTuple(args, "zz:unveil", &x, &y)) return 0;
-    if (!unveil(x, y)) {
-        Py_RETURN_NONE;
+    if ((abi = unveil(x, y)) != -1) {
+        if (abi) {
+            return PyLong_FromUnsignedLong(abi);
+        } else {
+            Py_RETURN_NONE;
+        }
     } else {
         PyErr_SetString(PyExc_SystemError, strerror(errno));
         errno = e;
@@ -258,8 +279,6 @@ cosmo_exit1(PyObject *self, PyObject *args)
 {
     _Exit(1);
 }
-
-static bool ftrace_installed = 0;
 
 typedef struct {
     PyObject_HEAD
@@ -303,6 +322,7 @@ static PyTypeObject FtracerType = {
     .tp_methods = FtracerObject_methods,
 };
 
+#ifdef FTRACE
 PyDoc_STRVAR(ftrace_doc,
 "ftrace($module)\n\
 --\n\n\
@@ -312,7 +332,8 @@ Enables logging of C function calls to stderr, e.g.\n\
         WeirdFunction()\n\
 \n\
 Please be warned this prints massive amount of text. In order for it\n\
-to work, the concomitant .com.dbg binary needs to be present.");
+to work, the concomitant .dbg binary needs to be present.");
+#endif
 
 static PyObject *
 cosmo_ftrace(PyObject *self, PyObject *noargs)
@@ -332,9 +353,12 @@ static PyMethodDef cosmo_methods[] = {
     {"syscount", cosmo_syscount, METH_NOARGS, syscount_doc},
     {"popcount", cosmo_popcount, METH_VARARGS, popcount_doc},
     {"decimate", cosmo_decimate, METH_VARARGS, decimate_doc},
+    {"verynice", cosmo_verynice, METH_NOARGS, verynice_doc},
+#ifdef __x86_64__
     {"getcpucore", cosmo_getcpucore, METH_NOARGS, getcpucore_doc},
     {"getcpunode", cosmo_getcpunode, METH_NOARGS, getcpunode_doc},
-#ifdef __PG__
+#endif /* __x86_64__ */
+#ifdef FTRACE
     {"ftrace", cosmo_ftrace, METH_NOARGS, ftrace_doc},
 #endif
     {0},
@@ -376,7 +400,6 @@ PyInit_cosmo(void)
     if (PyType_Ready(&FtracerType) < 0) return 0;
     if (!(m = PyModule_Create(&cosmomodule))) return 0;
     PyModule_AddStringConstant(m, "MODE", MODE);
-    PyModule_AddIntConstant(m, "IMAGE_BASE_VIRTUAL", IMAGE_BASE_VIRTUAL);
     PyModule_AddStringConstant(m, "kernel", GetKernelName());
     PyModule_AddIntConstant(m, "kStartTsc", kStartTsc);
 
@@ -385,7 +408,12 @@ PyInit_cosmo(void)
     return !PyErr_Occurred() ? m : 0;
 }
 
-_Section(".rodata.pytab.1") const struct _inittab _PyImport_Inittab_cosmo = {
+#ifdef __aarch64__
+_Section(".rodata.pytab.1 //")
+#else
+_Section(".rodata.pytab.1")
+#endif
+ const struct _inittab _PyImport_Inittab_cosmo = {
     "cosmo",
     PyInit_cosmo,
 };

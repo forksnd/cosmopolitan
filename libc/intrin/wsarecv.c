@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2022 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -16,21 +16,23 @@
 │ TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR             │
 │ PERFORMANCE OF THIS SOFTWARE.                                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
+#include "libc/assert.h"
 #include "libc/calls/syscall_support-nt.internal.h"
-#include "libc/intrin/describeflags.internal.h"
-#include "libc/intrin/describentoverlapped.internal.h"
+#include "libc/intrin/describeflags.h"
+#include "libc/intrin/describentoverlapped.h"
 #include "libc/intrin/kprintf.h"
-#include "libc/intrin/strace.internal.h"
+#include "libc/intrin/likely.h"
+#include "libc/intrin/strace.h"
 #include "libc/nt/thunk/msabi.h"
 #include "libc/nt/winsock.h"
+#include "libc/runtime/runtime.h"
+#include "libc/sock/internal.h"
 
 __msabi extern typeof(WSARecv) *const __imp_WSARecv;
 
 /**
  * Receives data from Windows socket.
- *
  * @return 0 on success, or -1 on failure
- * @note this wrapper takes care of ABI, STRACE(), and __winerr()
  */
 textwindows int WSARecv(
     uint64_t s, const struct NtIovec *inout_lpBuffers, uint32_t dwBufferCount,
@@ -38,7 +40,13 @@ textwindows int WSARecv(
     struct NtOverlapped *opt_inout_lpOverlapped,
     const NtWsaOverlappedCompletionRoutine opt_lpCompletionRoutine) {
   int rc;
-#if defined(SYSDEBUG) && _NTTRACE
+  if (opt_inout_lpOverlapped) {
+    // Use NULL for this parameter if the lpOverlapped parameter is not
+    // NULL to avoid potentially erroneous results. This parameter can
+    // be NULL only if the lpOverlapped parameter is not NULL.
+    unassert(!opt_out_lpNumberOfBytesRecvd);
+  }
+#if SYSDEBUG && _NTTRACE
   uint32_t NumberOfBytesRecvd;
   if (opt_out_lpNumberOfBytesRecvd) {
     NumberOfBytesRecvd = *opt_out_lpNumberOfBytesRecvd;
@@ -49,13 +57,10 @@ textwindows int WSARecv(
   if (opt_out_lpNumberOfBytesRecvd) {
     *opt_out_lpNumberOfBytesRecvd = NumberOfBytesRecvd;
   }
-  if (rc == -1) {
-    __winerr();
-  }
   if (UNLIKELY(__strace > 0) && strace_enabled(0) > 0) {
     kprintf(STRACE_PROLOGUE "WSARecv(%lu, [", s);
-    DescribeIovNt(inout_lpBuffers, dwBufferCount,
-                  rc != -1 ? NumberOfBytesRecvd : 0);
+    _DescribeIovNt(inout_lpBuffers, dwBufferCount,
+                   rc != -1 ? NumberOfBytesRecvd : 0);
     kprintf("], %u, [%'u], %p, %s, %p) → %d% lm\n", dwBufferCount,
             NumberOfBytesRecvd, inout_lpFlags,
             DescribeNtOverlapped(opt_inout_lpOverlapped),

@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2021 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -18,7 +18,7 @@
 ╚─────────────────────────────────────────────────────────────────────────────*/
 #include "libc/mem/mem.h"
 #include "libc/str/str.h"
-#include "libc/str/tab.internal.h"
+#include "libc/str/tab.h"
 #include "net/http/escape.h"
 #include "net/http/url.h"
 
@@ -55,8 +55,10 @@ static size_t DimensionUrl(struct Url *h) {
 static bool NeedsSquareBrackets(struct Url *h) {
   int c;
   size_t i;
-  if (!memchr(h->host.p, ':', h->host.n)) return false;
-  if (h->pass.p) return true;
+  if (!memchr(h->host.p, ':', h->host.n))
+    return false;
+  if (h->pass.p)
+    return true;
   if (h->host.n >= 4 && h->host.p[0] == 'v' && h->host.p[2] == '.' &&
       kHexToInt[h->host.p[1] & 0xFF] != -1) {
     for (i = 3; i < h->host.n; ++i) {
@@ -122,7 +124,8 @@ char *EncodeUrl(struct Url *h, size_t *z) {
     if (h->params.p) {
       *p++ = '?';
       for (i = 0; i < h->params.n; ++i) {
-        if (i) *p++ = '&';
+        if (i)
+          *p++ = '&';
         p = EscapeUrlView(p, &h->params.p[i].key, kEscapeParam);
         if (h->params.p[i].val.p) {
           *p++ = '=';
@@ -136,10 +139,12 @@ char *EncodeUrl(struct Url *h, size_t *z) {
     }
     n = p - m;
     *p++ = '\0';
-    if ((p = realloc(m, p - m))) m = p;
+    if ((p = realloc(m, p - m)))
+      m = p;
   } else {
     n = 0;
   }
-  if (z) *z = n;
+  if (z)
+    *z = n;
   return m;
 }

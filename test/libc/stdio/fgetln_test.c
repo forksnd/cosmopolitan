@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2022 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -28,7 +28,7 @@
 
 TEST(fgetln, test) {
   FILE *f;
-  f = fmemopen(_gc(strdup(kHyperion)), kHyperionSize, "r+");
+  f = fmemopen(gc(strdup(kHyperion)), kHyperionSize, "r+");
   EXPECT_STREQ("The fall of Hyperion - a Dream\n", fgetln(f, 0));
   EXPECT_STREQ("John Keats\n", fgetln(f, 0));
   EXPECT_STREQ("\n", fgetln(f, 0));
@@ -61,7 +61,6 @@ TEST(fgetln, testEvilLastLine) {
 }
 
 TEST(fgetln, testReadingFromStdin_doesntLeakMemory) {
-  FILE *f;
   int oldstdin, pfds[2];
   oldstdin = dup(0);
   EXPECT_SYS(0, 0, pipe(pfds));
@@ -81,7 +80,7 @@ TEST(fgetln, testReadingFromStdin_doesntLeakMemory) {
 }
 
 BENCH(fgetln, bench) {
-  FILE *f = fmemopen(_gc(strdup(kHyperion)), kHyperionSize, "r+");
+  FILE *f = fmemopen(gc(strdup(kHyperion)), kHyperionSize, "r+");
   EZBENCH2("fgetln", donothing, fgetln(f, 0));
   EZBENCH2("xgetline", donothing, free(xgetline(f)));
   fclose(f);

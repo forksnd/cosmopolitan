@@ -4399,7 +4399,7 @@ static void rtreecheck(
 
 /* Conditionally include the geopoly code */
 #ifdef SQLITE_ENABLE_GEOPOLY
-# include "geopoly.inc"
+#include "third_party/sqlite3/geopoly.inc"
 #endif
 
 /*

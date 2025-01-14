@@ -1,5 +1,5 @@
 /*-*- mode:unix-assembly; indent-tabs-mode:t; tab-width:8; coding:utf-8     -*-│
-│vi: set et ft=asm ts=8 tw=8 fenc=utf-8                                     :vi│
+│ vi: set noet ft=asm ts=8 sw=8 fenc=utf-8                                 :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2020 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -16,12 +16,12 @@
 │ TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR             │
 │ PERFORMANCE OF THIS SOFTWARE.                                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
-#include "libc/macros.internal.h"
+#include "libc/macros.h"
 
 //	Decentralized section for test testcase registration.
 //
 //	@see	ape/ape.lds
-	.section .piro.relo.sort.testcase.1,"aw",@nobits
+	.section .piro.relo.sort.testcase.1,"aw",@progbits
 	.type	__testcase_start,@object
 	.type	__testcase_end,@object
 	.globl	__testcase_start,__testcase_end
@@ -34,7 +34,7 @@ __testcase_start:
 	...
 	decentralized content
 	...
-	*/.section .piro.relo.sort.testcase.3,"aw",@nobits
+	*/.section .piro.relo.sort.testcase.3,"aw",@progbits
 __testcase_end:
 	.quad	0
 	.overrun

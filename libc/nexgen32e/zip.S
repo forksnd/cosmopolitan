@@ -1,5 +1,5 @@
 /*-*- mode:unix-assembly; indent-tabs-mode:t; tab-width:8; coding:utf-8     -*-│
-│vi: set et ft=asm ts=8 tw=8 fenc=utf-8                                     :vi│
+│ vi: set noet ft=asm ts=8 sw=8 fenc=utf-8                                 :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2020 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -16,32 +16,31 @@
 │ TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR             │
 │ PERFORMANCE OF THIS SOFTWARE.                                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
-#include "libc/macros.internal.h"
+#include "libc/macros.h"
 #include "ape/relocations.h"
 #include "libc/zip.h"
+.section .zip.eocd,"",@progbits
 
-//	ZIP Central Directory.
-	.section .zip.3,"",@progbits
-	.hidden	__zip_start
+//	ZIP End Of Central Directory (EOCD) record.
 	.globl	__zip_start
-	.type	__zip_start,@object
 __zip_start:
-	.previous/*
-	...
-	decentralized content
-	...
-	*/.section .zip.5,"",@progbits
-__zip_end:
-	.long	kZipCdirHdrMagic	// magic
+__zip_eocd:				// let symbol be discarded
+	.long	kZipCdirHdrMagicTodo	// magic (scan backwards for this)
 	.short	0			// disk
 	.short	0			// starting disk
-	.short	v_zip_records		// number of records on disk
-	.short	v_zip_records		// records
-	.long	v_zip_cdirsize		// size of central directory
-	.long	RVA(__zip_start)	// central directory offset
-	.short	v_zip_commentsize	// comment size
-	.endobj	__zip_end,globl,hidden
-	.weak	v_zip_records
-	.weak	v_zip_cdirsize
-	.weak	v_zip_commentsize
-	.previous
+	.short	0			// number of records on disk
+	.short	0			// records
+	.endobj	__zip_eocd,globl
+
+__zip_eocd.size:
+	.weak	__zip_cdir_size
+	.long	__zip_cdir_size
+	.endobj	__zip_eocd.size
+
+__zip_eocd.offset:
+	.long	0
+	.endobj	__zip_eocd.offset
+
+__zip_eocd.commentsize:
+	.short	0
+	.endobj	__zip_eocd.commentsize

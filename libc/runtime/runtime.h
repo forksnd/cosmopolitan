@@ -1,15 +1,17 @@
 #ifndef COSMOPOLITAN_LIBC_RUNTIME_RUNTIME_H_
 #define COSMOPOLITAN_LIBC_RUNTIME_RUNTIME_H_
-#if !(__ASSEMBLER__ + __LINKER__ + 0)
 COSMOPOLITAN_C_START_
 /*───────────────────────────────────────────────────────────────────────────│─╗
 │ cosmopolitan § runtime                                                   ─╬─│┼
 ╚────────────────────────────────────────────────────────────────────────────│*/
+/* clang-format off */
 
 #ifdef __x86_64__
 typedef long jmp_buf[8];
+typedef long sigjmp_buf[11];
 #elif defined(__aarch64__)
 typedef long jmp_buf[22];
+typedef long sigjmp_buf[25];
 #elif defined(__powerpc64__)
 typedef unsigned __int128 jmp_buf[32];
 #elif defined(__s390x__)
@@ -18,116 +20,132 @@ typedef unsigned long jmp_buf[18];
 typedef unsigned long jmp_buf[26];
 #endif
 
-typedef long sigjmp_buf[12];
-
-extern char **environ;                      /* CRT */
-extern int __argc;                          /* CRT */
-extern char **__argv;                       /* CRT */
-extern char **__envp;                       /* CRT */
-extern unsigned long *__auxv;               /* CRT */
-extern intptr_t __oldstack;                 /* CRT */
-extern uint64_t __nosync;                   /* SYS */
-extern int __strace;                        /* SYS */
-extern int __ftrace;                        /* SYS */
-extern char *program_invocation_name;       /* RII */
-extern char *program_invocation_short_name; /* RII */
-extern uint64_t __syscount;                 /* RII */
-extern uint64_t kStartTsc;                  /* RII */
-extern char kTmpPath[];                     /* RII */
-extern const char kNtSystemDirectory[];     /* RII */
-extern const char kNtWindowsDirectory[];    /* RII */
-extern size_t __virtualmax;
-extern bool __isworker;
-
-void mcount(void);
-int daemon(int, int);
-int _freestack(void *);
-void _bt(const char *, ...);
-int _cocmd(int, char **, char **);
-unsigned long getauxval(unsigned long);
-void *_mapanon(size_t) attributeallocsize((1)) mallocesque;
-void *_mapshared(size_t) attributeallocsize((1)) mallocesque;
-void *_mapstack(void) returnsaligned((FRAMESIZE)) mallocesque;
-int setjmp(jmp_buf)
-libcesque returnstwice paramsnonnull();
+void mcount(void) libcesque;
+int daemon(int, int) libcesque;
+unsigned long getauxval(unsigned long) libcesque;
+int setjmp(jmp_buf) libcesque returnstwice paramsnonnull();
 void longjmp(jmp_buf, int) libcesque wontreturn paramsnonnull();
-axdx_t setlongerjmp(jmp_buf)
-libcesque returnstwice paramsnonnull();
-void longerjmp(jmp_buf, intptr_t) libcesque wontreturn paramsnonnull();
-int _setjmp(jmp_buf)
-libcesque returnstwice paramsnonnull();
+int _setjmp(jmp_buf) libcesque returnstwice paramsnonnull();
 int sigsetjmp(sigjmp_buf, int) libcesque returnstwice paramsnonnull();
 void siglongjmp(sigjmp_buf, int) libcesque wontreturn paramsnonnull();
 void _longjmp(jmp_buf, int) libcesque wontreturn paramsnonnull();
 void exit(int) wontreturn;
 void _exit(int) libcesque wontreturn;
 void _Exit(int) libcesque wontreturn;
-void _Exitr(int) libcesque wontreturn;
-void _Exit1(int) libcesque wontreturn;
 void quick_exit(int) wontreturn;
 void abort(void) wontreturn;
-int __cxa_atexit(void *, void *, void *) libcesque;
-int atfork(void *, void *) libcesque;
-int atexit(void (*)(void)) libcesque;
-char *getenv(const char *) nosideeffect libcesque;
-int putenv(char *) paramsnonnull();
-int setenv(const char *, const char *, int);
-int unsetenv(const char *);
-int clearenv(void);
-void fpreset(void);
-void *mmap(void *, uint64_t, int32_t, int32_t, int32_t, int64_t);
-void *mremap(void *, size_t, size_t, int, ...);
-int munmap(void *, uint64_t);
-int mprotect(void *, uint64_t, int) privileged;
-int msync(void *, size_t, int);
-int mlock(const void *, size_t);
-int munlock(const void *, size_t);
-void *sbrk(intptr_t);
-int brk(void *);
-long gethostid(void);
-int sethostid(long);
-char *getlogin(void);
-int getlogin_r(char *, size_t);
-int login_tty(int);
-int getpagesize(void);
-int syncfs(int);
-int vhangup(void);
-int getdtablesize(void);
-int sethostname(const char *, size_t);
-int acct(const char *);
-void _intsort(int *, size_t);
-void _longsort(long *, size_t);
-bool _isheap(void *);
-int NtGetVersion(void) pureconst;
-unsigned _getcpucount(void) pureconst;
-long _missingno();
-void __oom_hook(size_t);
-void _loadxmm(void *);
-void _peekall(void);
-void _savexmm(void *);
-void _weakfree(void *);
-int _OpenExecutable(void);
-int ftrace_install(void);
-int ftrace_enabled(int);
-int strace_enabled(int);
-long _GetResourceLimit(int);
-long _GetMaxFd(void);
-char *GetProgramExecutableName(void);
-char *GetInterpreterExecutableName(char *, size_t);
-void __printargs(const char *);
-void __paginate(int, const char *);
-int __arg_max(void);
-void __print_maps(void);
-void __warn_if_powersave(void);
-const char *__describe_os(void);
-bool _IsDynamicExecutable(const char *);
-void _restorewintty(void);
-const char *GetCpuidOs(void);
-const char *GetCpuidEmulator(void);
-void GetCpuidBrand(char[13], uint32_t);
-bool IsGenuineBlink(void);
-bool IsCygwin(void);
+int atexit(void (*)(void)) paramsnonnull() libcesque;
+char *getenv(const char *) paramsnonnull() __wur nosideeffect libcesque;
+int putenv(char *) libcesque __read_write(1);
+int setenv(const char *, const char *, int) libcesque;
+int unsetenv(const char *) libcesque;
+int clearenv(void) libcesque;
+void fpreset(void) libcesque;
+void *mmap(void *, uint64_t, int32_t, int32_t, int32_t, int64_t) libcesque;
+void *mremap(void *, size_t, size_t, int, ...) libcesque;
+int munmap(void *, uint64_t) libcesque;
+int mprotect(void *, uint64_t, int) libcesque;
+int msync(void *, size_t, int) libcesque;
+int mlock(const void *, size_t) libcesque;
+int munlock(const void *, size_t) libcesque;
+long gethostid(void) libcesque;
+int sethostid(long) libcesque;
+char *getlogin(void) libcesque;
+int getlogin_r(char *, size_t) libcesque __write_only(1, 2);
+int login_tty(int) libcesque __fd_arg(1);
+int getpagesize(void) pureconst libcesque;
+int getgransize(void) pureconst libcesque;
+int syncfs(int) dontthrow libcesque;
+int vhangup(void) libcesque;
+int getdtablesize(void) libcesque;
+int sethostname(const char *, size_t) libcesque;
+int acct(const char *) libcesque;
+
+#if defined(_GNU_SOURCE) || defined(_COSMO_SOURCE)
+extern char **environ;
+char *secure_getenv(const char *) paramsnonnull() __wur nosideeffect libcesque;
+#endif
+
+#ifdef _COSMO_SOURCE
+extern int __argc;
+extern char **__argv;
+extern char **__envp;
+extern int __pagesize;
+extern int __gransize;
+extern unsigned long *__auxv;
+extern intptr_t __oldstack;
+extern char *__program_executable_name;
+extern uint64_t __nosync;
+extern int __strace;
+extern int __ftrace;
+extern uint64_t __syscount;
+extern uint64_t kStartTsc;
+extern const char kNtSystemDirectory[];
+extern const char kNtWindowsDirectory[];
+extern size_t __virtualmax;
+extern size_t __stackmax;
+extern bool32 __isworker;
+/* utilities */
+void _intsort(int *, size_t) libcesque __read_write(1, 2);
+void _longsort(long *, size_t) libcesque __read_write(1, 2);
+/* diagnostics */
+void ShowCrashReports(void) libcesque;
+int ftrace_install(void) libcesque;
+int ftrace_enabled(int) libcesque;
+int strace_enabled(int) libcesque;
+void __print_maps(size_t) libcesque;
+void __print_maps_win32(int64_t, const char *, size_t) libcesque;
+void __printargs(const char *) libcesque;
+/* builtin sh-like system/popen dsl */
+int _cocmd(int, char **, char **) libcesque;
+/* executable program */
+char *GetProgramExecutableName(void) libcesque;
+char *GetInterpreterExecutableName(char *, size_t) libcesque;
+int __open_executable(void) libcesque;
+/* execution control */
+int verynice(void) libcesque;
+void __warn_if_powersave(void) libcesque;
+void _Exit1(int) libcesque wontreturn libcesque;
+void __paginate(int, const char *) libcesque __fd_arg(1);
+void __paginate_file(int, const char *) libcesque __fd_arg(1);
+/* memory management */
+void _weakfree(void *) libcesque;
+void *_mapanon(size_t) attributeallocsize((1)) mallocesque libcesque;
+void *_mapshared(size_t) attributeallocsize((1)) mallocesque libcesque;
+void CheckForFileLeaks(void) libcesque;
+void __oom_hook(size_t) libcesque;
+/* code morphing */
+void __morph_begin(void) libcesque;
+void __morph_end(void) libcesque;
+void __jit_begin(void) libcesque;
+void __jit_end(void) libcesque;
+void __clear_cache(void *, void *);
+/* portability */
+bool32 IsGenuineBlink(void) libcesque;
+bool32 IsCygwin(void) libcesque;
+const char *GetCpuidOs(void) libcesque;
+const char *GetCpuidEmulator(void) libcesque;
+void GetCpuidBrand(char[13], uint32_t) libcesque;
+long __get_rlimit(int) libcesque;
+const char *__describe_os(void) libcesque;
+long __get_sysctl(int, int) libcesque;
+int __get_arg_max(void) pureconst libcesque;
+int __get_cpu_count(void) pureconst libcesque;
+long __get_avphys_pages(void) pureconst libcesque;
+long __get_phys_pages(void) pureconst libcesque;
+long __get_minsigstksz(void) pureconst libcesque;
+long __get_safe_size(long, long) libcesque;
+char *__get_tmpdir(void) libcesque;
+forceinline int __trace_disabled(int x) {
+  return 0;
+}
+#ifndef FTRACE
+#define ftrace_enabled(...) __trace_disabled(__VA_ARGS__)
+#endif
+#ifndef SYSDEBUG
+#define strace_enabled(...) __trace_disabled(__VA_ARGS__)
+#endif
+#endif /* _COSMO_SOURCE */
 
 COSMOPOLITAN_C_END_
-#endif /* !(__ASSEMBLER__ + __LINKER__ + 0) */
 #endif /* COSMOPOLITAN_LIBC_RUNTIME_RUNTIME_H_ */

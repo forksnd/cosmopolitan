@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2021 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -31,11 +31,11 @@
 wchar_t *utf16to32(const char16_t *p, size_t n, size_t *z) {
   wint_t x, y;
   wchar_t *r, *q;
-  unsigned m, j, w;
   const char16_t *e;
-  int16_t v1[8], v2[8], v3[8], vz[8];
-  if (z) *z = 0;
-  if (n == -1) n = p ? strlen16(p) : 0;
+  if (z)
+    *z = 0;
+  if (n == -1)
+    n = p ? strlen16(p) : 0;
   if ((q = r = malloc(n * 4 + 8 + 1))) {
     for (e = p + n; p < e;) {
       x = *p++ & 0xffff;
@@ -49,9 +49,11 @@ wchar_t *utf16to32(const char16_t *p, size_t n, size_t *z) {
       }
       *q++ = x;
     }
-    if (z) *z = q - r;
+    if (z)
+      *z = q - r;
     *q++ = '\0';
-    if ((q = realloc(r, (q - r) * sizeof(*r)))) r = q;
+    if ((q = realloc(r, (q - r) * sizeof(*r))))
+      r = q;
   }
   return r;
 }

@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:t;c-basic-offset:8;tab-width:8;coding:utf-8   -*-│
-│vi: set et ft=c ts=8 tw=8 fenc=utf-8                                       :vi│
+│ vi: set noet ft=c ts=8 sw=8 fenc=utf-8                                   :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2016 Google Inc.                                                   │
 │                                                                              │
@@ -15,18 +15,14 @@
 │ See the License for the specific language governing permissions and          │
 │ limitations under the License.                                               │
 ╚─────────────────────────────────────────────────────────────────────────────*/
+#include "libc/intrin/dll.h"
 #include "third_party/nsync/atomic.h"
 #include "third_party/nsync/common.internal.h"
-#include "third_party/nsync/dll.h"
 #include "third_party/nsync/mu_semaphore.h"
 #include "third_party/nsync/races.internal.h"
+#include "third_party/nsync/defs.h"
 #include "third_party/nsync/wait_s.internal.h"
-
-asm(".ident\t\"\\n\\n\
-*NSYNC (Apache 2.0)\\n\
-Copyright 2016 Google, Inc.\\n\
-https://github.com/google/nsync\"");
-// clang-format off
+__static_yoink("nsync_notice");
 
 /* Routines for debugging. */
 
@@ -142,9 +138,9 @@ static void emit_word (struct emit_buf *b, const struct bit_name *name, uint32_t
 }
 
 /* Emit the waiter queue *q to *b. */
-static void emit_waiters (struct emit_buf *b, nsync_dll_list_ list) {
-        nsync_dll_element_ *p = nsync_dll_first_ (list);
-        nsync_dll_element_ *next;
+static void emit_waiters (struct emit_buf *b, struct Dll *list) {
+        struct Dll *p = dll_first (list);
+        struct Dll *next;
         if (p != NULL) {
                 emit_print (b, "\nwaiters =\n");
         }
@@ -153,15 +149,23 @@ static void emit_waiters (struct emit_buf *b, nsync_dll_list_ list) {
                 waiter *w = DLL_WAITER (p);
                 next = NULL;
                 emit_print (b, "   %i", (uintptr_t) w);
+#if NSYNC_DEBUG
                 if (w->tag != WAITER_TAG) {
                         emit_print (b, "bad WAITER_TAG %i",
                                     (uintptr_t) w->tag);
                 } else {
-                        next = nsync_dll_next_ (list, p);
+#else
+		{
+#endif
+                        next = dll_next (list, p);
+#if NSYNC_DEBUG
                         if (nw->tag != NSYNC_WAITER_TAG) {
                                 emit_print (b, " bad WAITER_TAG %i",
                                             (uintptr_t) nw->tag);
                         } else {
+#else
+			{
+#endif
                                 emit_print (b, " embedded=%i waiting=%i",
                                             (uintptr_t) (w->flags & NSYNC_WAITER_FLAG_MUCV),
                                             (uintptr_t) ATM_LOAD (&nw->waiting));
@@ -202,7 +206,7 @@ static char *emit_mu_state (struct emit_buf *b, nsync_mu *mu,
         word = ATM_LOAD (&mu->word);
         if ((word & MU_WAITING) != 0 && print_waiters &&  /* can benefit from lock */
 	    (blocking || (word & MU_SPINLOCK) == 0)) {  /* willing, or no need to wait */
-                word = nsync_spin_test_and_set_ (&mu->word, MU_SPINLOCK, MU_SPINLOCK, 0);
+                word = nsync_spin_test_and_set_ (&mu->word, MU_SPINLOCK, MU_SPINLOCK, 0, mu);
                 acquired = 1;
         }
         readers = word / MU_RLOCK;
@@ -239,7 +243,7 @@ static char *emit_cv_state (struct emit_buf *b, nsync_cv *cv,
         word = ATM_LOAD (&cv->word);
         if ((word & CV_NON_EMPTY) != 0 && print_waiters &&  /* can benefit from lock */
 	    (blocking || (word & CV_SPINLOCK) == 0)) {  /* willing, or no need to wait */
-                word = nsync_spin_test_and_set_ (&cv->word, CV_SPINLOCK, CV_SPINLOCK, 0);
+                word = nsync_spin_test_and_set_ (&cv->word, CV_SPINLOCK, CV_SPINLOCK, 0, cv);
                 acquired = 1;
         }
         emit_print (b, "cv 0x%i -> 0x%i = {", (uintptr_t) cv, word);

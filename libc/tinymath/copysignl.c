@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2023 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -18,19 +18,16 @@
 ╚─────────────────────────────────────────────────────────────────────────────*/
 #include "libc/math.h"
 #include "libc/tinymath/ldshape.internal.h"
+#if !(LDBL_MANT_DIG == 53 && LDBL_MAX_EXP == 1024)
 
 /**
  * Returns 𝑥 with same sign as 𝑦.
  */
 long double copysignl(long double x, long double y) {
-#if LDBL_MANT_DIG == 53 && LDBL_MAX_EXP == 1024
-  return copysign(x, y);
-#elif (LDBL_MANT_DIG == 64 || LDBL_MANT_DIG == 113) && LDBL_MAX_EXP == 16384
   union ldshape ux = {x}, uy = {y};
   ux.i.se &= 0x7fff;
   ux.i.se |= uy.i.se & 0x8000;
   return ux.f;
-#else
-#error "architecture unsupported"
-#endif
 }
+
+#endif /* long double is long */

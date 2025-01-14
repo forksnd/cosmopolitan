@@ -47,6 +47,22 @@ assert(hex(0x1940efe9d47ae889) == "0x1940efe9d47ae889")
 assert(oct(0x1940efe9d47ae889) == "0145007376472436564211")
 assert(bin(0x1940efe9d47ae889) == "0b0001100101000000111011111110100111010100011110101110100010001001")
 
+assert(EncodeHex("\1\2\3\4\255") == "01020304ff")
+assert(DecodeHex("01020304ff") == "\1\2\3\4\255")
+
+assert(EncodeBase32("123456") == "64s36d1n6r")
+assert(EncodeBase32("12") == "64s0")
+assert(EncodeBase32("\33", "01") == "00100001")
+assert(EncodeBase32("\33", "0123456789abcdef") == "21")
+
+assert(DecodeBase32("64s36d1n6r") == "123456")
+assert(DecodeBase32("64s0") == "12")
+assert(DecodeBase32("64 \t\r\ns0") == "12")
+assert(DecodeBase32("64s0!64s0") == "12")
+
+assert(EncodeBase32("\1\2\3\4\255", "0123456789abcdef") == "01020304ff")
+assert(DecodeBase32("01020304ff", "0123456789abcdef") == "\1\2\3\4\255")
+
 assert(EscapeHtml(nil) == nil)
 assert(EscapeHtml("?hello&there<>") == "?hello&amp;there&lt;&gt;")
 

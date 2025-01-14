@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2020 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -21,11 +21,12 @@
 #include "libc/calls/syscall-nt.internal.h"
 #include "libc/calls/syscall-sysv.internal.h"
 #include "libc/dce.h"
-#include "libc/intrin/describeflags.internal.h"
-#include "libc/intrin/strace.internal.h"
+#include "libc/intrin/describeflags.h"
+#include "libc/intrin/strace.h"
 #include "libc/intrin/weaken.h"
 #include "libc/log/backtrace.internal.h"
-#include "libc/zipos/zipos.internal.h"
+#include "libc/runtime/zipos.internal.h"
+#include "libc/sysv/errfuns.h"
 
 /**
  * Changes current position of file descriptor, e.g.
@@ -71,22 +72,25 @@
  * @raise EINVAL if resulting offset would be negative
  * @raise EINVAL if `whence` isn't valid
  * @asyncsignalsafe
- * @threadsafe
  * @vforksafe
  */
 int64_t lseek(int fd, int64_t offset, int whence) {
   int64_t rc;
   if (fd < g_fds.n && g_fds.p[fd].kind == kFdZip) {
-    rc = _weaken(__zipos_lseek)(
+    rc = _weaken(__zipos_seek)(
         (struct ZiposHandle *)(intptr_t)g_fds.p[fd].handle, offset, whence);
-  } else if (!IsWindows() && !IsOpenbsd() && !IsNetbsd()) {
+  } else if (IsLinux() || IsXnu() || IsFreebsd() || IsOpenbsd()) {
     rc = sys_lseek(fd, offset, whence, 0);
-  } else if (IsOpenbsd() || IsNetbsd()) {
+  } else if (IsNetbsd()) {
     rc = sys_lseek(fd, offset, offset, whence);
-  } else {
+  } else if (IsWindows()) {
     rc = sys_lseek_nt(fd, offset, whence);
+  } else {
+    rc = enosys();
   }
   STRACE("lseek(%d, %'ld, %s) → %'ld% m", fd, offset, DescribeWhence(whence),
          rc);
   return rc;
 }
+
+__weak_reference(lseek, lseek64);

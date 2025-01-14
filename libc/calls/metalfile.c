@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ This is free and unencumbered software released into the public domain.      │
 │                                                                              │
@@ -29,9 +29,10 @@
 #include "libc/assert.h"
 #include "libc/calls/internal.h"
 #include "libc/calls/metalfile.internal.h"
-#include "libc/intrin/directmap.internal.h"
+#include "libc/intrin/directmap.h"
+#include "libc/intrin/kprintf.h"
 #include "libc/intrin/weaken.h"
-#include "libc/macros.internal.h"
+#include "libc/macros.h"
 #include "libc/mem/mem.h"
 #include "libc/runtime/pc.internal.h"
 #include "libc/runtime/runtime.h"
@@ -47,12 +48,12 @@
 #define MAP_FIXED_linux     0x00000010
 #define MAP_SHARED_linux    0x00000001
 
-STATIC_YOINK("_init_metalfile");
+__static_yoink("_init_metalfile");
 
 void *__ape_com_base;
 size_t __ape_com_size = 0;
 
-textstartup noasan void InitializeMetalFile(void) {
+textstartup void InitializeMetalFile(void) {
   if (IsMetal()) {
     /*
      * Copy out a pristine image of the program — before the program might
@@ -61,18 +62,21 @@ textstartup noasan void InitializeMetalFile(void) {
      * This code is included if a symbol "file:/proc/self/exe" is defined
      * (see libc/calls/metalfile.internal.h & libc/calls/metalfile_init.S).
      * The zipos code will automatically arrange to do this.  Alternatively,
-     * user code can STATIC_YOINK this symbol.
+     * user code can __static_yoink this symbol.
      */
-    size_t size = ROUNDUP(_ezip - _base, 4096);
+    size_t size = ROUNDUP(_ezip - __executable_start, 4096);
+    // TODO(jart): Restore support for ZIPOS on metal.
     void *copied_base;
-    struct DirectMap dm;
-    dm = sys_mmap_metal(NULL, size, PROT_READ | PROT_WRITE,
-                        MAP_SHARED_linux | MAP_ANONYMOUS_linux, -1, 0);
-    copied_base = dm.addr;
-    _npassert(copied_base != (void *)-1);
+    void *addr = sys_mmap_metal(NULL, size, PROT_READ | PROT_WRITE,
+                                MAP_SHARED_linux | MAP_ANONYMOUS_linux, -1, 0);
+    copied_base = addr;
+    npassert(copied_base != (void *)-1);
     memcpy(copied_base, (void *)(BANE + IMAGE_BASE_PHYSICAL), size);
     __ape_com_base = copied_base;
     __ape_com_size = size;
+    // TODO(tkchia): LIBC_CALLS doesn't depend on LIBC_VGA so references
+    //               to its functions need to be weak
+    // KINFOF("%s @ %p,+%#zx", APE_COM_NAME, copied_base, size);
   }
 }
 

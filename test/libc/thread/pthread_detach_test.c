@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2022 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -19,16 +19,14 @@
 #include "libc/calls/calls.h"
 #include "libc/calls/struct/sigaction.h"
 #include "libc/errno.h"
-#include "libc/intrin/strace.internal.h"
+#include "libc/intrin/strace.h"
 #include "libc/sysv/consts/sa.h"
 #include "libc/sysv/consts/sig.h"
 #include "libc/testlib/testlib.h"
 #include "libc/thread/posixthread.internal.h"
 #include "libc/thread/thread.h"
-#include "third_party/nsync/dll.h"
 
-void OnUsr1(int sig, struct siginfo *si, void *vctx) {
-  struct ucontext *ctx = vctx;
+void OnUsr1(int sig, siginfo_t *si, void *vctx) {
 }
 
 void SetUp(void) {
@@ -52,9 +50,8 @@ TEST(pthread_detach, testCreateReturn) {
   pthread_t id;
   ASSERT_EQ(0, pthread_create(&id, 0, Increment, 0));
   ASSERT_EQ(0, pthread_detach(id));
-  while (!pthread_orphan_np()) {
+  while (!pthread_orphan_np())
     pthread_decimate_np();
-  }
 }
 
 TEST(pthread_detach, testDetachUponCreation) {
@@ -64,7 +61,6 @@ TEST(pthread_detach, testDetachUponCreation) {
   ASSERT_EQ(0, pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED));
   ASSERT_EQ(0, pthread_create(&th, &attr, Increment, 0));
   ASSERT_EQ(0, pthread_attr_destroy(&attr));
-  while (!pthread_orphan_np()) {
+  while (!pthread_orphan_np())
     pthread_decimate_np();
-  }
 }

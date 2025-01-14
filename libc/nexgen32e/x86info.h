@@ -43,6 +43,11 @@
 #define X86_MARCH_TREMONT        19
 #define X86_MARCH_KNIGHTSLANDING 20
 #define X86_MARCH_KNIGHTSMILL    21
+#define X86_MARCH_SAPPHIRERAPIDS 22
+#define X86_MARCH_ALDERLAKE      23
+#define X86_MARCH_COMETLAKE      24
+#define X86_MARCH_RAPTORLAKE     25
+#define X86_MARCH_ROCKETLAKE     26
 
 #define X86_GRADE_UNKNOWN   0
 #define X86_GRADE_APPLIANCE 1
@@ -60,7 +65,6 @@ struct X86ProcessorModel {
   unsigned char grade;
 };
 
-extern const size_t kX86ProcessorModelCount;
 extern const struct X86ProcessorModel kX86ProcessorModels[];
 
 const struct X86ProcessorModel *getx86processormodel(short) nosideeffect;

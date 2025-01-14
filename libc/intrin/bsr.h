@@ -1,35 +1,23 @@
+#ifdef _COSMO_SOURCE
 #ifndef COSMOPOLITAN_LIBC_NEXGEN32E_BSR_H_
 #define COSMOPOLITAN_LIBC_NEXGEN32E_BSR_H_
-#if !(__ASSEMBLER__ + __LINKER__ + 0)
 COSMOPOLITAN_C_START_
 
-int _bsr(int) pureconst;
-int _bsrl(long) pureconst;
-int _bsrll(long long) pureconst;
+libcesque int bsr(int) pureconst;
+libcesque int bsrl(long) pureconst;
+libcesque int bsrll(long long) pureconst;
 
 #if defined(__GNUC__) && !defined(__STRICT_ANSI__)
-#ifdef __x86_64__
-int _bsr128(uint128_t) pureconst;
-#define _bsr(u)                                                 \
-  ({                                                            \
-    unsigned BiTs;                                              \
-    asm("bsr\t%0,%0" : "=r"(BiTs) : "0"((unsigned)(u)) : "cc"); \
-    BiTs;                                                       \
-  })
-#define _bsrl(u)                                                     \
-  ({                                                                 \
-    unsigned long BiTs;                                              \
-    asm("bsr\t%0,%0" : "=r"(BiTs) : "0"((unsigned long)(u)) : "cc"); \
-    (unsigned)BiTs;                                                  \
-  })
-#define _bsrll(u) _bsrl(u)
-#else
-#define _bsr(x)   (__builtin_clz(x) ^ (sizeof(int) * CHAR_BIT - 1))
-#define _bsrl(x)  (__builtin_clzl(x) ^ (sizeof(long) * CHAR_BIT - 1))
-#define _bsrll(x) (__builtin_clzll(x) ^ (sizeof(long long) * CHAR_BIT - 1))
-#endif
+#define bsr(x)   (__builtin_clz(x) ^ (sizeof(int) * 8 - 1))
+#define bsrl(x)  (__builtin_clzl(x) ^ (sizeof(long) * 8 - 1))
+#define bsrll(x) (__builtin_clzll(x) ^ (sizeof(long long) * 8 - 1))
 #endif
 
+/* deprecated */
+#define _bsr(x)   bsr(x)
+#define _bsrl(x)  bsrl(x)
+#define _bsrll(x) bsrll(x)
+
 COSMOPOLITAN_C_END_
-#endif /* !(__ASSEMBLER__ + __LINKER__ + 0) */
 #endif /* COSMOPOLITAN_LIBC_NEXGEN32E_BSR_H_ */
+#endif /* _COSMO_SOURCE */

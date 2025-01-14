@@ -1,5 +1,5 @@
 /*-*- mode:unix-assembly; indent-tabs-mode:t; tab-width:8; coding:utf-8     -*-│
-│vi: set et ft=asm ts=8 tw=8 fenc=utf-8                                     :vi│
+│ vi: set noet ft=asm ts=8 sw=8 fenc=utf-8                                 :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │                                                                              │
 │  Musl Libc                                                                   │
@@ -25,18 +25,35 @@
 │  SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.                      │
 │                                                                              │
 ╚─────────────────────────────────────────────────────────────────────────────*/
-#include "libc/macros.internal.h"
+#include "libc/macros.h"
 
+//	Clears floating point exception status, e.g.
+//
+//	    feclearexcept(FE_ALL_EXCEPT);
+//
+//	@param excepts may bitwise-or the following:
+//		- `FE_INVALID`
+//		- `FE_DIVBYZERO`
+//		- `FE_OVERFLOW`
+//		- `FE_UNDERFLOW`
+//		- `FE_INEXACT`
+//		- `FE_ALL_EXCEPT` (all of the above)
+//	@return	0 on success, or nonzero on error
+	.ftrace1
 feclearexcept:
+	.ftrace2
 #ifdef __x86_64__
 //	maintain exceptions in the sse mxcsr, clear x87 exceptions
 	mov	%edi,%ecx
 	and	$0x3f,%ecx
+#ifndef NOX87
 	fnstsw	%ax
 	test	%eax,%ecx
 	jz	1f
 	fnclex
-1:	stmxcsr	-8(%rsp)
+1:
+#endif
+	stmxcsr	-8(%rsp)
 	and	$0x3f,%eax
 	or	%eax,-8(%rsp)
 	test	%ecx,-8(%rsp)
@@ -53,10 +70,57 @@ feclearexcept:
 	msr	fpsr,x1
 	mov	w0,#0
 	ret
+#else
+#error "unsupported architecture"
 #endif
 	.endfn	feclearexcept,globl
 
+//	Checks for floating point exception.
+//
+//	This function may be used to check the thread-local
+//	floating-point exception status bits, e.g.
+//
+//	    feclearexcept(FE_ALL_EXCEPT);
+//	    volatile double x = 0, y = 1 / x;
+//	    assert(fetestexcept(FE_ALL_EXCEPT) == FE_DIVBYZERO);
+//
+	.ftrace1
+//	@param excepts may bitwise-or the following:
+//		- `FE_INVALID`
+//		- `FE_DIVBYZERO`
+//		- `FE_OVERFLOW`
+//		- `FE_UNDERFLOW`
+//		- `FE_INEXACT`
+//		- `FE_ALL_EXCEPT` (all of the above)
+//	@return	mask of which exception status codes are currently set,
+//		or zero if there aren't any floating point exceptions
+	.ftrace1
+fetestexcept:
+	.ftrace2
+#ifdef __x86_64__
+	and	$0x3f,%edi
+	push	$0
+	stmxcsr	(%rsp)
+#ifdef NOX87
+	pop	%rax
+#else
+	pop	%rsi
+	fnstsw	%ax
+	or	%esi,%eax
+	and	%edi,%eax
+#endif
+	ret
+#elif defined(__aarch64__)
+	and	w0,w0,#0x1f
+	mrs	x1,fpsr
+	and	w0,w0,w1
+	ret
+#endif
+	.endfn	fetestexcept,globl
+
+	.ftrace1
 feraiseexcept:
+	.ftrace2
 #ifdef __x86_64__
 	and	$0x3f,%edi
 	stmxcsr	-8(%rsp)
@@ -74,15 +138,19 @@ feraiseexcept:
 #endif
 	.endfn	feraiseexcept,globl
 
+	.ftrace1
 __fesetround:
+	.ftrace2
 #ifdef __x86_64__
 	push	%rax
 	xor	%eax,%eax
 	mov	%edi,%ecx
+#ifndef NOX87
 	fnstcw	(%rsp)
 	andb	$0xf3,1(%rsp)
 	or	%ch,1(%rsp)
 	fldcw	(%rsp)
+#endif
 	stmxcsr	(%rsp)
 	shl	$3,%ch
 	andb	$0x9f,1(%rsp)
@@ -100,7 +168,9 @@ __fesetround:
 #endif
 	.endfn	__fesetround,globl,hidden
 
+	.ftrace1
 fegetround:
+	.ftrace2
 #ifdef __x86_64__
 	push	%rax
 	stmxcsr	(%rsp)
@@ -115,10 +185,14 @@ fegetround:
 #endif
 	.endfn	fegetround,globl
 
+	.ftrace1
 fegetenv:
+	.ftrace2
 #ifdef __x86_64__
 	xor	%eax,%eax
+#ifndef NOX87
 	fnstenv	(%rdi)
+#endif
 	stmxcsr	28(%rdi)
 	ret
 #elif defined(__aarch64__)
@@ -130,19 +204,25 @@ fegetenv:
 #endif
 	.endfn	fegetenv,globl
 
+	.ftrace1
 fesetenv:
+	.ftrace2
 #ifdef __x86_64__
 	xor	%eax,%eax
 	inc	%rdi
 	jz	1f
+#ifndef NOX87
 	fldenv	-1(%rdi)
+#endif
 	ldmxcsr	27(%rdi)
 	ret
 1:	push	%rax
 	push	%rax
 	pushq	$0xffff
 	pushq	$0x37f
+#ifndef NOX87
 	fldenv	(%rsp)
+#endif
 	pushq	$0x1f80
 	ldmxcsr	(%rsp)
 	add	$40,%rsp
@@ -159,21 +239,3 @@ fesetenv:
 	ret
 #endif
 	.endfn	fesetenv,globl
-
-fetestexcept:
-#ifdef __x86_64__
-	and	$0x3f,%edi
-	push	%rax
-	stmxcsr	(%rsp)
-	pop	%rsi
-	fnstsw	%ax
-	or	%esi,%eax
-	and	%edi,%eax
-	ret
-#elif defined(__aarch64__)
-	and	w0,w0,#0x1f
-	mrs	x1,fpsr
-	and	w0,w0,w1
-	ret
-#endif
-	.endfn	fetestexcept,globl

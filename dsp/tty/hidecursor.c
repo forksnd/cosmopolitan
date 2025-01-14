@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2020 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -17,7 +17,6 @@
 │ PERFORMANCE OF THIS SOFTWARE.                                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
 #include "dsp/tty/tty.h"
-#include "libc/intrin/pushpop.h"
 #include "libc/dce.h"
 #include "libc/log/internal.h"
 #include "libc/log/log.h"
@@ -31,9 +30,11 @@
 static int ttysetcursor(int fd, bool visible) {
   struct NtConsoleCursorInfo ntcursor;
   char code[8] = "\e[?25l";
-  if (__nocolor) return 0;
-  if (visible) code[5] = 'h';
-  if (SupportsWindows()) {
+  if (__nocolor)
+    return 0;
+  if (visible)
+    code[5] = 'h';
+  if (IsWindows()) {
     GetConsoleCursorInfo(GetStdHandle(kNtStdOutputHandle), &ntcursor);
     ntcursor.bVisible = visible;
     SetConsoleCursorInfo(GetStdHandle(kNtStdOutputHandle), &ntcursor);

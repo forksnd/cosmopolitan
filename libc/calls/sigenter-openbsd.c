@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2021 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -27,8 +27,9 @@
 #include "libc/calls/struct/ucontext-openbsd.internal.h"
 #include "libc/calls/ucontext.h"
 #include "libc/log/libfatal.internal.h"
-#include "libc/macros.internal.h"
+#include "libc/macros.h"
 #include "libc/runtime/runtime.h"
+#include "libc/runtime/stack.h"
 #include "libc/str/str.h"
 #include "libc/sysv/consts/sa.h"
 
@@ -36,22 +37,25 @@
 
 privileged void __sigenter_openbsd(int sig, struct siginfo_openbsd *openbsdinfo,
                                    struct ucontext_openbsd *ctx) {
-  int rva, flags;
+#pragma GCC push_options
+#pragma GCC diagnostic ignored "-Wframe-larger-than="
   struct Goodies {
     ucontext_t uc;
-    struct siginfo si;
+    siginfo_t si;
   } g;
-  rva = __sighandrvas[sig & (NSIG - 1)];
+  CheckLargeStackAllocation(&g, sizeof(g));
+#pragma GCC pop_options
+  int rva, flags;
+  rva = __sighandrvas[sig];
   if (rva >= kSigactionMinRva) {
-    flags = __sighandflags[sig & (NSIG - 1)];
+    flags = __sighandflags[sig];
     if (~flags & SA_SIGINFO) {
-      ((sigaction_f)(_base + rva))(sig, 0, 0);
+      ((sigaction_f)(__executable_start + rva))(sig, 0, 0);
     } else {
       __repstosb(&g.uc, 0, sizeof(g.uc));
       __siginfo2cosmo(&g.si, (void *)openbsdinfo);
       g.uc.uc_mcontext.fpregs = &g.uc.__fpustate;
-      g.uc.uc_sigmask.__bits[0] = ctx->sc_mask;
-      g.uc.uc_sigmask.__bits[1] = 0;
+      g.uc.uc_sigmask = ctx->sc_mask;
       g.uc.uc_mcontext.rdi = ctx->sc_rdi;
       g.uc.uc_mcontext.rsi = ctx->sc_rsi;
       g.uc.uc_mcontext.rdx = ctx->sc_rdx;
@@ -74,10 +78,11 @@ privileged void __sigenter_openbsd(int sig, struct siginfo_openbsd *openbsdinfo,
       g.uc.uc_mcontext.rip = ctx->sc_rip;
       g.uc.uc_mcontext.rsp = ctx->sc_rsp;
       if (ctx->sc_fpstate) {
-        *g.uc.uc_mcontext.fpregs = *ctx->sc_fpstate;
+        __repmovsb(g.uc.uc_mcontext.fpregs, ctx->sc_fpstate,
+                   sizeof(*ctx->sc_fpstate));
       }
-      ((sigaction_f)(_base + rva))(sig, &g.si, &g.uc);
-      ctx->sc_mask = g.uc.uc_sigmask.__bits[0];
+      ((sigaction_f)(__executable_start + rva))(sig, &g.si, &g.uc);
+      ctx->sc_mask = g.uc.uc_sigmask;
       ctx->sc_rdi = g.uc.uc_mcontext.rdi;
       ctx->sc_rsi = g.uc.uc_mcontext.rsi;
       ctx->sc_rdx = g.uc.uc_mcontext.rdx;
@@ -100,7 +105,8 @@ privileged void __sigenter_openbsd(int sig, struct siginfo_openbsd *openbsdinfo,
       ctx->sc_rip = g.uc.uc_mcontext.rip;
       ctx->sc_rsp = g.uc.uc_mcontext.rsp;
       if (ctx->sc_fpstate) {
-        *ctx->sc_fpstate = *g.uc.uc_mcontext.fpregs;
+        __repmovsb(ctx->sc_fpstate, g.uc.uc_mcontext.fpregs,
+                   sizeof(*ctx->sc_fpstate));
       }
     }
   }

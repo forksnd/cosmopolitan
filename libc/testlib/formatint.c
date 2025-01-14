@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2020 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -16,23 +16,49 @@
 │ TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR             │
 │ PERFORMANCE OF THIS SOFTWARE.                                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
-#include "libc/fmt/fmt.h"
-#include "libc/intrin/bits.h"
-#include "libc/macros.internal.h"
-#include "libc/mem/mem.h"
-#include "libc/testlib/testlib.h"
+#include "libc/atomic.h"
+#include "libc/ctype.h"
+#include "libc/fmt/itoa.h"
+#include "libc/fmt/magnumstrs.internal.h"
+#include "libc/intrin/atomic.h"
+#include "libc/str/str.h"
 
-static size_t sbufi_;
-static char sbufs_[2][256];
+#define STRS  4
+#define BYTES 128
 
-dontdiscard char *testlib_formatint(intptr_t x) {
-  char *str = sbufi_ < ARRAYLEN(sbufs_) ? sbufs_[sbufi_++] : malloc(256);
-  char *p = str;
-  p += sprintf(p, "%ld\t(or %#lx", x, x);
-  if (0 <= x && x < 256) {
-    p += sprintf(p, " or %#`c", (unsigned char)x);
+static atomic_uint bufi;
+static char bufs[STRS][BYTES];
+
+char *testlib_formatint(intptr_t x) {
+  int i = atomic_fetch_add(&bufi, 1) % STRS;
+  char *p = bufs[i];
+  p = FormatInt64(p, x);
+  p = stpcpy(p, " (or ");
+  p = FormatHex64(p, x, 1);
+  if (0 <= x && x <= 255) {
+    p = stpcpy(p, " or '");
+    if (!isascii(x) || iscntrl(x)) {
+      *p++ = '\\';
+      if (x > 7) {
+        if (x > 070) {
+          *p++ = '0' + ((x & 0700) >> 6);
+        }
+        *p++ = '0' + ((x & 070) >> 3);
+      }
+      *p++ = '0' + (x & 7);
+    } else if (x == '\\' || x == '\'') {
+      *p++ = '\\';
+      *p++ = x;
+    } else {
+      *p++ = x;
+    }
+    *p++ = '\'';
+  }
+  if (_strerrno(x)) {
+    p = stpcpy(p, " or ");
+    p = stpcpy(p, _strerrno(x));
   }
   *p++ = ')';
   *p++ = '\0';
-  return str;
+  return bufs[i];
 }

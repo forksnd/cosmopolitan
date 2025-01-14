@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2021 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -26,5 +26,6 @@ TEST(memrchr, test) {
 }
 
 BENCH(memrchr, bench) {
-  EZBENCH2("memrchr", donothing, EXPROPRIATE(memrchr("yo.hi.there", '.', 11)));
+  EZBENCH2("memrchr", donothing,
+           __expropriate(memrchr("yo.hi.there", '.', 11)));
 }

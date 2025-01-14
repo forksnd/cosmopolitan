@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2020 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -17,8 +17,6 @@
 │ PERFORMANCE OF THIS SOFTWARE.                                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
 #include "libc/calls/struct/sigset.h"
-#include "libc/macros.internal.h"
-#include "libc/str/str.h"
 
 /**
  * Determines if signal set is empty.
@@ -28,11 +26,5 @@
  * @vforksafe
  */
 int sigisemptyset(const sigset_t *set) {
-  int i;
-  for (i = 0; i < ARRAYLEN(set->__bits); ++i) {
-    if (set->__bits[i]) {
-      return 0;
-    }
-  }
-  return 1;
+  return *set == 0;
 }

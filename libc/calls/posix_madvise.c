@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2020 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -23,8 +23,11 @@
  * Advises kernel about memory intentions, the POSIX way.
  *
  * @return 0 on success, or errno on error
+ * @raise EINVAL if `advice` isn't valid or supported by system
+ * @raise EINVAL on Linux if addr/length isn't page size aligned with
+ *     respect to `getpagesize()`
+ * @raise ENOMEM on Linux if addr/length overlaps unmapped regions
  * @returnserrno
- * @threadsafe
  */
 errno_t posix_madvise(void *addr, uint64_t len, int advice) {
   int rc, e = errno;

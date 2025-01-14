@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2022 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -16,11 +16,11 @@
 │ TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR             │
 │ PERFORMANCE OF THIS SOFTWARE.                                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
-#include "libc/intrin/bits.h"
 #include "libc/intrin/bswap.h"
-#include "libc/macros.internal.h"
+#include "libc/macros.h"
+#include "libc/serialize.h"
 #include "libc/str/str.h"
-#include "libc/str/tab.internal.h"
+#include "libc/str/tab.h"
 #include "net/http/http.h"
 
 static const char kNoCompressExts[][8] = {
@@ -39,11 +39,11 @@ static const char kNoCompressExts[][8] = {
 };
 
 static bool BisectNoCompressExts(uint64_t ext) {
-  int c, m, l, r;
+  int m, l, r;
   l = 0;
   r = ARRAYLEN(kNoCompressExts) - 1;
   while (l <= r) {
-    m = (l + r) >> 1;
+    m = (l & r) + ((l ^ r) >> 1);  // floor((a+b)/2)
     if (READ64BE(kNoCompressExts[m]) < ext) {
       l = m + 1;
     } else if (READ64BE(kNoCompressExts[m]) > ext) {
@@ -58,12 +58,15 @@ static bool BisectNoCompressExts(uint64_t ext) {
 bool IsNoCompressExt(const char *p, size_t n) {
   int c, i;
   uint64_t w;
-  if (n == -1) n = p ? strlen(p) : 0;
+  if (n == -1)
+    n = p ? strlen(p) : 0;
   if (n) {
     for (i = w = 0; n--;) {
       c = p[n] & 255;
-      if (c == '.') break;
-      if (++i > 8) return false;
+      if (c == '.')
+        break;
+      if (++i > 8)
+        return false;
       w <<= 8;
       w |= kToLower[c];
     }

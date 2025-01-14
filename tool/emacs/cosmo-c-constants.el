@@ -31,8 +31,7 @@
     "__STDC_WANT_LIB_EXT1__"))
 
 (defconst cosmo-c-constants-limits
-  '("IMAGE_BASE_VIRTUAL"
-    "IMAGE_BASE_REAL"
+  '("IMAGE_BASE_REAL"
     "IMAGE_BASE_PHYSICAL"
     "CHAR_MAX"
     "SCHAR_MAX"
@@ -111,7 +110,6 @@
     "INFINITY"
     "M_E"
     "M_LOG2_10"
-    "M_LOG10_2"
     "M_LOG2E"
     "M_LOG10E"
     "M_LN2"
@@ -151,6 +149,7 @@
     "FLT_MIN_EXP"
     "HLF_MAX"
     "HLF_MIN"
+    "FLT_EVAL_METHOD"
     "LDBL_DECIMAL_DIG"
     "LDBL_DIG"
     "LDBL_EPSILON"

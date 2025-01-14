@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2020 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -16,17 +16,17 @@
 │ TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR             │
 │ PERFORMANCE OF THIS SOFTWARE.                                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
-#include "libc/intrin/bits.h"
 #include "libc/dce.h"
+#include "libc/mem/gc.h"
 #include "libc/mem/mem.h"
 #include "libc/nexgen32e/crc32.h"
 #include "libc/nexgen32e/x86feature.h"
-#include "libc/mem/gc.internal.h"
 #include "libc/stdio/stdio.h"
 #include "libc/str/str.h"
 #include "libc/testlib/ezbench.h"
 #include "libc/testlib/hyperion.h"
 #include "libc/testlib/testlib.h"
+#include "third_party/zlib/zlib.h"
 
 #define FANATICS "Fanatics"
 
@@ -70,18 +70,22 @@ static unsigned KMH(const void *p, unsigned long n) {
 
 BENCH(crc32c, bench) {
   for (int i = 1; i < 256; i *= 2) {
-    EZBENCH_N("crc32c", i, crc32c(0, kHyperion, i));
-    EZBENCH_N("crc32_z", i, crc32_z(0, kHyperion, i));
+    EZBENCH_N("crc32c", i, __expropriate(crc32c(0, kHyperion, i)));
+    EZBENCH_N("crc32_z", i, __expropriate(crc32_z(0, kHyperion, i)));
     EZBENCH_N("fnv_hash", i,
-              EXPROPRIATE(fnv_hash(VEIL("r", kHyperion), VEIL("r", i))));
-    EZBENCH_N("KMH", i, EXPROPRIATE(KMH(VEIL("r", kHyperion), VEIL("r", i))));
+              __expropriate(fnv_hash(__veil("r", kHyperion), __veil("r", i))));
+    EZBENCH_N("KMH", i,
+              __expropriate(KMH(__veil("r", kHyperion), __veil("r", i))));
     fprintf(stderr, "\n");
   }
-  EZBENCH_N("crc32c", kHyperionSize, crc32c(0, kHyperion, kHyperionSize));
-  EZBENCH_N("crc32_z", kHyperionSize, crc32_z(0, kHyperion, kHyperionSize));
+  EZBENCH_N("crc32c", kHyperionSize,
+            __expropriate(crc32c(0, kHyperion, kHyperionSize)));
+  EZBENCH_N("crc32_z", kHyperionSize,
+            __expropriate(crc32_z(0, kHyperion, kHyperionSize)));
+  EZBENCH_N("fnv_hash", kHyperionSize,
+            __expropriate(
+                fnv_hash(__veil("r", kHyperion), __veil("r", kHyperionSize))));
   EZBENCH_N(
-      "fnv_hash", kHyperionSize,
-      EXPROPRIATE(fnv_hash(VEIL("r", kHyperion), VEIL("r", kHyperionSize))));
-  EZBENCH_N("KMH", kHyperionSize,
-            EXPROPRIATE(KMH(VEIL("r", kHyperion), VEIL("r", kHyperionSize))));
+      "KMH", kHyperionSize,
+      __expropriate(KMH(__veil("r", kHyperion), __veil("r", kHyperionSize))));
 }

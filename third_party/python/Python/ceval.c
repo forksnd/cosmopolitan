@@ -1,10 +1,11 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:4;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=4 sts=4 sw=4 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=4 sts=4 sw=4 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Python 3                                                                     │
 │ https://docs.python.org/3/license.html                                       │
 ╚─────────────────────────────────────────────────────────────────────────────*/
 #define PY_LOCAL_AGGRESSIVE
+#include "third_party/python/Include/ceval.h"
 #include "libc/errno.h"
 #include "libc/intrin/likely.h"
 #include "libc/runtime/stack.h"
@@ -12,7 +13,6 @@
 #include "third_party/python/Include/boolobject.h"
 #include "third_party/python/Include/bytesobject.h"
 #include "third_party/python/Include/cellobject.h"
-#include "third_party/python/Include/ceval.h"
 #include "third_party/python/Include/classobject.h"
 #include "third_party/python/Include/code.h"
 #include "third_party/python/Include/descrobject.h"
@@ -35,8 +35,10 @@
 #include "third_party/python/Include/sysmodule.h"
 #include "third_party/python/Include/traceback.h"
 #include "third_party/python/Include/tupleobject.h"
+#include "libc/thread/thread.h"
+#include "libc/thread/thread.h"
+#include "libc/thread/thread.h"
 #include "third_party/python/Include/warnings.h"
-/* clang-format off */
 
 /* Execute compiled code */
 
@@ -655,10 +657,9 @@ int
 _Py_CheckRecursiveCall(const char *where)
 {
     PyThreadState *t;
-    const char *rsp, *bot;
-    rsp = __builtin_frame_address(0);
-    bot = (const char *)GetStackAddr() + 32768;
-    if (rsp > bot) {
+    uintptr_t bottom = GetStackBottom();
+    uintptr_t pointer = GetStackPointer();
+    if (pointer > bottom + 32768) {
         t = PyThreadState_GET();
         _Py_CheckRecursionLimit = recursion_limit;
         if (t->recursion_depth > recursion_limit && !t->recursion_critical) {
@@ -670,7 +671,7 @@ _Py_CheckRecursiveCall(const char *where)
             return -1;
         }
         return 0;
-    } else if (rsp > bot - 20480) {
+    } else if (pointer > bottom + 12288) {
         PyErr_Format(PyExc_MemoryError, "Stack overflow%s", where);
         return -1;
     } else {
@@ -3623,7 +3624,7 @@ _PyEval_EvalFrameDefault(PyFrameObject *f, int throwflag)
 
         /* This should never be reached. Every opcode should end with DISPATCH()
            or goto error. */
-        unreachable;
+        __builtin_unreachable();
 
 error:
         COLD_LABEL;
@@ -5353,6 +5354,9 @@ dtrace_function_entry(PyFrameObject *f)
     char* filename;
     char* funcname;
     int lineno;
+    (void)filename;
+    (void)funcname;
+    (void)lineno;
     filename = PyUnicode_AsUTF8(f->f_code->co_filename);
     funcname = PyUnicode_AsUTF8(f->f_code->co_name);
     lineno = PyCode_Addr2Line(f->f_code, f->f_lasti);
@@ -5365,6 +5369,9 @@ dtrace_function_return(PyFrameObject *f)
     char* filename;
     char* funcname;
     int lineno;
+    (void)filename;
+    (void)funcname;
+    (void)lineno;
     filename = PyUnicode_AsUTF8(f->f_code->co_filename);
     funcname = PyUnicode_AsUTF8(f->f_code->co_name);
     lineno = PyCode_Addr2Line(f->f_code, f->f_lasti);

@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2022 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -18,9 +18,8 @@
 ╚─────────────────────────────────────────────────────────────────────────────*/
 #include "libc/calls/calls.h"
 #include "libc/errno.h"
-#include "libc/intrin/bits.h"
 #include "libc/intrin/kprintf.h"
-#include "libc/macros.internal.h"
+#include "libc/macros.h"
 #include "libc/runtime/runtime.h"
 #include "libc/testlib/testlib.h"
 #include "libc/thread/thread.h"
@@ -31,7 +30,7 @@
 struct SharedMemory {
   pthread_mutex_t mutex;
   volatile long x;
-} * shm;
+}* shm;
 
 void Worker(void) {
   long t;
@@ -48,12 +47,12 @@ TEST(lockipc, mutex) {
   int e, rc, ws, pid;
 
   // create shared memory
-  shm = _mapshared(FRAMESIZE);
+  shm = _mapshared(getpagesize());
 
   // create shared mutex
   pthread_mutexattr_t mattr;
   pthread_mutexattr_init(&mattr);
-  pthread_mutexattr_settype(&mattr, PTHREAD_MUTEX_NORMAL);
+  pthread_mutexattr_settype(&mattr, PTHREAD_MUTEX_DEFAULT);
   pthread_mutexattr_setpshared(&mattr, PTHREAD_PROCESS_SHARED);
   pthread_mutex_init(&shm->mutex, &mattr);
   pthread_mutexattr_destroy(&mattr);
@@ -70,7 +69,7 @@ TEST(lockipc, mutex) {
   // wait for processes to finish
   for (;;) {
     e = errno;
-    if ((pid = waitpid(0, &ws, 0)) != -1) {
+    if ((pid = waitpid(-1, &ws, 0)) != -1) {
       if (WIFSIGNALED(ws)) {
         kprintf("process %d terminated with %G\n", pid, WTERMSIG(ws));
         testlib_incrementfailed();
@@ -87,5 +86,5 @@ TEST(lockipc, mutex) {
 
   EXPECT_EQ(PROCESSES * ITERATIONS, shm->x);
   ASSERT_EQ(0, pthread_mutex_destroy(&shm->mutex));
-  ASSERT_SYS(0, 0, munmap(shm, FRAMESIZE));
+  ASSERT_SYS(0, 0, munmap(shm, getpagesize()));
 }

@@ -1,6 +1,6 @@
 #ifndef COSMOPOLITAN_LIBC_LCG_H_
 #define COSMOPOLITAN_LIBC_LCG_H_
-#if !(__ASSEMBLER__ + __LINKER__ + 0)
+#ifdef _COSMO_SOURCE
 
 forceinline uint64_t KnuthLinearCongruentialGenerator(uint64_t prev[1]) {
   /* Knuth, D.E., "The Art of Computer Programming," Vol 2,
@@ -10,5 +10,5 @@ forceinline uint64_t KnuthLinearCongruentialGenerator(uint64_t prev[1]) {
   return prev[0]; /* be sure to shift! */
 }
 
-#endif /* !(__ASSEMBLER__ + __LINKER__ + 0) */
+#endif /* _COSMO_SOURCE */
 #endif /* COSMOPOLITAN_LIBC_LCG_H_ */

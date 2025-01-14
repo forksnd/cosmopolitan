@@ -1,15 +1,16 @@
-#include "libc/macros.internal.h"
+#include "libc/macros.h"
 .text.unlikely
 
+	.ftrace1
 enotsup:
+	.ftrace2
 #ifdef __x86_64__
 	.leafprologue
-	.profilable
 	mov	ENOTSUP(%rip),%ecx
 	jmp	__errfun
 #elif defined(__aarch64__)
 	adrp	x1,ENOTSUP
-	ldr	w0,[x1,#:lo12:ENOTSUP]
+	ldrsw	x0,[x1,#:lo12:ENOTSUP]
 	b	__errfun
 #else
 #error "unsupported architecture"

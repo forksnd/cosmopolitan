@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2022 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -278,7 +278,7 @@ void statfs2cosmo(struct statfs *f, const union statfs_meta *m) {
     f_files = m->netbsd.f_files;
     f_ffree = m->netbsd.f_ffree;
     f_fsid = m->netbsd.f_fsid;
-    f_namelen = f->f_namelen;
+    f_namelen = 511;
     f_frsize = m->netbsd.f_bsize;
     f_flags = m->netbsd.f_flags;
     f_owner = m->netbsd.f_owner;
@@ -299,5 +299,6 @@ void statfs2cosmo(struct statfs *f, const union statfs_meta *m) {
   f->f_namelen = f_namelen;
   f->f_frsize = f_frsize;
   f->f_flags = f_flags;
+  f->f_owner = f_owner;
   memcpy(f->f_fstypename, f_fstypename, 16);
 }

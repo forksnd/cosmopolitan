@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2022 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -17,7 +17,7 @@
 │ PERFORMANCE OF THIS SOFTWARE.                                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
 #include "libc/calls/syscall_support-nt.internal.h"
-#include "libc/intrin/strace.internal.h"
+#include "libc/intrin/strace.h"
 #include "libc/nt/memory.h"
 
 __msabi extern typeof(FlushViewOfFile) *const __imp_FlushViewOfFile;
@@ -36,7 +36,8 @@ textwindows bool32 FlushViewOfFile(const void *lpBaseAddress,
                                    size_t dwNumberOfBytesToFlush) {
   bool32 ok;
   ok = __imp_FlushViewOfFile(lpBaseAddress, dwNumberOfBytesToFlush);
-  if (!ok) __winerr();
+  if (!ok)
+    __winerr();
   NTTRACE("FlushViewOfFile(%p, %'zu) → %hhhd% m", lpBaseAddress,
           dwNumberOfBytesToFlush, ok);
   return ok;

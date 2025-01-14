@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2022 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -25,15 +25,18 @@ int PrintChar(int fd, int s) {
   unsigned c;
   int d, e, i, n;
   c = s & 0xffffffff;
-  if (bp[fd] + 6 > sizeof(g_buffer[fd])) Flush(fd);
+  if (bp[fd] + 6 > sizeof(g_buffer[fd]))
+    Flush(fd);
   if (c < 0200) {
     g_buffer[fd][bp[fd]++] = c;
-    if (c == L'\n') Flush(fd);
+    if (c == L'\n')
+      Flush(fd);
   } else {
     d = c;
-    e = kTpEnc[_bsrl(d) - 7];
+    e = kTpEnc[bsrl(d) - 7];
     i = n = e & 255;
-    do g_buffer[fd][bp[fd] + i--] = 0200 | (d & 077);
+    do
+      g_buffer[fd][bp[fd] + i--] = 0200 | (d & 077);
     while (d >>= 6, i);
     g_buffer[fd][bp[fd]] = d | e >> 8;
     bp[fd] += n + 1;

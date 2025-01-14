@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2021 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -30,26 +30,32 @@
  */
 int IsDelegate(int x_) {
   dword w_;
-  if (x_ >= 0) return 0;
+  if (x_ >= 0)
+    return 0;
   w_ = Get(x_);  // (λ V (F . V) . Q)
   int ax_ = LO(w_);
   int dx_ = HI(w_);
-  if (ax_ != kLambda) return 0;
-  if (dx_ >= 0) return 0;
+  if (ax_ != kLambda)
+    return 0;
+  if (dx_ >= 0)
+    return 0;
   w_ = Get(dx_);  // (V (F . V) . Q)
   int adx_ = LO(w_);
   int ddx_ = HI(w_);
   int V = adx_;
-  if (V <= 0) return 0;
-  if (ddx_ >= 0) return 0;
+  if (V <= 0)
+    return 0;
+  if (ddx_ >= 0)
+    return 0;
   w_ = Get(ddx_);  // ((F . V) . Q)
   int addx_ = LO(w_);
-  int dddx_ = HI(w_);
-  if (addx_ >= 0) return 0;
+  if (addx_ >= 0)
+    return 0;
   w_ = Get(addx_);  // (F . V)
   int aaddx_ = LO(w_);
   int daddx_ = HI(w_);
   int F = aaddx_;
-  if (daddx_ != V) return 0;
+  if (daddx_ != V)
+    return 0;
   return F;
 }

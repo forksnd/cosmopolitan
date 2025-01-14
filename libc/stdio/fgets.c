@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2020 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -16,7 +16,6 @@
 │ TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR             │
 │ PERFORMANCE OF THIS SOFTWARE.                                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
-#include "libc/stdio/lock.internal.h"
 #include "libc/stdio/stdio.h"
 
 /**
@@ -24,7 +23,10 @@
  *
  * This function is similar to getline() except it'll truncate lines
  * exceeding size. The line ending marker is included and may be removed
- * using _chomp().
+ * using chomp().
+ *
+ * When reading from the console on Windows in `ICANON` mode, the
+ * returned line will end with `\r\n` rather than `\n`.
  *
  * @param s is output buffer
  * @param size is capacity of s
@@ -32,7 +34,6 @@
  * @return s on success, NULL on error, or NULL if EOF happens when
  *     zero characters have been read
  * @see fgets_unlocked()
- * @threadsafe
  */
 char *fgets(char *s, int size, FILE *f) {
   char *res;

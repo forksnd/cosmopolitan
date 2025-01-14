@@ -2921,7 +2921,7 @@ Invalid file name:
     >>> print(normalize(err))                    # doctest: +ELLIPSIS
     Traceback (most recent call last):
       ...
-    FileNotFoundError: [Errno 2] ENOENT...
+    FileNotFoundError: [Errno 2] No such file or directory...
 
 Invalid doctest option:
 
@@ -2962,7 +2962,7 @@ if __name__ == '__main__':
     else:
         test_main()
 
-if __name__ == "PYOBJ.COM":
+if __name__ == "PYOBJ":
     import test.sample_doctest
     import test.sample_doctest_no_docstrings
     import test.sample_doctest_no_doctests

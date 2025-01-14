@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:4;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=4 sts=4 sw=4 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=4 sts=4 sw=4 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2021 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -19,8 +19,8 @@
 #include "libc/assert.h"
 #include "libc/calls/calls.h"
 #include "libc/errno.h"
-#include "libc/macros.internal.h"
-#include "libc/mem/gc.internal.h"
+#include "libc/macros.h"
+#include "libc/mem/gc.h"
 #include "libc/str/str.h"
 #include "net/https/https.h"
 #include "third_party/mbedtls/ctr_drbg.h"
@@ -37,7 +37,6 @@
 #include "third_party/python/Include/pymacro.h"
 #include "third_party/python/Include/structmember.h"
 #include "third_party/python/Include/yoink.h"
-/* clang-format off */
 
 /**
  * @fileoverview Enough TLS support for HttpsClient so far.
@@ -285,7 +284,6 @@ tls_recv_into(struct Tls *self, PyObject *args)
 {
     LOG("TLS.recv_into\n");
     int rc;
-    Py_ssize_t n;
     PyObject *res;
     Py_buffer buf;
     if (!PyArg_ParseTuple(args, "w*:recv_into", &buf)) return 0;
@@ -458,7 +456,7 @@ Creates TLS client.");
 static PyObject *
 newclient(PyObject *self, PyObject *args)
 {
-    int rc, fd;
+    int fd;
     PyObject *todo;
     struct Tls *tls;
     const char *host;
@@ -483,7 +481,7 @@ static struct PyModuleDef mbedtls_module = {
 PyMODINIT_FUNC
 PyInit_tls(void)
 {
-    PyObject *m, *mbedtls_md_meth_names;
+    PyObject *m;
     Py_TYPE(&tls_type) = &PyType_Type;
     if (PyType_Ready(&tls_type) < 0) return 0;
     if (!(m = PyModule_Create(&mbedtls_module))) return 0;
@@ -495,7 +493,12 @@ PyInit_tls(void)
     return m;
 }
 
-_Section(".rodata.pytab.1") const struct _inittab _PyImport_Inittab_tls = {
+#ifdef __aarch64__
+_Section(".rodata.pytab.1 //")
+#else
+_Section(".rodata.pytab.1")
+#endif
+ const struct _inittab _PyImport_Inittab_tls = {
     "tls",
     PyInit_tls,
 };

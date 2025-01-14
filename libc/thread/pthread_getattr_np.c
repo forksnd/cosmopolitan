@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2022 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -16,7 +16,6 @@
 │ TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR             │
 │ PERFORMANCE OF THIS SOFTWARE.                                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
-#include "libc/intrin/atomic.h"
 #include "libc/str/str.h"
 #include "libc/thread/posixthread.internal.h"
 #include "libc/thread/thread.h"
@@ -37,7 +36,7 @@
  *    thread. This is useful for knowing where the stack is. It can also
  *    be useful If you explicitly configured a stack too, since we might
  *    have needed to slightly tune the address and size to meet platform
- *    requirements. This function returns information that reflects that
+ *    requirements.
  *
  * 3. You can view changes pthread_create() may have made to the stack
  *    guard size by calling pthread_attr_getguardsize() on `attr`
@@ -49,8 +48,8 @@
  */
 errno_t pthread_getattr_np(pthread_t thread, pthread_attr_t *attr) {
   struct PosixThread *pt = (struct PosixThread *)thread;
-  memcpy(attr, &pt->attr, sizeof(pt->attr));
-  switch (atomic_load_explicit(&pt->status, memory_order_relaxed)) {
+  memcpy(attr, &pt->pt_attr, sizeof(pt->pt_attr));
+  switch (atomic_load_explicit(&pt->pt_status, memory_order_relaxed)) {
     case kPosixThreadJoinable:
     case kPosixThreadTerminated:
       attr->__detachstate = PTHREAD_CREATE_JOINABLE;
@@ -60,7 +59,7 @@ errno_t pthread_getattr_np(pthread_t thread, pthread_attr_t *attr) {
       attr->__detachstate = PTHREAD_CREATE_DETACHED;
       break;
     default:
-      unreachable;
+      __builtin_unreachable();
   }
   return 0;
 }

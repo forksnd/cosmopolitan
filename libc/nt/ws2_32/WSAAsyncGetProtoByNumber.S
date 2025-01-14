@@ -1,12 +1,13 @@
 #include "libc/nt/codegen.h"
-.imp	ws2_32,__imp_WSAAsyncGetProtoByNumber,WSAAsyncGetProtoByNumber,104
+.imp	ws2_32,__imp_WSAAsyncGetProtoByNumber,WSAAsyncGetProtoByNumber
 
 	.text.windows
+	.ftrace1
 WSAAsyncGetProtoByNumber:
+	.ftrace2
 #ifdef __x86_64__
 	push	%rbp
 	mov	%rsp,%rbp
-	.profilable
 	mov	__imp_WSAAsyncGetProtoByNumber(%rip),%rax
 	jmp	__sysv2nt6
 #elif defined(__aarch64__)

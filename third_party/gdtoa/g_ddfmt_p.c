@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:t;c-basic-offset:8;tab-width:8;coding:utf-8   -*-│
-│vi: set et ft=c ts=8 tw=8 fenc=utf-8                                       :vi│
+│ vi: set noet ft=c ts=8 sw=8 fenc=utf-8                                   :vi │
 ╚──────────────────────────────────────────────────────────────────────────────╝
 │                                                                              │
 │  The author of this software is David M. Gay.                                │
@@ -32,7 +32,6 @@
 #include "libc/runtime/fenv.h"
 #include "libc/str/str.h"
 #include "third_party/gdtoa/gdtoa.internal.h"
-/* clang-format off */
 
 extern ULong __gdtoa_NanDflt_d[2];
 

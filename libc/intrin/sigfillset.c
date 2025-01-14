@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2020 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -17,30 +17,25 @@
 │ PERFORMANCE OF THIS SOFTWARE.                                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
 #include "libc/calls/struct/sigset.h"
-#include "libc/str/str.h"
-#include "libc/sysv/consts/limits.h"
+#include "libc/dce.h"
 #include "libc/sysv/consts/sig.h"
 
 /**
- * Adds all signals to set.
+ * Fills up signal set.
  *
  * @return 0 on success, or -1 w/ errno
  * @asyncsignalsafe
  * @vforksafe
  */
 int sigfillset(sigset_t *set) {
-  memset(set->__bits, -1, sizeof(set->__bits));
-#define M(x) set->__bits[(x - 1) >> 6] &= ~(1ull << ((x - 1) & 63));
-#include "libc/intrin/sigisprecious.inc"
-  switch (_NSIG) {
-    case 32:
-      set->__bits[0] &= 0xffffffff;
-      break;
-    case 64:
-      set->__bits[1] = 0;
-      break;
-    default:
-      break;
-  }
+  *set = -1;
+  *set &= ~(1ull << (SIGTHR - 1));   // only libc should mask
+  *set &= ~(1ull << (SIGABRT - 1));  // it's annoying to mask
+  *set &= ~(1ull << (SIGKILL - 1));  // it's impossible to mask
+  *set &= ~(1ull << (SIGSTOP - 1));  // it's impossible to mask
+  if (IsOpenbsd())
+    *set &= 0xffffffff;  // it doesn't really exist
+  if (IsXnu())
+    *set &= 0xffffffff;  // it doesn't really exist
   return 0;
 }

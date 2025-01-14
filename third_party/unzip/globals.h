@@ -1,4 +1,3 @@
-// clang-format off
 /*
   Copyright (c) 1990-2010 Info-ZIP.  All rights reserved.
 
@@ -151,10 +150,6 @@
 #ifdef USE_BZIP2
 #include "third_party/bzip2/bzlib.h"
 #endif
-
-#if defined( UNIX) && defined( __APPLE__)
-#include "third_party/unzip/unix/macosx.h"
-#endif /* defined( UNIX) && defined( __APPLE__) */
 
 
 /*************/

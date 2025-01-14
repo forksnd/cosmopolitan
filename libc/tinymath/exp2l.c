@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:t;c-basic-offset:8;tab-width:8;coding:utf-8   -*-│
-│vi: set et ft=c ts=8 tw=8 fenc=utf-8                                       :vi│
+│ vi: set noet ft=c ts=8 sw=8 fenc=utf-8                                   :vi │
 ╚──────────────────────────────────────────────────────────────────────────────╝
 │                                                                              │
 │  Musl Libc                                                                   │
@@ -29,14 +29,10 @@
 #include "libc/tinymath/internal.h"
 #include "libc/tinymath/ldshape.internal.h"
 
-asm(".ident\t\"\\n\\n\
-FreeBSD libm (BSD-2 License)\\n\
-Copyright (c) 2005-2011, Bruce D. Evans, Steven G. Kargl, David Schultz.\"");
-asm(".ident\t\"\\n\\n\
-Musl libc (MIT License)\\n\
-Copyright 2005-2014 Rich Felker, et. al.\"");
-asm(".include \"libc/disclaimer.inc\"");
-// clang-format off
+__static_yoink("musl_libc_notice");
+__static_yoink("freebsd_libm_notice");
+
+#if LDBL_MANT_DIG == 64 && LDBL_MAX_EXP == 16384
 
 /* origin: FreeBSD /usr/src/lib/msun/ld80/s_exp2l.c and /usr/src/lib/msun/ld128/s_exp2l.c */
 /*-
@@ -65,12 +61,6 @@ asm(".include \"libc/disclaimer.inc\"");
  * SUCH DAMAGE.
  */
 
-#if LDBL_MANT_DIG == 53 && LDBL_MAX_EXP == 1024
-long double exp2l(long double x)
-{
-	return exp2(x);
-}
-#elif LDBL_MANT_DIG == 64 && LDBL_MAX_EXP == 16384
 #define TBLBITS 7
 #define TBLSIZE (1 << TBLBITS)
 
@@ -235,6 +225,10 @@ static const double tbl[TBLSIZE * 2] = {
  *   The table entries each have 104 bits of accuracy, encoded as
  *   a pair of double precision values.
  */
+
+/**
+ * Returns 2^𝑥.
+ */
 long double exp2l(long double x)
 {
 	union ldshape u = {x};
@@ -289,6 +283,7 @@ long double exp2l(long double x)
 
 	return scalbnl(r, k.i);
 }
+
 #elif LDBL_MANT_DIG == 113 && LDBL_MAX_EXP == 16384
 #define TBLBITS 7
 #define TBLSIZE (1 << TBLBITS)
@@ -600,6 +595,10 @@ static const float eps[TBLSIZE] = {
  *	Gal, S. and Bachelis, B.  An Accurate Elementary Mathematical Library
  *	for the IEEE Floating Point Standard.  TOMS 17(1), 26-46 (1991).
  */
+
+/**
+ * Returns 2^𝑥.
+ */
 long double
 exp2l(long double x)
 {
@@ -654,6 +653,5 @@ exp2l(long double x)
 
 	return scalbnl(r, k.i);
 }
-#else
-#error "architecture unsupported"
+
 #endif

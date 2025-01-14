@@ -30,7 +30,6 @@
 #define kNtFileSkipCompletionPortOnSuccess 1
 #define kNtFileSkipSetEventOnHandle        2
 
-#if !(__ASSEMBLER__ + __LINKER__ + 0)
 COSMOPOLITAN_C_START_
 
 typedef void (*NtOverlappedCompletionRoutine)(
@@ -39,13 +38,13 @@ typedef void (*NtOverlappedCompletionRoutine)(
 
 int64_t CreateIoCompletionPort(int64_t FileHandleOrNeg1,
                                int64_t opt_ExistingCompletionPortOrZero,
-                               void *StatePointer,
+                               uint64_t CompletionKey,
                                uint32_t NumberOfConcurrentThreads);
 
 bool32 GetQueuedCompletionStatus(int64_t CompletionPort,
                                  uint32_t *lpNumberOfBytesTransferred,
-                                 void *StatePointerPointer,
-                                 struct NtOverlapped **lpOverlapped,
+                                 uint64_t *out_lpCompletionKey,
+                                 struct NtOverlapped **out_lpOverlapped,
                                  uint32_t dwMilliseconds);
 
 bool32 GetQueuedCompletionStatusEx(
@@ -56,7 +55,7 @@ bool32 GetQueuedCompletionStatusEx(
 
 bool32 PostQueuedCompletionStatus(int64_t CompletionPort,
                                   uint32_t dwNumberOfBytesTransferred,
-                                  uint32_t *dwCompletionKey,
+                                  uint64_t dwCompletionKey,
                                   struct NtOverlapped *opt_lpOverlapped);
 
 bool32 SetFileCompletionNotificationModes(int64_t FileHandle,
@@ -73,5 +72,4 @@ bool32 WriteFileEx(int64_t hFile, const void *lpBuffer,
                    NtOverlappedCompletionRoutine lpCompletionRoutine);
 
 COSMOPOLITAN_C_END_
-#endif /* !(__ASSEMBLER__ + __LINKER__ + 0) */
 #endif /* COSMOPOLITAN_LIBC_NT_IOCP_H_ */

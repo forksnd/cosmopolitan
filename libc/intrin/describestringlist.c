@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2022 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -17,31 +17,24 @@
 │ PERFORMANCE OF THIS SOFTWARE.                                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
 #include "libc/dce.h"
-#include "libc/intrin/asan.internal.h"
-#include "libc/intrin/describeflags.internal.h"
+#include "libc/intrin/describeflags.h"
 #include "libc/intrin/kprintf.h"
-
-#ifdef DescribeStringList
-#undef DescribeStringList
-#endif
 
 #define N 300
 
 #define append(...) o += ksnprintf(buf + o, N - o, __VA_ARGS__)
 
-const char *DescribeStringList(char buf[N], char *const list[]) {
+const char *_DescribeStringList(char buf[N], char *const list[]) {
   int i, o = 0;
 
-  if (!list) return "NULL";
-  if (IsAsan() && !__asan_is_valid_strlist(list)) {
-    ksnprintf(buf, N, "%p", list);
-    return buf;
-  }
+  if (!list)
+    return "NULL";
 
   append("{");
   i = 0;
   do {
-    if (i++) append(", ");
+    if (i++)
+      append(", ");
     append("%#s", *list);
   } while (*list++);
   append("}");

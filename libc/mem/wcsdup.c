@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2020 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -21,10 +21,9 @@
 
 /**
  * Allocates copy of wide string.
- * @threadsafe
  */
 wchar_t *wcsdup(const wchar_t *s) {
   size_t len = wcslen(s);
-  char *s2 = malloc((len + 1) * sizeof(wchar_t));
-  return s2 ? memcpy(s2, s, (len + 1) * sizeof(wchar_t)) : NULL;
+  wchar_t *s2 = malloc((len + 1) * sizeof(wchar_t));
+  return s2 ? wmemcpy(s2, s, len + 1) : NULL;
 }

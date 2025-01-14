@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2022 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -17,8 +17,8 @@
 │ PERFORMANCE OF THIS SOFTWARE.                                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
 #include "libc/calls/syscall_support-nt.internal.h"
-#include "libc/intrin/describeflags.internal.h"
-#include "libc/intrin/strace.internal.h"
+#include "libc/intrin/describeflags.h"
+#include "libc/intrin/strace.h"
 #include "libc/nt/errors.h"
 #include "libc/nt/files.h"
 #include "libc/nt/memory.h"
@@ -46,7 +46,8 @@ textwindows bool32 FindNextFile(int64_t hFindFile,
             DescribeNtFileFlagAttr(out_lpFindFileData->dwFileAttributes),
             DescribeNtFiletypeFlags(out_lpFindFileData->dwFileType), ok);
   } else {
-    if (GetLastError() != kNtErrorNoMoreFiles) __winerr();
+    if (GetLastError() != kNtErrorNoMoreFiles)
+      __winerr();
     NTTRACE("FindNextFile(%ld) → %hhhd% m", hFindFile, ok);
   }
   return ok;

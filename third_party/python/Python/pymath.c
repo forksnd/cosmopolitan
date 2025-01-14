@@ -1,11 +1,10 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:4;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=4 sts=4 sw=4 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=4 sts=4 sw=4 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Python 3                                                                     │
 │ https://docs.python.org/3/license.html                                       │
 ╚─────────────────────────────────────────────────────────────────────────────*/
 #include "third_party/python/pyconfig.h"
-/* clang-format off */
 
 #ifdef X87_DOUBLE_ROUNDING
 /* On x86 platforms using an x87 FPU, this function is called from the
@@ -34,6 +33,4 @@ unsigned short _Py_get_387controlword(void) {
 void _Py_set_387controlword(unsigned short cw) {
     __asm__ __volatile__ ("fldcw %0" : : "m" (cw));
 }
-#else
-#error wut
 #endif

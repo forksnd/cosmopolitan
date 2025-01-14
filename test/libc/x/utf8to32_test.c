@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2021 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -16,9 +16,8 @@
 │ TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR             │
 │ PERFORMANCE OF THIS SOFTWARE.                                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
+#include "libc/mem/gc.h"
 #include "libc/mem/mem.h"
-#include "libc/mem/shuffle.internal.h"
-#include "libc/mem/gc.internal.h"
 #include "libc/stdio/rand.h"
 #include "libc/testlib/ezbench.h"
 #include "libc/testlib/hyperion.h"
@@ -82,13 +81,23 @@ TEST(utf32to8, testLargeThompsonPikeEncoded) {
           -1, 0)));
 }
 
+void shuffle(wchar_t *a, int n) {
+  for (int i = n - 1; i >= 1; --i) {
+    int r = rand() % (i + 1);
+    wchar_t t = a[r];
+    a[r] = a[i];
+    a[i] = t;
+  }
+}
+
 char *GenerateBranchyUtf8Text(size_t *out_n) {
   char *p;
   size_t n;
   wchar_t *q = gc(utf8to32(kViewables, kViewablesSize, &n));
-  shuffle(lemur64, q, n);
+  shuffle(q, n);
   p = utf32to8(q, n, &n);
-  if (out_n) *out_n = n;
+  if (out_n)
+    *out_n = n;
   return p;
 }
 

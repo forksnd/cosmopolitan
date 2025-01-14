@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2022 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -17,11 +17,12 @@
 │ PERFORMANCE OF THIS SOFTWARE.                                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
 #include "libc/calls/calls.h"
-#include "libc/mem/copyfd.internal.h"
+#include "libc/runtime/runtime.h"
+#include "libc/stdio/stdio.h"
 #include "libc/sysv/consts/o.h"
 #include "libc/testlib/testlib.h"
 
-STATIC_YOINK("zip_uri_support");
+__static_yoink("zipos");
 
 /**
  * Extracts zip asset to filesystem.
@@ -32,9 +33,24 @@ STATIC_YOINK("zip_uri_support");
  */
 void testlib_extract(const char *zip, const char *to, int mode) {
   int fdin, fdout;
-  ASSERT_NE(-1, (fdin = open(zip, O_RDONLY)));
-  ASSERT_NE(-1, (fdout = creat(to, mode)));
-  ASSERT_NE(-1, _copyfd(fdin, fdout, -1));
-  ASSERT_NE(-1, close(fdout));
-  ASSERT_NE(-1, close(fdin));
+  if ((fdin = open(zip, O_RDONLY)) == -1) {
+    perror(zip);
+    exit(1);
+  }
+  if ((fdout = creat(to, mode)) == -1) {
+    perror(to);
+    exit(1);
+  }
+  if (copyfd(fdin, fdout, -1) == -1) {
+    perror(zip);
+    exit(1);
+  }
+  if (close(fdout)) {
+    perror(to);
+    exit(1);
+  }
+  if (close(fdin)) {
+    perror(zip);
+    exit(1);
+  }
 }

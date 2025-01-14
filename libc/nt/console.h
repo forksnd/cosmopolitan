@@ -37,7 +37,6 @@
 
 #define kNtAttachParentProcess -1u
 
-#if !(__ASSEMBLER__ + __LINKER__ + 0)
 COSMOPOLITAN_C_START_
 
 bool32 WriteConsoleOutput(int64_t hConsoleOutput,
@@ -49,8 +48,8 @@ bool32 ReadConsoleInput(int64_t hConsoleInput, struct NtInputRecord *lpBuffer,
                         uint32_t nLength, uint32_t *lpNumberOfEventsRead);
 bool32 PeekConsoleInput(int64_t hConsoleInput, struct NtInputRecord *lpBuffer,
                         uint32_t nLength, uint32_t *lpNumberOfEventsRead);
-bool32 GetNumberOfConsoleInputEvent(int64_t hConsoleInput,
-                                    uint32_t *lpNumberOfEvents);
+bool32 GetNumberOfConsoleInputEvents(int64_t hConsoleInput,
+                                     uint32_t *lpNumberOfEvents);
 bool32 ReadConsoleOutput(int64_t hConsoleOutput, struct NtCharInfo *lpBuffer,
                          struct NtCoord dwBufferSize,
                          struct NtCoord dwBufferCoord,
@@ -107,9 +106,13 @@ bool32 SetConsoleCursorInfo(
     int64_t hConsoleOutput,
     const struct NtConsoleCursorInfo *lpConsoleCursorInfo);
 
+long CreatePseudoConsole(struct NtCoord size, int64_t hInput, int64_t hOutput,
+                         uint32_t dwFlags, int64_t *out_phPC);
+long ResizePseudoConsole(int64_t hPC, struct NtCoord size);
+void ClosePseudoConsole(int64_t hPC);
+
 #if ShouldUseMsabiAttribute()
 #include "libc/nt/thunk/console.inc"
 #endif /* ShouldUseMsabiAttribute() */
 COSMOPOLITAN_C_END_
-#endif /* !(__ASSEMBLER__ + __LINKER__ + 0) */
 #endif /* COSMOPOLITAN_LIBC_NT_CONSOLE_H_ */

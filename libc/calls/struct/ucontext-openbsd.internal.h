@@ -1,7 +1,6 @@
 #ifndef COSMOPOLITAN_LIBC_CALLS_STRUCT_UCONTEXT_OPENBSD_INTERNAL_H_
 #define COSMOPOLITAN_LIBC_CALLS_STRUCT_UCONTEXT_OPENBSD_INTERNAL_H_
 #include "libc/calls/ucontext.h"
-#if !(__ASSEMBLER__ + __LINKER__ + 0)
 COSMOPOLITAN_C_START_
 
 struct ucontext_openbsd {
@@ -33,10 +32,9 @@ struct ucontext_openbsd {
   int64_t sc_ss;
   struct FpuState *sc_fpstate;
   int32_t __sc_unused;
-  int32_t sc_mask;
+  uint32_t sc_mask;
   int64_t sc_cookie;
 };
 
 COSMOPOLITAN_C_END_
-#endif /* !(__ASSEMBLER__ + __LINKER__ + 0) */
 #endif /* COSMOPOLITAN_LIBC_CALLS_STRUCT_UCONTEXT_OPENBSD_INTERNAL_H_ */

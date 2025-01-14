@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2022 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -17,13 +17,14 @@
 │ PERFORMANCE OF THIS SOFTWARE.                                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
 #include "libc/limits.h"
+#include "libc/stdckdint.h"
 #include "tool/plinko/lib/histo.h"
 
 long GetLongSum(const long *h, size_t n) {
   long t;
   size_t i;
   for (t = i = 0; i < n; ++i) {
-    if (__builtin_add_overflow(t, h[i], &t)) {
+    if (ckd_add(&t, t, h[i])) {
       t = LONG_MAX;
       break;
     }

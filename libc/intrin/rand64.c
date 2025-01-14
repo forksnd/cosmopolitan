@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=8 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=8 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2020 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -16,20 +16,31 @@
 │ TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR             │
 │ PERFORMANCE OF THIS SOFTWARE.                                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
-#include "libc/intrin/_getauxval.internal.h"
+#include "libc/intrin/getauxval.h"
 #include "libc/nexgen32e/rdtsc.h"
 #include "libc/runtime/internal.h"
 #include "libc/runtime/runtime.h"
 #include "libc/str/str.h"
 #include "libc/sysv/consts/auxv.h"
+#include "libc/thread/posixthread.internal.h"
 #include "libc/thread/thread.h"
 #include "libc/thread/tls.h"
 
-static struct {
-  int thepid;
-  uint128_t thepool;
-  pthread_spinlock_t lock;
-} g_rand64;
+static int _rand64_pid;
+static unsigned __int128 _rand64_pool;
+static pthread_mutex_t __rand64_lock_obj = PTHREAD_MUTEX_INITIALIZER;
+
+void __rand64_lock(void) {
+  _pthread_mutex_lock(&__rand64_lock_obj);
+}
+
+void __rand64_unlock(void) {
+  _pthread_mutex_unlock(&__rand64_lock_obj);
+}
+
+void __rand64_wipe(void) {
+  _pthread_mutex_wipe_np(&__rand64_lock_obj);
+}
 
 /**
  * Returns nondeterministic random data.
@@ -39,22 +50,17 @@ static struct {
  * the case even across forks and threads, whose sequences will differ.
  *
  * @see rdseed(), rdrand(), rand(), random(), rngset()
- * @note this function takes 5 cycles (30 if `__threaded`)
- * @note this function is not intended for cryptography
  * @note this function passes bigcrush and practrand
- * @asyncsignalsafe
- * @threadsafe
- * @vforksafe
  */
 uint64_t _rand64(void) {
   void *p;
   uint128_t s;
-  if (__threaded) pthread_spin_lock(&g_rand64.lock);
-  if (__pid == g_rand64.thepid) {
-    s = g_rand64.thepool;  // normal path
+  __rand64_lock();
+  if (__pid == _rand64_pid) {
+    s = _rand64_pool;  // normal path
   } else {
-    if (!g_rand64.thepid) {
-      if (AT_RANDOM && (p = (void *)_getauxval(AT_RANDOM).value)) {
+    if (!_rand64_pid) {
+      if (AT_RANDOM && (p = (void *)__getauxval(AT_RANDOM).value)) {
         // linux / freebsd kernel supplied entropy
         memcpy(&s, p, 16);
       } else {
@@ -63,13 +69,13 @@ uint64_t _rand64(void) {
       }
     } else {
       // blend another timestamp on fork contention
-      s = g_rand64.thepool ^ rdtsc();
+      s = _rand64_pool ^ rdtsc();
     }
     // blend the pid on startup and fork contention
     s ^= __pid;
-    g_rand64.thepid = __pid;
+    _rand64_pid = __pid;
   }
-  g_rand64.thepool = (s *= 15750249268501108917ull);  // lemur64
-  pthread_spin_unlock(&g_rand64.lock);
+  _rand64_pool = (s *= 15750249268501108917ull);  // lemur64
+  __rand64_unlock();
   return s >> 64;
 }

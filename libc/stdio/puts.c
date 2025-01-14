@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=8 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=8 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2020 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -16,23 +16,8 @@
 │ TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR             │
 │ PERFORMANCE OF THIS SOFTWARE.                                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
-#include "libc/stdio/lock.internal.h"
 #include "libc/stdio/stdio.h"
 #include "libc/str/str.h"
-
-static inline int PutsImpl(const char *s, FILE *f) {
-  size_t n, r;
-  if ((n = strlen(s))) {
-    r = fwrite_unlocked(s, 1, n, f);
-    if (!r) return -1;
-    if (r < n) return r;
-  }
-  if (fputc_unlocked('\n', f) == -1) {
-    if (feof_unlocked(f)) return n;
-    return -1;
-  }
-  return n + 1;
-}
 
 /**
  * Writes string w/ trailing newline to stdout.
@@ -41,11 +26,9 @@ static inline int PutsImpl(const char *s, FILE *f) {
  *     `errno` set and the `ferror(stdout)` state is updated
  */
 int puts(const char *s) {
-  FILE *f;
   int bytes;
-  f = stdout;
-  flockfile(f);
-  bytes = PutsImpl(s, f);
-  funlockfile(f);
+  flockfile(stdout);
+  bytes = puts_unlocked(s);
+  funlockfile(stdout);
   return bytes;
 }

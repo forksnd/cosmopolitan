@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:4;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=4 sts=4 sw=4 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=4 sts=4 sw=4 fenc=utf-8                               :vi │
 ╚──────────────────────────────────────────────────────────────────────────────╝
 │  Copyright (C) 2002-2013 Mark Adler, all rights reserved                     │
 │  version 2.3, 21 Jan 2013                                                    │
@@ -22,14 +22,12 @@
 │                                                                              │
 │  Mark Adler    madler@alumni.caltech.edu                                     │
 ╚─────────────────────────────────────────────────────────────────────────────*/
-#include "libc/runtime/runtime.h"
 #include "third_party/puff/puff.h"
-// clang-format off
+#include "libc/runtime/runtime.h"
 
-asm(".ident\t\"\\n\\n\
-puff (zlib License)\\n\
-Copyright 2002-203 Mark Adler\"");
-asm(".include \"libc/disclaimer.inc\"");
+__notice(puff_notice, "\
+puff (zlib License)\n\
+Copyright 2002-2013 Mark Adler");
 
 // Origin: git@github.com:madler/zlib.git
 // Commit: 03614c56ad299f9b238c75aa1e66f0c08fc4fc8b
@@ -158,7 +156,7 @@ struct state {
  *   buffer, using shift right, and new bytes are appended to the top of the
  *   bit buffer, using shift left.
  */
-local noinstrument int bits(struct state *s, int need)
+local dontinstrument int bits(struct state *s, int need)
 {
     long val;           /* bit accumulator (can use up to 20 bits) */
 

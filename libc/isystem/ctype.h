@@ -1,4 +1,4 @@
-#ifndef LIBC_ISYSTEM_CTYPE_H_
-#define LIBC_ISYSTEM_CTYPE_H_
-#include "libc/str/str.h"
-#endif
+#ifndef _CTYPE_H
+#define _CTYPE_H
+#include "libc/ctype.h"
+#endif /* _CTYPE_H */

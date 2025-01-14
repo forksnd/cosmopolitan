@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:t;c-basic-offset:8;tab-width:8;coding:utf-8   -*-│
-│vi: set et ft=c ts=8 tw=8 fenc=utf-8                                       :vi│
+│ vi: set noet ft=c ts=8 sw=8 fenc=utf-8                                   :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2016 Google Inc.                                                   │
 │                                                                              │
@@ -16,38 +16,35 @@
 │ limitations under the License.                                               │
 ╚─────────────────────────────────────────────────────────────────────────────*/
 #include "libc/errno.h"
+#include "libc/intrin/dll.h"
 #include "libc/runtime/runtime.h"
 #include "third_party/nsync/atomic.h"
 #include "third_party/nsync/atomic.internal.h"
 #include "third_party/nsync/common.internal.h"
-#include "third_party/nsync/dll.h"
 #include "third_party/nsync/mu_semaphore.h"
 #include "third_party/nsync/wait_s.internal.h"
-
-asm(".ident\t\"\\n\\n\
-*NSYNC (Apache 2.0)\\n\
-Copyright 2016 Google, Inc.\\n\
-https://github.com/google/nsync\"");
-// clang-format off
+__static_yoink("nsync_notice");
 
 /* Wait until one of:
      w->sem is non-zero----decrement it and return 0.
      abs_deadline expires---return ETIMEDOUT.
      cancel_note is non-NULL and *cancel_note becomes notified---return ECANCELED. */
-int nsync_sem_wait_with_cancel_ (waiter *w, nsync_time abs_deadline,
+int nsync_sem_wait_with_cancel_ (waiter *w, int clock, nsync_time abs_deadline,
 			         nsync_note cancel_note) {
 	int sem_outcome;
 	if (cancel_note == NULL) {
-		sem_outcome = nsync_mu_semaphore_p_with_deadline (&w->sem, abs_deadline);
+		sem_outcome = nsync_mu_semaphore_p_with_deadline (&w->sem, clock, abs_deadline);
 	} else {
 		nsync_time cancel_time;
 		cancel_time = nsync_note_notified_deadline_ (cancel_note);
 		sem_outcome = ECANCELED;
 		if (nsync_time_cmp (cancel_time, nsync_time_zero) > 0) {
 			struct nsync_waiter_s nw;
+#if NSYNC_DEBUG
 			nw.tag = NSYNC_WAITER_TAG;
+#endif
 			nw.sem = &w->sem;
-			nsync_dll_init_ (&nw.q, &nw);
+			dll_init (&nw.q);
 			ATM_STORE (&nw.waiting, 1);
 			nw.flags = 0;
 			nsync_mu_lock (&cancel_note->note_mu);
@@ -55,8 +52,7 @@ int nsync_sem_wait_with_cancel_ (waiter *w, nsync_time abs_deadline,
 			if (nsync_time_cmp (cancel_time, nsync_time_zero) > 0) {
 				nsync_time local_abs_deadline;
 				int deadline_is_nearer = 0;
-				cancel_note->waiters = nsync_dll_make_last_in_list_ (
-					cancel_note->waiters, &nw.q);
+				dll_make_last (&cancel_note->waiters, &nw.q);
 				local_abs_deadline = cancel_time;
 				if (nsync_time_cmp (abs_deadline, cancel_time) < 0) {
 					local_abs_deadline = abs_deadline;
@@ -64,7 +60,7 @@ int nsync_sem_wait_with_cancel_ (waiter *w, nsync_time abs_deadline,
 				}
 				nsync_mu_unlock (&cancel_note->note_mu);
 				sem_outcome = nsync_mu_semaphore_p_with_deadline (&w->sem,
-					local_abs_deadline);
+					clock, local_abs_deadline);
 				if (sem_outcome == ETIMEDOUT && !deadline_is_nearer) {
 					sem_outcome = ECANCELED;
 					nsync_note_notify (cancel_note);
@@ -73,8 +69,7 @@ int nsync_sem_wait_with_cancel_ (waiter *w, nsync_time abs_deadline,
 				cancel_time = NOTIFIED_TIME (cancel_note);
 				if (nsync_time_cmp (cancel_time,
 						    nsync_time_zero) > 0) {
-					cancel_note->waiters = nsync_dll_remove_ (
-						cancel_note->waiters, &nw.q);
+					dll_remove (&cancel_note->waiters, &nw.q);
 				}
 			}
 			nsync_mu_unlock (&cancel_note->note_mu);

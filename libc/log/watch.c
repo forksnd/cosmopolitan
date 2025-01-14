@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2022 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -16,12 +16,12 @@
 │ TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR             │
 │ PERFORMANCE OF THIS SOFTWARE.                                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
-#include "libc/intrin/bits.h"
 #include "libc/intrin/kprintf.h"
 #include "libc/log/backtrace.internal.h"
 #include "libc/log/log.h"
 #include "libc/runtime/runtime.h"
 #include "libc/runtime/symbols.internal.h"
+#include "libc/serialize.h"
 #include "libc/sysv/errfuns.h"
 
 #ifdef __x86_64__
@@ -33,17 +33,18 @@ static char __watch_last[4096];
 
 void __watch_hook(void);
 
-static noinstrument inline void Copy(char *p, char *q, size_t n) {
+dontinstrument static inline void Copy(char *p, char *q, size_t n) {
   size_t i;
   for (i = 0; i < n; ++i) {
     p[i] = q[i];
   }
 }
 
-static noinstrument inline int Cmp(char *p, char *q, size_t n) {
-  int c;
-  if (n == 8) return READ64LE(p) != READ64LE(q);
-  if (n == 4) return READ32LE(p) != READ32LE(q);
+dontinstrument static inline int Cmp(char *p, char *q, size_t n) {
+  if (n == 8)
+    return READ64LE(p) != READ64LE(q);
+  if (n == 4)
+    return READ32LE(p) != READ32LE(q);
   for (; n; ++p, ++q, --n) {
     if (*p != *q) {
       return 1;
@@ -52,8 +53,9 @@ static noinstrument inline int Cmp(char *p, char *q, size_t n) {
   return 0;
 }
 
-noinstrument void __watcher(void) {
-  if (__watch_busy) return;
+dontinstrument void __watcher(void) {
+  if (__watch_busy)
+    return;
   __watch_busy = true;
   if (Cmp(__watch_last, __watch_addr, __watch_size)) {
     kprintf("watchpoint %p changed:\n"
@@ -75,11 +77,15 @@ noinstrument void __watcher(void) {
  */
 int __watch(void *addr, size_t size) {
   static bool once;
-  if (__watch_busy) ebusy();
-  if (size > sizeof(__watch_last)) return einval();
+  if (__watch_busy)
+    ebusy();
+  if (size > sizeof(__watch_last))
+    return einval();
   if (!once) {
-    if (!GetSymbolTable()) return -1;
-    if (__hook(__watch_hook, GetSymbolTable()) == -1) return -1;
+    if (!GetSymbolTable())
+      return -1;
+    if (__hook(__watch_hook, GetSymbolTable()) == -1)
+      return -1;
     once = true;
   }
   __watch_addr = addr;

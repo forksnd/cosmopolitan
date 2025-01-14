@@ -1,12 +1,13 @@
 #include "libc/nt/codegen.h"
-.imp	advapi32,__imp_RegReplaceKeyW,RegReplaceKeyW,1670
+.imp	advapi32,__imp_RegReplaceKeyW,RegReplaceKeyW
 
 	.text.windows
+	.ftrace1
 RegReplaceKey:
+	.ftrace2
 #ifdef __x86_64__
 	push	%rbp
 	mov	%rsp,%rbp
-	.profilable
 	mov	__imp_RegReplaceKeyW(%rip),%rax
 	jmp	__sysv2nt
 #elif defined(__aarch64__)

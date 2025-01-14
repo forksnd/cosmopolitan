@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╚──────────────────────────────────────────────────────────────────────────────╝
 │                                                                              │
 │  Musl Libc                                                                   │
@@ -25,15 +25,12 @@
 │  SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.                      │
 │                                                                              │
 ╚─────────────────────────────────────────────────────────────────────────────*/
+#include "libc/ctype.h"
 #include "libc/fmt/conv.h"
 #include "libc/sock/sock.h"
 #include "libc/sock/struct/sockaddr.h"
 #include "libc/str/str.h"
-
-asm(".ident\t\"\\n\\n\
-Musl libc (MIT License)\\n\
-Copyright 2005-2014 Rich Felker, et. al.\"");
-asm(".include \"libc/disclaimer.inc\"");
+__static_yoink("musl_libc_notice");
 
 /**
  * Converts dotted IPv4 address string to network order binary.
@@ -46,11 +43,14 @@ int inet_aton(const char *s0, struct in_addr *dest) {
   int i;
   for (i = 0; i < 4; i++) {
     a[i] = strtoul(s, &z, 0);
-    if (z == s || (*z && *z != '.') || !isdigit(*s)) return 0;
-    if (!*z) break;
+    if (z == s || (*z && *z != '.') || !isdigit(*s))
+      return 0;
+    if (!*z)
+      break;
     s = z + 1;
   }
-  if (i == 4) return 0;
+  if (i == 4)
+    return 0;
   switch (i) {
     case 0:
       a[1] = a[0] & 0xffffff;
@@ -63,7 +63,8 @@ int inet_aton(const char *s0, struct in_addr *dest) {
       a[2] >>= 8;
   }
   for (i = 0; i < 4; i++) {
-    if (a[i] > 255) return 0;
+    if (a[i] > 255)
+      return 0;
     d[i] = a[i];
   }
   return 1;

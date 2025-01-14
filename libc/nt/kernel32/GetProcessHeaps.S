@@ -1,12 +1,13 @@
 #include "libc/nt/codegen.h"
-.imp	kernel32,__imp_GetProcessHeaps,GetProcessHeaps,0
+.imp	kernel32,__imp_GetProcessHeaps,GetProcessHeaps
 
 	.text.windows
+	.ftrace1
 GetProcessHeaps:
+	.ftrace2
 #ifdef __x86_64__
 	push	%rbp
 	mov	%rsp,%rbp
-	.profilable
 	mov	__imp_GetProcessHeaps(%rip),%rax
 	jmp	__sysv2nt
 #elif defined(__aarch64__)

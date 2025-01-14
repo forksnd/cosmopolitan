@@ -1,5 +1,5 @@
-#ifndef LIBC_ISYSTEM_FLOAT_H_
-#define LIBC_ISYSTEM_FLOAT_H_
-#include "libc/math.h"
+#ifndef _FLOAT_H
+#define _FLOAT_H
+#include <math.h>
 #include "libc/runtime/fenv.h"
-#endif
+#endif /* _FLOAT_H */

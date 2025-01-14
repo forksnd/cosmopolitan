@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2020 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -16,8 +16,52 @@
 │ TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR             │
 │ PERFORMANCE OF THIS SOFTWARE.                                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
-#include "libc/log/log.h"
+#include "libc/atomic.h"
+#include "libc/calls/calls.h"
+#include "libc/cosmo.h"
+#include "libc/errno.h"
+#include "libc/limits.h"
+#include "libc/runtime/runtime.h"
+#include "libc/str/str.h"
+
+#ifdef __x86_64__
+#define ADDR2LINE "cosmocc/3.2/bin/x86_64-linux-musl-addr2line"
+#elif defined(__aarch64__)
+#define ADDR2LINE "cosmocc/3.2/bin/aarch64-linux-musl-addr2line"
+#endif
+
+static struct {
+  atomic_uint once;
+  char *res;
+  char buf[PATH_MAX];
+} g_addr2line;
+
+void GetAddr2linePathInit(void) {
+  char *res;
+  int e = errno;
+  const char *env, *cmd, *path;
+  if ((env = secure_getenv("ADDR2LINE"))) {
+    cmd = env;
+    path = env;
+  } else {
+    cmd = "addr2line";
+    path = ADDR2LINE;
+  }
+  char *buf = g_addr2line.buf;
+  if (isexecutable(path)) {
+    if (*path != '/' && getcwd(buf, PATH_MAX)) {
+      strlcat(buf, "/", PATH_MAX);
+    }
+    strlcat(buf, path, PATH_MAX);
+    res = buf;
+  } else {
+    res = commandv(cmd, buf, PATH_MAX);
+  }
+  g_addr2line.res = res;
+  errno = e;
+}
 
 const char *GetAddr2linePath(void) {
-  return commandvenv("ADDR2LINE", "addr2line");
+  cosmo_once(&g_addr2line.once, GetAddr2linePathInit);
+  return g_addr2line.res;
 }

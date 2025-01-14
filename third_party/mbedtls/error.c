@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:4;tab-width:4;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright The Mbed TLS Contributors                                          │
 │                                                                              │
@@ -15,7 +15,7 @@
 │ See the License for the specific language governing permissions and          │
 │ limitations under the License.                                               │
 ╚─────────────────────────────────────────────────────────────────────────────*/
-#include "libc/fmt/fmt.h"
+#include "third_party/mbedtls/error.h"
 #include "libc/str/str.h"
 #include "third_party/mbedtls/aes.h"
 #include "third_party/mbedtls/asn1.h"
@@ -31,7 +31,6 @@
 #include "third_party/mbedtls/dhm.h"
 #include "third_party/mbedtls/ecp.h"
 #include "third_party/mbedtls/entropy.h"
-#include "third_party/mbedtls/error.h"
 #include "third_party/mbedtls/gcm.h"
 #include "third_party/mbedtls/hkdf.h"
 #include "third_party/mbedtls/hmac_drbg.h"
@@ -49,14 +48,8 @@
 #include "third_party/mbedtls/sha512.h"
 #include "third_party/mbedtls/ssl.h"
 #include "third_party/mbedtls/x509.h"
+__static_yoink("mbedtls_notice");
 
-asm(".ident\t\"\\n\\n\
-Mbed TLS (Apache 2.0)\\n\
-Copyright ARM Limited\\n\
-Copyright Mbed TLS Contributors\"");
-asm(".include \"libc/disclaimer.inc\"");
-
-/* clang-format off */
 /*
  *  Error message information
  *
@@ -358,6 +351,8 @@ const char * mbedtls_high_level_strerr( int error_code )
             return( "SSL - Connection requires a write call" );
         case -(MBEDTLS_ERR_SSL_TIMEOUT):
             return( "SSL - The operation timed out" );
+        case -(MBEDTLS_ERR_SSL_CANCELED):
+            return( "SSL - The POSIX thread was canceled" );
         case -(MBEDTLS_ERR_SSL_CLIENT_RECONNECT):
             return( "SSL - The client initiated a reconnect from the same port" );
         case -(MBEDTLS_ERR_SSL_UNEXPECTED_RECORD):

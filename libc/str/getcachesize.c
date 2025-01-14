@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2020 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -18,7 +18,6 @@
 ╚─────────────────────────────────────────────────────────────────────────────*/
 #include "libc/assert.h"
 #include "libc/dce.h"
-#include "libc/intrin/bits.h"
 #include "libc/nexgen32e/cachesize.h"
 #include "libc/nexgen32e/cpuid4.internal.h"
 #ifdef __x86_64__
@@ -52,8 +51,8 @@ static unsigned _getcachesize_cpuid4(int type, int level) {
  * @return size in bytes, or 0 if unknown
  */
 unsigned _getcachesize(int type, int level) {
-  _unassert(1 <= type && type <= 3);
-  _unassert(level >= 1);
+  unassert(1 <= type && type <= 3);
+  unassert(level >= 1);
   return _getcachesize_cpuid4(type, level);
 }
 

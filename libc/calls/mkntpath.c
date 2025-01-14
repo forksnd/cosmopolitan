@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2020 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -16,10 +16,11 @@
 │ TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR             │
 │ PERFORMANCE OF THIS SOFTWARE.                                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
-#include "libc/calls/ntmagicpaths.internal.h"
 #include "libc/calls/syscall_support-nt.internal.h"
-#include "libc/intrin/strace.internal.h"
-#include "libc/macros.internal.h"
+#include "libc/dce.h"
+#include "libc/intrin/kprintf.h"
+#include "libc/intrin/strace.h"
+#include "libc/macros.h"
 #include "libc/nt/systeminfo.h"
 #include "libc/str/str.h"
 #include "libc/sysv/consts/o.h"
@@ -33,22 +34,48 @@ static inline int IsAlpha(int c) {
   return ('A' <= c && c <= 'Z') || ('a' <= c && c <= 'z');
 }
 
-textwindows static const char *FixNtMagicPath(const char *path,
-                                              unsigned flags) {
-  const struct NtMagicPaths *mp = &kNtMagicPaths;
-  asm("" : "+r"(mp));
-  if (!IsSlash(path[0])) return path;
-  if (strcmp(path, mp->devtty) == 0) {
-    if ((flags & O_ACCMODE) == O_RDONLY) {
-      return mp->conin;
-    } else if ((flags & O_ACCMODE) == O_WRONLY) {
-      return mp->conout;
+textwindows size_t __normntpath(char16_t *p, size_t n) {
+  size_t i, j;
+  for (j = i = 0; i < n; ++i) {
+    int c = p[i];
+    if (c == '/') {
+      c = '\\';
+    }
+    if (j > 1 && c == '\\' && p[j - 1] == '\\') {
+      // matched "^/" or "//" but not "^//"
+    } else if ((j && p[j - 1] == '\\') &&  //
+               c == '.' &&                 //
+               (i + 1 == n || IsSlash(p[i + 1]))) {
+      // matched "/./" or "/.$"
+      i += !(i + 1 == n);
+    } else if ((j && p[j - 1] == '\\') &&         //
+               c == '.' &&                        //
+               (i + 1 < n && p[i + 1] == '.') &&  //
+               (i + 2 == n || IsSlash(p[i + 2]))) {
+      // matched "/../" or "/..$"
+      while (j && p[j - 1] == '\\')
+        --j;
+      if (j && p[j - 1] == '.') {
+        // matched "." before
+        if (j >= 2 && p[j - 2] == '.' &&  //
+            (j == 2 || p[j - 3] == '\\')) {
+          // matched "^.." or "/.." before
+          p[++j] = '.';
+          ++j;
+          continue;
+        } else if (j == 1 || p[j - 2] == '\\') {
+          // matched "^." or "/." before
+          continue;
+        }
+      }
+      while (j && p[j - 1] != '\\')
+        --j;
+    } else {
+      p[j++] = c;
     }
   }
-  if (strcmp(path, mp->devnull) == 0) return mp->nul;
-  if (strcmp(path, mp->devstdin) == 0) return mp->conin;
-  if (strcmp(path, mp->devstdout) == 0) return mp->conout;
-  return path;
+  p[j] = 0;
+  return j;
 }
 
 textwindows int __mkntpath(const char *path,
@@ -75,22 +102,19 @@ textwindows int __mkntpath(const char *path,
  */
 textwindows int __mkntpath2(const char *path,
                             char16_t path16[hasatleast PATH_MAX], int flags) {
-  /*
-   * 1. Need +1 for NUL-terminator
-   * 2. Need +1 for UTF-16 overflow
-   * 3. Need ≥2 for SetCurrentDirectory trailing slash requirement
-   * 4. Need ≥13 for mkdir() i.e. 1+8+3+1, e.g. "\\ffffffff.xxx\0"
-   *    which is an "8.3 filename" from the DOS days
-   */
-  const char *q;
-  bool isdospath;
-  char16_t c, *p;
-  size_t i, j, n, m, x, z;
-  if (!path) return efault();
-  path = FixNtMagicPath(path, flags);
-  p = path16;
-  q = path;
+  // 1. Need +1 for NUL-terminator
+  // 2. Need +1 for UTF-16 overflow
+  // 3. Need ≥2 for SetCurrentDirectory trailing slash requirement
+  // 4. Need ≥13 for mkdir() i.e. 1+8+3+1, e.g. "\\ffffffff.xxx\0"
+  //    which is an "8.3 filename" from the DOS days
 
+  if (!path) {
+    return efault();
+  }
+
+  size_t x, z;
+  char16_t *p = path16;
+  const char *q = path;
   if (IsSlash(q[0]) && IsAlpha(q[1]) && IsSlash(q[2])) {
     z = MIN(32767, PATH_MAX);
     // turn "\c\foo" into "\\?\c:\foo"
@@ -142,10 +166,12 @@ textwindows int __mkntpath2(const char *path,
   }
 
   // turn /tmp into GetTempPath()
+  size_t m;
   if (!x && IsSlash(q[0]) && q[1] == 't' && q[2] == 'm' && q[3] == 'p' &&
       (IsSlash(q[4]) || !q[4])) {
     m = GetTempPath(z, p);
-    if (!q[4]) return m;
+    if (!q[4])
+      return m;
     q += 5;
     p += m;
     z -= m;
@@ -154,37 +180,26 @@ textwindows int __mkntpath2(const char *path,
   }
 
   // turn utf-8 into utf-16
-  n = tprecode8to16(p, z, q).ax;
+  size_t n = tprecode8to16(p, z, q).ax;
   if (n >= z - 1) {
-    STRACE("path too long for windows: %#s", path);
     return enametoolong();
   }
 
-  // 1. turn `/` into `\`
-  // 2. turn `\\` into `\` if not at beginning
-  for (j = i = 0; i < n; ++i) {
-    c = p[i];
-    if (c == '/') {
-      c = '\\';
-    }
-    if (j > 1 && c == '\\' && p[j - 1] == '\\') {
-      continue;
-    }
-    p[j++] = c;
-  }
-  p[j] = 0;
-  n = j;
+  // normalize path
+  // we need it because \\?\... paths have to be normalized
+  // we don't remove the trailing slash since it is special
+  n = __normntpath(p, n);
 
   // our path is now stored at `path16` with length `n`
   n = x + m + n;
 
   // To avoid toil like this:
   //
-  //     CMD.EXE was started with the above path as the current directory.
-  //     UNC paths are not supported.  Defaulting to Windows directory.
-  //     Access is denied.
+  //     "CMD.EXE was started with the above path as the current
+  //      directory. UNC paths are not supported. Defaulting to Windows
+  //      directory. Access is denied." -Quoth CMD.EXE
   //
-  // Remove \\?\ prefix if we're within 260 character limit.
+  // Remove \\?\ prefix if we're within the 260 character limit.
   if (n > 4 && n < 260 &&   //
       path16[0] == '\\' &&  //
       path16[1] == '\\' &&  //

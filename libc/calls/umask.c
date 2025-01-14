@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2022 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -17,12 +17,21 @@
 │ PERFORMANCE OF THIS SOFTWARE.                                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
 #include "libc/calls/calls.h"
+#include "libc/calls/internal.h"
 #include "libc/calls/syscall-sysv.internal.h"
 #include "libc/dce.h"
-#include "libc/intrin/strace.internal.h"
+#include "libc/intrin/atomic.h"
+#include "libc/intrin/strace.h"
+#include "libc/sysv/consts/nr.h"
 
 /**
  * Sets file mode creation mask.
+ *
+ * On Windows, the value of umask() determines how Cosmopolitan goes
+ * about creating synthetic `st_mode` bits. The default umask is 077
+ * which is based on the assumption that Windows is being used for a
+ * single user. Don't assume that Cosmopolitan Libc will help you to
+ * secure a multitenant Windows computer.
  *
  * @return previous mask
  * @note always succeeds
@@ -32,8 +41,7 @@ unsigned umask(unsigned newmask) {
   if (!IsWindows()) {
     oldmask = sys_umask(newmask);
   } else {
-    // TODO(jart): what should we do with this?
-    oldmask = newmask;
+    oldmask = atomic_exchange(&__umask, newmask);
   }
   STRACE("umask(%#o) → %#o", oldmask);
   return oldmask;

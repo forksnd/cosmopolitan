@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2022 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -19,12 +19,11 @@
 #include "libc/atomic.h"
 #include "libc/sysv/consts/clock.h"
 #include "libc/thread/freebsd.internal.h"
-#ifdef __x86_64__
 
 int sys_umtx_timedwait_uint_cp(atomic_int *, int, int, size_t,
                                struct _umtx_time *) asm("sys_futex_cp");
 
-int sys_umtx_timedwait_uint(atomic_int *p, int expect, bool pshare,
+int sys_umtx_timedwait_uint(atomic_int *p, int expect, bool pshare, int clock,
                             const struct timespec *abstime) {
   int op;
   size_t size;
@@ -33,7 +32,7 @@ int sys_umtx_timedwait_uint(atomic_int *p, int expect, bool pshare,
     tm_p = 0;
     size = 0;
   } else {
-    timo._clockid = CLOCK_REALTIME;
+    timo._clockid = clock;
     timo._flags = UMTX_ABSTIME;
     timo._timeout = *abstime;
     tm_p = &timo;
@@ -46,5 +45,3 @@ int sys_umtx_timedwait_uint(atomic_int *p, int expect, bool pshare,
   }
   return sys_umtx_timedwait_uint_cp(p, op, expect, size, tm_p);
 }
-
-#endif

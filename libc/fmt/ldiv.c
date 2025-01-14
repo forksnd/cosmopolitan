@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2020 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -18,6 +18,22 @@
 ╚─────────────────────────────────────────────────────────────────────────────*/
 #include "libc/fmt/conv.h"
 
+/**
+ * Divides integers yielding numerator and denominator.
+ */
 ldiv_t(ldiv)(long num, long den) {
-  return ldiv(num, den);
+  ldiv_t retval;
+  retval.quot = num / den;
+  retval.rem = num % den;
+#if __STDC_VERSION__ + 0 < 199901L
+  // satisfy quot*denominator+rem == numerator
+  if (n > 0 && retval.rem < 0) {
+    retval.quot += 1;
+    retval.rem -= d;
+  }
+#endif
+  return retval;
 }
+
+__weak_reference(ldiv, lldiv);
+__weak_reference(ldiv, imaxdiv);

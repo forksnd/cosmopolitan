@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2022 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -19,12 +19,16 @@
 #include "libc/thread/thread.h"
 #include "third_party/lua/lrepl.h"
 
-static pthread_mutex_t lua_repl_lock_obj;
+static pthread_mutex_t lua_repl_lock_obj = PTHREAD_MUTEX_INITIALIZER;
 
-void(lua_repl_lock)(void) {
+void lua_repl_wock(void) {
+  lua_repl_lock_obj = (pthread_mutex_t)PTHREAD_MUTEX_INITIALIZER;
+}
+
+void lua_repl_lock(void) {
   pthread_mutex_lock(&lua_repl_lock_obj);
 }
 
-void(lua_repl_unlock)(void) {
+void lua_repl_unlock(void) {
   pthread_mutex_unlock(&lua_repl_lock_obj);
 }

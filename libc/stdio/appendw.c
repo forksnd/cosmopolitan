@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2021 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -18,10 +18,10 @@
 ╚─────────────────────────────────────────────────────────────────────────────*/
 #include "libc/assert.h"
 #include "libc/dce.h"
-#include "libc/intrin/bits.h"
 #include "libc/intrin/bsr.h"
-#include "libc/macros.internal.h"
+#include "libc/macros.h"
 #include "libc/mem/mem.h"
+#include "libc/serialize.h"
 #include "libc/stdio/append.h"
 
 #define W sizeof(size_t)
@@ -59,15 +59,17 @@ ssize_t appendw(char **b, uint64_t w) {
   char *p, *q;
   struct appendz z;
   z = appendz((p = *b));
-  l = w ? (_bsrl(w) >> 3) + 1 : 1;
+  l = w ? (bsrl(w) >> 3) + 1 : 1;
   n = ROUNDUP(z.i + 8 + 1, 8) + W;
   if (n > z.n) {
-    if (!z.n) z.n = W * 2;
-    while (n > z.n) z.n += z.n >> 1;
+    if (!z.n)
+      z.n = W * 2;
+    while (n > z.n)
+      z.n += z.n >> 1;
     z.n = ROUNDUP(z.n, W);
     if ((p = realloc(p, z.n))) {
       z.n = malloc_usable_size(p);
-      _unassert(!(z.n & (W - 1)));
+      unassert(!(z.n & (W - 1)));
       *b = p;
     } else {
       return -1;
@@ -77,7 +79,8 @@ ssize_t appendw(char **b, uint64_t w) {
   WRITE64LE(q, w);
   q[8] = 0;
   z.i += l;
-  if (!IsTiny() && W == 8) z.i |= (size_t)APPEND_COOKIE << 48;
+  if (!IsTiny() && W == 8)
+    z.i |= (size_t)APPEND_COOKIE << 48;
   *(size_t *)(p + z.n - W) = z.i;
   return l;
 }

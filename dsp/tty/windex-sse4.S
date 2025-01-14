@@ -1,5 +1,5 @@
 /*-*- mode:unix-assembly; indent-tabs-mode:t; tab-width:8; coding:utf-8     -*-│
-│vi: set et ft=asm ts=8 tw=8 fenc=utf-8                                     :vi│
+│ vi: set noet ft=asm ts=8 sw=8 fenc=utf-8                                 :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2020 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -16,17 +16,18 @@
 │ TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR             │
 │ PERFORMANCE OF THIS SOFTWARE.                                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
-#include "libc/macros.internal.h"
+#include "libc/macros.h"
 
 //	Returns index of minimum positive int16 in array.
 //
 //	@param	rdi points to nonempty array
 //	@param	esi is 16-byte aligned 8+ / 8 multiple array item count
 //	@note	needs sse4 (nehalem+)
+	.ftrace1
 windex_sse4:
+	.ftrace2
 	push	%rbp
 	mov	%rsp,%rbp
-	.profilable
 	mov	$8,%eax
 	sub	$32,%rsp
 	movdqa	(%rdi),%xmm2

@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2022 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -19,10 +19,9 @@
 #include "libc/calls/calls.h"
 #include "libc/calls/struct/sched_param.h"
 #include "libc/dce.h"
-#include "libc/fmt/fmt.h"
-#include "libc/macros.internal.h"
+#include "libc/macros.h"
 #include "libc/math.h"
-#include "libc/mem/gc.internal.h"
+#include "libc/mem/gc.h"
 #include "libc/mem/mem.h"
 #include "libc/nexgen32e/vendor.internal.h"
 #include "libc/runtime/internal.h"
@@ -34,8 +33,7 @@
 #include "libc/sysv/consts/prot.h"
 #include "libc/sysv/consts/sched.h"
 #include "libc/testlib/testlib.h"
-#include "libc/thread/spawn.h"
-#include "libc/thread/wait0.internal.h"
+#include "libc/thread/thread.h"
 #include "libc/x/x.h"
 
 #define DUB(i) (union Dub){i}.x
@@ -53,11 +51,10 @@ union Dub {
 };
 
 void SetUpOnce(void) {
-  __enable_threads();
   ASSERT_SYS(0, 0, pledge("stdio", 0));
 }
 
-int Worker(void *p, int tid) {
+void *Worker(void *p) {
   int i;
   char str[64];
   for (i = 0; i < 256; ++i) {
@@ -70,9 +67,13 @@ int Worker(void *p, int tid) {
 
 TEST(dtoa, locks) {
   int i, n = 32;
-  struct spawn *t = gc(malloc(sizeof(struct spawn) * n));
-  for (i = 0; i < n; ++i) ASSERT_SYS(0, 0, _spawn(Worker, 0, t + i));
-  for (i = 0; i < n; ++i) EXPECT_SYS(0, 0, _join(t + i));
+  pthread_t *t = gc(malloc(sizeof(pthread_t) * n));
+  for (i = 0; i < n; ++i) {
+    ASSERT_EQ(0, pthread_create(t + i, 0, Worker, 0));
+  }
+  for (i = 0; i < n; ++i) {
+    EXPECT_EQ(0, pthread_join(t[i], 0));
+  }
 }
 
 static const struct {
@@ -100,6 +101,8 @@ TEST(printf, double) {
     }
   }
 }
+
+#if LDBL_MANT_DIG == 64
 
 static const struct {
   const char *s;
@@ -131,7 +134,14 @@ static const struct {
     {"1.23000000000000000002e-320", "%.21Lg",
      DUBBLE(3bd8, 9b98, c371, 844c, 3f1a)},
     {"0xap-3", "%.La", DUBBLE(3fff, 9d70, a3d7, a3d, 70a4)},
-    {"0x9.d70a3d70a3d70a4p-3", "%.20La", DUBBLE(3fff, 9d70, a3d7, a3d, 70a4)},
+    //   cosmo prints 0x9.d70a3d70a3d70a400000p-3
+    //   glibc prints 0x9.d70a3d70a3d70a400000p-3
+    // openbsd prints 0x9.d70a3d70a3d70a400000p-3
+    //   apple prints 0x9.d70a3d70a3d70a400000p-3
+    //    musl prints 0x1.3ae147ae147ae1480000p+0
+    // freebsd prints 0x1.3ae147ae147ae1480000p+0
+    {"0x9.d70a3d70a3d70a400000p-3", "%.20La",
+     DUBBLE(3fff, 9d70, a3d7, 0a3d, 70a4)},
     {"0x9.b18ab5df7180b6cp+88", "%La", DUBBLE(405a, 9b18, ab5d, f718, b6c)},
     {"0xa.fc6a015291b4024p+87", "%La", DUBBLE(4059, afc6, a015, 291b, 4024)},
 };
@@ -149,9 +159,11 @@ TEST(printf, longdouble) {
               "TEST FAILED\n"
               "\t{%`'s, %`'s, DUBBLE(%x, %x, %x, %x, %x)}\n"
               "\t→%`'s\n",
-              Vx[i].s, Vx[i].f, Vx[i].u.i[0], Vx[i].u.i[1], Vx[i].u.i[2],
-              Vx[i].u.i[3], Vx[i].u.i[4], buf);
+              Vx[i].s, Vx[i].f, Vx[i].u.i[4], Vx[i].u.i[3], Vx[i].u.i[2],
+              Vx[i].u.i[1], Vx[i].u.i[0], buf);
       testlib_incrementfailed();
     }
   }
 }
+
+#endif  // LDBL_MANT_DIG == 64

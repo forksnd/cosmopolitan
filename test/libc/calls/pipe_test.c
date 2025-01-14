@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2022 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -30,7 +30,7 @@ char buf[6] = {0};
 struct rlimit rlim = {0, 10};
 
 TEST(pipe, efault) {
-  EXPECT_SYS(EFAULT, -1, pipe(VEIL("r", (void *)0)));
+  EXPECT_SYS(EFAULT, -1, pipe(__veil("r", (void *)0)));
 }
 
 TEST(pipe, einval) {
@@ -38,8 +38,10 @@ TEST(pipe, einval) {
 }
 
 TEST(pipe, ebadf) {
-  if (IsFreebsd()) return;  // somehow succeeds
-  if (IsOpenbsd()) return;  // somehow succeeds
+  if (IsFreebsd())
+    return;  // somehow succeeds
+  if (IsOpenbsd())
+    return;  // somehow succeeds
   EXPECT_SYS(0, 0, pipe(f));
   EXPECT_SYS(EBADF, -1, write(f[0], "h", 1));
   EXPECT_SYS(EBADF, -1, read(f[1], buf, 1));
@@ -48,8 +50,10 @@ TEST(pipe, ebadf) {
 }
 
 TEST(pipe, emfile) {
-  if (IsWindows()) return;  // TODO
-  if (IsCygwin()) return;
+  if (IsWindows())
+    return;  // TODO
+  if (IsCygwin())
+    return;
   ASSERT_NE(-1, (pid = fork()));
   if (!pid) {
     ASSERT_EQ(0, setrlimit(RLIMIT_NOFILE, &rlim));

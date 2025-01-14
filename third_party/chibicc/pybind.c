@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2020 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -17,7 +17,8 @@
 │ PERFORMANCE OF THIS SOFTWARE.                                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
 #include "libc/fmt/conv.h"
-#include "libc/intrin/bits.h"
+#include "libc/fmt/libgen.h"
+#include "libc/serialize.h"
 #include "libc/log/libfatal.internal.h"
 #include "libc/mem/gc.h"
 #include "libc/mem/mem.h"
@@ -537,7 +538,7 @@ const struct _inittab _PyImport_Inittab_%s = {\n\
 };\n\
 ",
           module, module,
-          tok->file->javadown ? _gc(xasprintf("pb_%s_doc", module)) : "0",
+          tok->file->javadown ? gc(xasprintf("pb_%s_doc", module)) : "0",
           module, module, module, module, module, module);
   CHECK_NE(-1, (fd = creat(path, 0644)));
   CHECK_NE(-1, xwrite(fd, b, appendz(b).i));

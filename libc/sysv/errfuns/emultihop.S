@@ -1,15 +1,16 @@
-#include "libc/macros.internal.h"
+#include "libc/macros.h"
 .text.unlikely
 
+	.ftrace1
 emultihop:
+	.ftrace2
 #ifdef __x86_64__
 	.leafprologue
-	.profilable
 	mov	EMULTIHOP(%rip),%ecx
 	jmp	__errfun
 #elif defined(__aarch64__)
 	adrp	x1,EMULTIHOP
-	ldr	w0,[x1,#:lo12:EMULTIHOP]
+	ldrsw	x0,[x1,#:lo12:EMULTIHOP]
 	b	__errfun
 #else
 #error "unsupported architecture"

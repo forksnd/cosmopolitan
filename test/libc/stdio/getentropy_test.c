@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2022 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -22,18 +22,17 @@
 #include "libc/calls/struct/sigset.h"
 #include "libc/dce.h"
 #include "libc/errno.h"
-#include "libc/macros.internal.h"
+#include "libc/macros.h"
 #include "libc/mem/gc.h"
 #include "libc/mem/mem.h"
 #include "libc/runtime/runtime.h"
 #include "libc/stdio/rand.h"
 #include "libc/stdio/stdio.h"
-#include "libc/str/tab.internal.h"
+#include "libc/str/tab.h"
 #include "libc/sysv/consts/sig.h"
 #include "libc/testlib/testlib.h"
 #include "libc/thread/thread.h"
-
-// TODO(jart): Why can EINTR happen on Windows?
+#ifndef __aarch64__
 
 atomic_int done;
 atomic_int ready;
@@ -50,9 +49,9 @@ void *TortureWorker(void *arg) {
   ASSERT_SYS(0, 0, sigprocmask(SIG_SETMASK, &ss, 0));
   ready = true;
   while (!done) {
-    if (!IsWindows()) pthread_kill(parent, SIGUSR1);
+    pthread_kill(parent, SIGUSR1);
     usleep(1);
-    if (!IsWindows()) pthread_kill(parent, SIGUSR2);
+    pthread_kill(parent, SIGUSR2);
     usleep(1);
   }
   return 0;
@@ -62,8 +61,8 @@ TEST(getentropy, test) {
   pthread_t child;
   double e, w = 7.7;
   struct sigaction sa;
-  int i, j, k, m, n = 999;
-  char *buf = _gc(calloc(1, n));
+  int i, k, m, n = 999;
+  char *buf = gc(calloc(1, n));
   sa.sa_flags = 0;
   sa.sa_handler = OnSig;
   sigemptyset(&sa.sa_mask);
@@ -71,7 +70,8 @@ TEST(getentropy, test) {
   ASSERT_SYS(0, 0, sigaction(SIGUSR2, &sa, 0));
   parent = pthread_self();
   ASSERT_EQ(0, pthread_create(&child, 0, TortureWorker, 0));
-  while (!ready) pthread_yield();
+  while (!ready)
+    pthread_yield();
   for (k = 0; k < 10; ++k) {
     ASSERT_SYS(0, 0, getentropy(0, 0));
     for (i = 0; i < n; i += m) {
@@ -82,9 +82,11 @@ TEST(getentropy, test) {
     if ((e = MeasureEntropy(buf, n)) < w) {
       fprintf(stderr, "error: entropy suspect! got %g but want >=%g\n", e, w);
       for (i = 0; i < n;) {
-        if (!(i % 16)) fprintf(stderr, "%6x ", i);
+        if (!(i % 16))
+          fprintf(stderr, "%6x ", i);
         fprintf(stderr, "%lc", kCp437[buf[i] & 255]);
-        if (!(++i % 16)) fprintf(stderr, "\n");
+        if (!(++i % 16))
+          fprintf(stderr, "\n");
       }
       fprintf(stderr, "\n");
       done = true;
@@ -94,5 +96,7 @@ TEST(getentropy, test) {
   }
   done = true;
   ASSERT_EQ(0, pthread_join(child, 0));
-  if (!IsWindows()) ASSERT_GT(gotsome, 0);
+  ASSERT_GT(gotsome, 0);
 }
+
+#endif /* __aarch64__ */

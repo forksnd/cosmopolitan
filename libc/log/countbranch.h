@@ -1,7 +1,7 @@
 #ifndef COSMOPOLITAN_LIBC_LOG_COUNTBRANCH_H_
 #define COSMOPOLITAN_LIBC_LOG_COUNTBRANCH_H_
-#include "libc/macros.internal.h"
-#if !(__ASSEMBLER__ + __LINKER__ + 0)
+#include "libc/macros.h"
+#include "libc/stdbool.h"
 COSMOPOLITAN_C_START_
 
 #define COUNTBRANCH(x) COUNTBRANCH_(x, #x, STRINGIFY(__FILE__), __LINE__)
@@ -12,7 +12,7 @@ COSMOPOLITAN_C_START_
     bool Cond;                                                  \
     struct countbranch *Info;                                   \
     asm(".section .rodata.str1.1,\"aMS\",@progbits,1\n\t"       \
-        ".align\t1\n"                                           \
+        ".balign\t1\n"                                          \
         "31338:\t"                                              \
         ".asciz\t" xs "\n"                                      \
         "31339:\t"                                              \
@@ -24,7 +24,7 @@ COSMOPOLITAN_C_START_
         "nopl\tcountbranch_data(%%rip)\n\t"                     \
         ".previous\n\t"                                         \
         ".section .sort.data.countbranch.2,\"a\",@progbits\n\t" \
-        ".align\t8\n31337:\t"                                   \
+        ".balign\t8\n31337:\t"                                  \
         ".quad\t0\n\t"                                          \
         ".quad\t0\n\t"                                          \
         ".quad\t31338b\n\t"                                     \
@@ -36,7 +36,8 @@ COSMOPOLITAN_C_START_
         : "=r"(Info));                                          \
     Cond = (x);                                                 \
     ++Info->total;                                              \
-    if (Cond) ++Info->taken;                                    \
+    if (Cond)                                                   \
+      ++Info->taken;                                            \
     Cond;                                                       \
   })
 
@@ -54,5 +55,4 @@ extern struct countbranch countbranch_data[];
 void countbranch_report(void);
 
 COSMOPOLITAN_C_END_
-#endif /* !(__ASSEMBLER__ + __LINKER__ + 0) */
 #endif /* COSMOPOLITAN_LIBC_LOG_COUNTBRANCH_H_ */

@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2021 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -20,7 +20,7 @@
 #include "third_party/mbedtls/platform.h"
 
 // disable ubsan because n=0 is defined behavior in cosmopolitan
-noubsan void mbedtls_platform_zeroize(void *p, size_t n) {
+dontubsan void mbedtls_platform_zeroize(void *p, size_t n) {
   MBEDTLS_INTERNAL_VALIDATE(!n || p);
   bzero(p, n);
 }

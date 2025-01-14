@@ -7,23 +7,21 @@
 
 #define FD_SETSIZE 1024 /* it's 64 on windows */
 
-#if !(__ASSEMBLER__ + __LINKER__ + 0)
 COSMOPOLITAN_C_START_
 
 typedef struct fd_set {
-  unsigned long fds_bits[FD_SETSIZE / (sizeof(long) * CHAR_BIT)];
+  unsigned long fds_bits[FD_SETSIZE / (sizeof(long) * 8)];
 } fd_set;
 
-#define FD_ISSET(FD, SET) (((SET)->fds_bits[(FD) >> 6] >> ((FD)&63)) & 1)
-#define FD_SET(FD, SET)   ((SET)->fds_bits[(FD) >> 6] |= 1ull << ((FD)&63))
-#define FD_CLR(FD, SET)   ((SET)->fds_bits[(FD) >> 6] &= ~(1ull << ((FD)&63)))
+#define FD_ISSET(FD, SET) (((SET)->fds_bits[(FD) >> 6] >> ((FD) & 63)) & 1)
+#define FD_SET(FD, SET)   ((SET)->fds_bits[(FD) >> 6] |= 1ull << ((FD) & 63))
+#define FD_CLR(FD, SET)   ((SET)->fds_bits[(FD) >> 6] &= ~(1ull << ((FD) & 63)))
 #define FD_ZERO(SET)      bzero((SET)->fds_bits, sizeof((SET)->fds_bits))
-#define FD_SIZE(bits)     (((bits) + (sizeof(long) * CHAR_BIT) - 1) / sizeof(long))
+#define FD_SIZE(bits)     (((bits) + (sizeof(long) * 8) - 1) / sizeof(long))
 
-int select(int, fd_set *, fd_set *, fd_set *, struct timeval *);
+int select(int, fd_set *, fd_set *, fd_set *, struct timeval *) libcesque;
 int pselect(int, fd_set *, fd_set *, fd_set *, const struct timespec *,
-            const sigset_t *);
+            const sigset_t *) libcesque;
 
 COSMOPOLITAN_C_END_
-#endif /* !(__ASSEMBLER__ + __LINKER__ + 0) */
 #endif /* COSMOPOLITAN_LIBC_SOCK_SELECT_H_ */

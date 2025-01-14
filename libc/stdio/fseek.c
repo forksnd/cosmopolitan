@@ -1,7 +1,7 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
-│ Copyright 2020 Justine Alexandra Roberts Tunney                              │
+│ Copyright 2021 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
 │ Permission to use, copy, modify, and/or distribute this software for         │
 │ any purpose with or without fee is hereby granted, provided that the         │
@@ -16,7 +16,9 @@
 │ TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR             │
 │ PERFORMANCE OF THIS SOFTWARE.                                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
-#include "libc/stdio/stdio.h"
+#include "libc/intrin/describeflags.h"
+#include "libc/intrin/strace.h"
+#include "libc/stdio/internal.h"
 
 /**
  * Repositions open file stream.
@@ -31,6 +33,14 @@
  * @param whence can be SEET_SET, SEEK_CUR, or SEEK_END
  * @returns 0 on success or -1 on error
  */
-int fseek(FILE *f, long offset, int whence) {
-  return fseeko(f, offset, whence);
+int fseek(FILE *f, int64_t offset, int whence) {
+  int rc;
+  flockfile(f);
+  rc = fseek_unlocked(f, offset, whence);
+  STDIOTRACE("fseek(%p, %'ld, %s) → %d %s", f, offset, DescribeWhence(whence),
+             rc, DescribeStdioState(f->state));
+  funlockfile(f);
+  return rc;
 }
+
+__strong_reference(fseek, fseeko);

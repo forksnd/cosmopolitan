@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2021 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -39,7 +39,8 @@
 bool IsAcceptablePort(const char *s, size_t n) {
   int p, c;
   size_t i;
-  if (n == -1) n = s ? strlen(s) : 0;
+  if (n == -1)
+    n = s ? strlen(s) : 0;
   for (p = i = 0; i < n; ++i) {
     c = s[i] & 255;
     if ('0' <= c && c <= '9') {

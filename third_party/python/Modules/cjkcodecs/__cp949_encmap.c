@@ -1,5 +1,5 @@
 #include "libc/x/x.h"
-/* clang-format off */
+#include "third_party/python/Modules/cjkcodecs/xloadzd.h"
 
 static _Atomic(void *) __cp949_encmap_ptr;
 static const unsigned char __cp949_encmap_rodata[29600] = {

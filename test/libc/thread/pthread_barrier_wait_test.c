@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2022 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -20,17 +20,17 @@
 #include "libc/atomic.h"
 #include "libc/errno.h"
 #include "libc/intrin/atomic.h"
-#include "libc/mem/gc.internal.h"
+#include "libc/mem/gc.h"
 #include "libc/mem/mem.h"
+#include "libc/runtime/runtime.h"
 #include "libc/testlib/testlib.h"
-#include "libc/thread/spawn.h"
 #include "libc/thread/thread.h"
 
 int i, n;
 atomic_int p, w;
 pthread_barrier_t barrier;
 
-int Worker(void *arg, int tid) {
+void *Worker(void *arg) {
   int rc;
   rc = pthread_barrier_wait(&barrier);
   atomic_fetch_add(&w, 1);
@@ -41,38 +41,32 @@ int Worker(void *arg, int tid) {
   return 0;
 }
 
-TEST(pthread_barrier_init, test0_isInvalid) {
-  __assert_disable = true;
-  ASSERT_EQ(EINVAL, pthread_barrier_init(&barrier, 0, 0));
-  __assert_disable = false;
-}
-
 TEST(pthread_barrier_wait, test1) {
-  struct spawn t;
+  pthread_t t;
   p = 0;
   w = 0;
   n = 1;
   ASSERT_EQ(0, pthread_barrier_init(&barrier, 0, n));
-  ASSERT_SYS(0, 0, _spawn(Worker, 0, &t));
-  EXPECT_SYS(0, 0, _join(&t));
+  ASSERT_SYS(0, 0, pthread_create(&t, 0, Worker, 0));
+  EXPECT_SYS(0, 0, pthread_join(t, 0));
   ASSERT_EQ(1, p);
   ASSERT_EQ(n, w);
   ASSERT_EQ(0, pthread_barrier_destroy(&barrier));
 }
 
 TEST(pthread_barrier_wait, test32) {
-  struct spawn *t;
+  pthread_t *t;
   p = 0;
-  w = 0;
   n = 32;
-  t = gc(malloc(sizeof(struct spawn) * n));
+  w = 0;
+  t = gc(malloc(sizeof(pthread_t) * n));
   ASSERT_EQ(0, pthread_barrier_init(&barrier, 0, n));
   for (i = 0; i < n; ++i) {
     ASSERT_EQ(0, w);
-    ASSERT_SYS(0, 0, _spawn(Worker, 0, t + i));
+    ASSERT_SYS(0, 0, pthread_create(t + i, 0, Worker, 0));
   }
   for (i = 0; i < n; ++i) {
-    EXPECT_SYS(0, 0, _join(t + i));
+    EXPECT_SYS(0, 0, pthread_join(t[i], 0));
   }
   ASSERT_EQ(1, p);
   ASSERT_EQ(n, w);

@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2022 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -32,11 +32,13 @@
 #include "libc/x/x.h"
 #include "libc/x/xasprintf.h"
 
-char testlib_enable_tmp_setup_teardown;
+void SetUpOnce(void) {
+  testlib_enable_tmp_setup_teardown();
+}
 
 void Make(const char *path, int mode) {
   int fd, n = lemur64() & 0xfffff;
-  char *data = _gc(malloc(n));
+  char *data = gc(malloc(n));
   rngset(data, n, lemur64, -1);
   ASSERT_NE(-1, (fd = creat(path, mode)));
   ASSERT_SYS(0, n, write(fd, data, n));
@@ -75,8 +77,8 @@ TEST(copy_file_range, test) {
   size_t n, m;
   Make("foo", 0644);
   Copy("foo", "bar");
-  p = _gc(xslurp("foo", &n));
-  q = _gc(xslurp("bar", &m));
+  p = gc(xslurp("foo", &n));
+  q = gc(xslurp("bar", &m));
   ASSERT_EQ(n, m);
   ASSERT_EQ(0, memcmp(p, q, n));
 }
@@ -92,19 +94,23 @@ bool HasCopyFileRange(void) {
 }
 
 TEST(copy_file_range, badFd) {
-  if (!HasCopyFileRange()) return;
+  if (!HasCopyFileRange())
+    return;
   ASSERT_SYS(EBADF, -1, copy_file_range(-1, 0, -1, 0, -1u, 0));
 }
 
 TEST(copy_file_range, badFlags) {
-  if (!HasCopyFileRange()) return;
+  if (!HasCopyFileRange())
+    return;
   ASSERT_SYS(EINVAL, -1, copy_file_range(0, 0, 1, 0, -1u, -1));
 }
 
 TEST(copy_file_range, differentFileSystems) {
   return;  // TODO(jart): Why does this flake on GitHub Actions?
-  if (!IsLinux()) return;
-  if (!HasCopyFileRange()) return;
+  if (!IsLinux())
+    return;
+  if (!HasCopyFileRange())
+    return;
   ASSERT_SYS(0, 3, open("/proc/stat", 0));
   ASSERT_SYS(0, 4, creat("foo", 0644));
   ASSERT_SYS(EXDEV, -1, copy_file_range(3, 0, 4, 0, -1u, 0));
@@ -115,7 +121,8 @@ TEST(copy_file_range, differentFileSystems) {
 TEST(copy_file_range, twoDifferentFiles) {
   char buf[16] = {0};
   int64_t i = 1, o = 0;
-  if (!HasCopyFileRange()) return;
+  if (!HasCopyFileRange())
+    return;
   ASSERT_SYS(0, 3, open("foo", O_RDWR | O_CREAT | O_TRUNC, 0644));
   ASSERT_SYS(0, 4, open("bar", O_RDWR | O_CREAT | O_TRUNC, 0644));
   ASSERT_SYS(0, 5, pwrite(3, "hello", 5, 0));
@@ -132,7 +139,8 @@ TEST(copy_file_range, twoDifferentFiles) {
 TEST(copy_file_range, sameFile_doesntChangeFilePointer) {
   char buf[16] = {0};
   int64_t i = 1, o = 5;
-  if (!HasCopyFileRange()) return;
+  if (!HasCopyFileRange())
+    return;
   ASSERT_SYS(0, 3, open("foo", O_RDWR | O_CREAT | O_TRUNC, 0644));
   ASSERT_SYS(0, 5, pwrite(3, "hello", 5, 0));
   ASSERT_SYS(0, 4, copy_file_range(3, &i, 3, &o, 4, 0));
@@ -146,7 +154,8 @@ TEST(copy_file_range, sameFile_doesntChangeFilePointer) {
 TEST(copy_file_range, overlappingRange) {
   int rc;
   int64_t i = 1, o = 2;
-  if (!HasCopyFileRange()) return;
+  if (!HasCopyFileRange())
+    return;
   ASSERT_SYS(0, 3, open("foo", O_RDWR | O_CREAT | O_TRUNC, 0644));
   ASSERT_SYS(0, 5, pwrite(3, "hello", 5, 0));
   rc = copy_file_range(3, &i, 3, &o, 4, 0);

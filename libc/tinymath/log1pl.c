@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:t;c-basic-offset:8;tab-width:8;coding:utf-8   -*-│
-│vi: set et ft=c ts=8 tw=8 fenc=utf-8                                       :vi│
+│ vi: set noet ft=c ts=8 sw=8 fenc=utf-8                                   :vi │
 ╚──────────────────────────────────────────────────────────────────────────────╝
 │                                                                              │
 │  Musl Libc                                                                   │
@@ -28,15 +28,9 @@
 #include "libc/complex.h"
 #include "libc/math.h"
 #include "libc/tinymath/complex.internal.h"
-
-asm(".ident\t\"\\n\\n\
-OpenBSD libm (MIT License)\\n\
-Copyright (c) 2008 Stephen L. Moshier <steve@moshier.net>\"");
-asm(".ident\t\"\\n\\n\
-Musl libc (MIT License)\\n\
-Copyright 2005-2014 Rich Felker, et. al.\"");
-asm(".include \"libc/disclaimer.inc\"");
-// clang-format off
+#if LDBL_MANT_DIG == 64 && LDBL_MAX_EXP == 16384
+__static_yoink("musl_libc_notice");
+__static_yoink("openbsd_libm_notice");
 
 /* origin: OpenBSD /usr/src/lib/libm/src/ld80/s_log1pl.c */
 /*
@@ -88,12 +82,6 @@ asm(".include \"libc/disclaimer.inc\"");
  *    IEEE     -1.0, 9.0    100000      8.2e-20    2.5e-20
  */
 
-#if LDBL_MANT_DIG == 53 && LDBL_MAX_EXP == 1024
-long double log1pl(long double x)
-{
-	return log1p(x);
-}
-#elif LDBL_MANT_DIG == 64 && LDBL_MAX_EXP == 16384
 /* Coefficients for log(1+x) = x - x^2 / 2 + x^3 P(x)/Q(x)
  * 1/sqrt(2) <= x < sqrt(2)
  * Theoretical peak relative error = 2.32e-20
@@ -209,12 +197,5 @@ long double log1pl(long double xm1)
 	z = z + e * C1;
 	return z;
 }
-#elif LDBL_MANT_DIG == 113 && LDBL_MAX_EXP == 16384
-// TODO: broken implementation to make things compile
-long double log1pl(long double x)
-{
-	return log1p(x);
-}
-#else
-#error "architecture unsupported"
-#endif
+
+#endif /* ieee80 */

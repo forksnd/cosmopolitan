@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2021 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -18,83 +18,24 @@
 ╚─────────────────────────────────────────────────────────────────────────────*/
 #include "libc/assert.h"
 #include "libc/dce.h"
-#include "libc/intrin/asan.internal.h"
 #include "libc/nexgen32e/nexgen32e.h"
 #include "libc/nexgen32e/x86feature.h"
 #include "libc/str/str.h"
+#ifndef __aarch64__
 
 typedef long long xmm_t __attribute__((__vector_size__(16), __aligned__(1)));
 typedef long long xmm_a __attribute__((__vector_size__(16), __aligned__(16)));
 
-/**
- * Copies memory.
- *
- *     memmove n=0                        661 picoseconds
- *     memmove n=1                        661 ps/byte          1,476 mb/s
- *     memmove n=2                        330 ps/byte          2,952 mb/s
- *     memmove n=3                        330 ps/byte          2,952 mb/s
- *     memmove n=4                        165 ps/byte          5,904 mb/s
- *     memmove n=7                        141 ps/byte          6,888 mb/s
- *     memmove n=8                         82 ps/byte             11 GB/s
- *     memmove n=15                        44 ps/byte             21 GB/s
- *     memmove n=16                        41 ps/byte             23 GB/s
- *     memmove n=31                        32 ps/byte             29 GB/s
- *     memmove n=32                        31 ps/byte             30 GB/s
- *     memmove n=63                        21 ps/byte             45 GB/s
- *     memmove n=64                        15 ps/byte             61 GB/s
- *     memmove n=127                       13 ps/byte             73 GB/s
- *     memmove n=128                       31 ps/byte             30 GB/s
- *     memmove n=255                       20 ps/byte             45 GB/s
- *     memmove n=256                       19 ps/byte             49 GB/s
- *     memmove n=511                       16 ps/byte             56 GB/s
- *     memmove n=512                       17 ps/byte             54 GB/s
- *     memmove n=1023                      18 ps/byte             52 GB/s
- *     memmove n=1024                      13 ps/byte             72 GB/s
- *     memmove n=2047                       9 ps/byte             96 GB/s
- *     memmove n=2048                       9 ps/byte             98 GB/s
- *     memmove n=4095                       8 ps/byte            112 GB/s
- *     memmove n=4096                       8 ps/byte            109 GB/s
- *     memmove n=8191                       7 ps/byte            124 GB/s
- *     memmove n=8192                       7 ps/byte            125 GB/s
- *     memmove n=16383                      7 ps/byte            134 GB/s
- *     memmove n=16384                      7 ps/byte            134 GB/s
- *     memmove n=32767                     13 ps/byte             72 GB/s
- *     memmove n=32768                     13 ps/byte             72 GB/s
- *     memmove n=65535                     13 ps/byte             68 GB/s
- *     memmove n=65536                     14 ps/byte             67 GB/s
- *     memmove n=131071                    14 ps/byte             65 GB/s
- *     memmove n=131072                    14 ps/byte             64 GB/s
- *     memmove n=262143                    15 ps/byte             63 GB/s
- *     memmove n=262144                    15 ps/byte             63 GB/s
- *     memmove n=524287                    15 ps/byte             61 GB/s
- *     memmove n=524288                    15 ps/byte             61 GB/s
- *     memmove n=1048575                   15 ps/byte             61 GB/s
- *     memmove n=1048576                   15 ps/byte             61 GB/s
- *     memmove n=2097151                   19 ps/byte             48 GB/s
- *     memmove n=2097152                   27 ps/byte             35 GB/s
- *     memmove n=4194303                   28 ps/byte             33 GB/s
- *     memmove n=4194304                   28 ps/byte             33 GB/s
- *     memmove n=8388607                   28 ps/byte             33 GB/s
- *     memmove n=8388608                   28 ps/byte             33 GB/s
- *
- * DST and SRC may overlap.
- *
- * @param dst is destination
- * @param src is memory to copy
- * @param n is number of bytes to copy
- * @return dst
- * @asyncsignalsafe
- */
-void *memmove(void *dst, const void *src, size_t n) {
+static __vex void *__memmove(void *dst, const void *src, size_t n) {
   char *d;
   size_t i;
   const char *s;
   uint64_t a, b;
-  xmm_t v, w, x, y, V, W, X, Y, wut;
+  xmm_t v, w, x, y, V, W, X, Y;
   d = dst;
   s = src;
 
-#ifdef __x86__
+#if defined(__x86_64__) && !defined(__chibicc__)
   if (IsTiny()) {
     uint16_t w1, w2;
     uint32_t l1, l2;
@@ -211,12 +152,13 @@ void *memmove(void *dst, const void *src, size_t n) {
       *(xmm_t *)(d + n - 16) = Y;
       return d;
     default:
-      if (d == s) return d;
+      if (d == s)
+        return d;
 
-#ifdef __x86__
+#if defined(__x86_64__) && !defined(__chibicc__)
       if (n < kHalfCache3 || !kHalfCache3) {
         if (d > s) {
-          if (IsAsan() || n < 900 || !X86_HAVE(ERMS)) {
+          if (n < 900 || !X86_HAVE(ERMS)) {
             do {
               n -= 32;
               v = *(const xmm_t *)(s + n);
@@ -225,8 +167,6 @@ void *memmove(void *dst, const void *src, size_t n) {
               *(xmm_t *)(d + n + 16) = w;
             } while (n >= 32);
           } else {
-            if (IsAsan()) __asan_verify(d, n);
-            if (IsAsan()) __asan_verify(s, n);
             asm("std\n\t"
                 "rep movsb\n\t"
                 "cld"
@@ -235,7 +175,7 @@ void *memmove(void *dst, const void *src, size_t n) {
             return dst;
           }
         } else {
-          if (IsAsan() || n < 900 || !X86_HAVE(ERMS)) {
+          if (n < 900 || !X86_HAVE(ERMS)) {
             i = 0;
             do {
               v = *(const xmm_t *)(s + i);
@@ -247,8 +187,6 @@ void *memmove(void *dst, const void *src, size_t n) {
             s += i;
             n -= i;
           } else {
-            if (IsAsan()) __asan_verify(d, n);
-            if (IsAsan()) __asan_verify(s, n);
             asm("rep movsb"
                 : "+D"(d), "+S"(s), "+c"(n), "=m"(*(char(*)[n])d)
                 : "m"(*(char(*)[n])s));
@@ -341,5 +279,69 @@ void *memmove(void *dst, const void *src, size_t n) {
   }
 }
 
-asm("memcpy = memmove\n\t"
-    ".globl\tmemcpy");
+/**
+ * Copies memory.
+ *
+ *     memmove n=0                        661 picoseconds
+ *     memmove n=1                        661 ps/byte          1,476 mb/s
+ *     memmove n=2                        330 ps/byte          2,952 mb/s
+ *     memmove n=3                        330 ps/byte          2,952 mb/s
+ *     memmove n=4                        165 ps/byte          5,904 mb/s
+ *     memmove n=7                        141 ps/byte          6,888 mb/s
+ *     memmove n=8                         82 ps/byte             11 GB/s
+ *     memmove n=15                        44 ps/byte             21 GB/s
+ *     memmove n=16                        41 ps/byte             23 GB/s
+ *     memmove n=31                        32 ps/byte             29 GB/s
+ *     memmove n=32                        31 ps/byte             30 GB/s
+ *     memmove n=63                        21 ps/byte             45 GB/s
+ *     memmove n=64                        15 ps/byte             61 GB/s
+ *     memmove n=127                       13 ps/byte             73 GB/s
+ *     memmove n=128                       31 ps/byte             30 GB/s
+ *     memmove n=255                       20 ps/byte             45 GB/s
+ *     memmove n=256                       19 ps/byte             49 GB/s
+ *     memmove n=511                       16 ps/byte             56 GB/s
+ *     memmove n=512                       17 ps/byte             54 GB/s
+ *     memmove n=1023                      18 ps/byte             52 GB/s
+ *     memmove n=1024                      13 ps/byte             72 GB/s
+ *     memmove n=2047                       9 ps/byte             96 GB/s
+ *     memmove n=2048                       9 ps/byte             98 GB/s
+ *     memmove n=4095                       8 ps/byte            112 GB/s
+ *     memmove n=4096                       8 ps/byte            109 GB/s
+ *     memmove n=8191                       7 ps/byte            124 GB/s
+ *     memmove n=8192                       7 ps/byte            125 GB/s
+ *     memmove n=16383                      7 ps/byte            134 GB/s
+ *     memmove n=16384                      7 ps/byte            134 GB/s
+ *     memmove n=32767                     13 ps/byte             72 GB/s
+ *     memmove n=32768                     13 ps/byte             72 GB/s
+ *     memmove n=65535                     13 ps/byte             68 GB/s
+ *     memmove n=65536                     14 ps/byte             67 GB/s
+ *     memmove n=131071                    14 ps/byte             65 GB/s
+ *     memmove n=131072                    14 ps/byte             64 GB/s
+ *     memmove n=262143                    15 ps/byte             63 GB/s
+ *     memmove n=262144                    15 ps/byte             63 GB/s
+ *     memmove n=524287                    15 ps/byte             61 GB/s
+ *     memmove n=524288                    15 ps/byte             61 GB/s
+ *     memmove n=1048575                   15 ps/byte             61 GB/s
+ *     memmove n=1048576                   15 ps/byte             61 GB/s
+ *     memmove n=2097151                   19 ps/byte             48 GB/s
+ *     memmove n=2097152                   27 ps/byte             35 GB/s
+ *     memmove n=4194303                   28 ps/byte             33 GB/s
+ *     memmove n=4194304                   28 ps/byte             33 GB/s
+ *     memmove n=8388607                   28 ps/byte             33 GB/s
+ *     memmove n=8388608                   28 ps/byte             33 GB/s
+ *
+ * DST and SRC may overlap.
+ *
+ * @param dst is destination
+ * @param src is memory to copy
+ * @param n is number of bytes to copy
+ * @return dst
+ * @asyncsignalsafe
+ */
+void *memmove(void *dst, const void *src, size_t n) {
+  return __memmove(dst, src, n);
+}
+
+__weak_reference(memmove, memcpy);
+
+#endif /* __aarch64__ */

@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2021 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -19,10 +19,9 @@
 #include "ape/relocations.h"
 #include "ape/sections.internal.h"
 #include "libc/dce.h"
-#include "libc/intrin/bits.h"
 #include "libc/intrin/newbie.h"
 #include "libc/intrin/weaken.h"
-#include "libc/macros.internal.h"
+#include "libc/macros.h"
 #include "libc/nt/efi.h"
 #include "libc/nt/thunk/msabi.h"
 #include "libc/runtime/e820.internal.h"
@@ -30,6 +29,9 @@
 #include "libc/runtime/pc.internal.h"
 #include "libc/runtime/runtime.h"
 #include "libc/str/str.h"
+
+#pragma GCC diagnostic ignored "-Warray-bounds"
+#pragma GCC diagnostic ignored "-Wstringop-overflow"
 
 #ifdef __x86_64__
 
@@ -41,8 +43,10 @@ struct EfiArgs {
   char ArgBlock[0xC00];
 };
 
-static const EFI_GUID kEfiLoadedImageProtocol = LOADED_IMAGE_PROTOCOL;
-static const EFI_GUID kEfiGraphicsOutputProtocol = GRAPHICS_OUTPUT_PROTOCOL;
+static EFI_GUID kEfiLoadedImageProtocol = LOADED_IMAGE_PROTOCOL;
+static EFI_GUID kEfiGraphicsOutputProtocol = GRAPHICS_OUTPUT_PROTOCOL;
+static const EFI_GUID kEfiAcpi20TableGuid = ACPI_20_TABLE_GUID;
+static const EFI_GUID kEfiAcpi10TableGuid = ACPI_10_TABLE_GUID;
 
 extern const char vga_console[];
 extern void _EfiPostboot(struct mman *, uint64_t *, uintptr_t, char **);
@@ -105,7 +109,8 @@ static void EfiInitVga(struct mman *mm, EFI_SYSTEM_TABLE *SystemTable) {
     default:
       notpossible;
   }
-  if (!bytes_per_pix) notpossible;
+  if (!bytes_per_pix)
+    notpossible;
   mm->pc_video_type = vid_typ;
   mm->pc_video_stride = GraphMode->Info->PixelsPerScanLine * bytes_per_pix;
   mm->pc_video_width = GraphMode->Info->HorizontalResolution;
@@ -117,6 +122,25 @@ static void EfiInitVga(struct mman *mm, EFI_SYSTEM_TABLE *SystemTable) {
                                     GraphMode->FrameBufferSize, 0);
 }
 
+static void EfiInitAcpi(struct mman *mm, EFI_SYSTEM_TABLE *SystemTable) {
+  void *rsdp1 = NULL, *rsdp2 = NULL;
+  uintptr_t n = SystemTable->NumberOfTableEntries, i;
+  EFI_CONFIGURATION_TABLE *tab;
+  for (i = 0, tab = SystemTable->ConfigurationTable; i < n; ++i, ++tab) {
+    EFI_GUID *guid = &tab->VendorGuid;
+    if (memcmp(guid, &kEfiAcpi20TableGuid, sizeof(EFI_GUID)) == 0) {
+      rsdp2 = tab->VendorTable;
+    } else if (memcmp(guid, &kEfiAcpi20TableGuid, sizeof(EFI_GUID)) == 0) {
+      rsdp1 = tab->VendorTable;
+    }
+  }
+  if (rsdp2) {
+    mm->pc_acpi_rsdp = (uintptr_t)rsdp2;
+  } else {
+    mm->pc_acpi_rsdp = (uintptr_t)rsdp1;
+  }
+}
+
 /**
  * EFI Application Entrypoint.
  *
@@ -125,7 +149,7 @@ static void EfiInitVga(struct mman *mm, EFI_SYSTEM_TABLE *SystemTable) {
  * So if you want to trade away Windows so that you can use
  * UEFI instead of the normal BIOS boot process, do this:
  *
- *     STATIC_YOINK("EfiMain");
+ *     __static_yoink("EfiMain");
  *     int main() { ... }
  *
  * You can use QEMU to test this, but please note that UEFI
@@ -137,13 +161,12 @@ static void EfiInitVga(struct mman *mm, EFI_SYSTEM_TABLE *SystemTable) {
  *       -net none        \
  *       -drive format=raw,file=fat:rw:o/tool/viz
  *     FS0:
- *     deathstar.com
+ *     deathstar
  *
  * @see libc/dce.h
  */
-__msabi noasan EFI_STATUS EfiMain(EFI_HANDLE ImageHandle,
-                                  EFI_SYSTEM_TABLE *SystemTable) {
-  int type, x87cw = 0x037f;
+__msabi EFI_STATUS EfiMain(EFI_HANDLE ImageHandle,
+                           EFI_SYSTEM_TABLE *SystemTable) {
   struct mman *mm;
   uint32_t DescVersion;
   uintptr_t i, j, MapSize;
@@ -152,7 +175,11 @@ __msabi noasan EFI_STATUS EfiMain(EFI_HANDLE ImageHandle,
   EFI_MEMORY_DESCRIPTOR *Map, *Desc;
   uint64_t Address;
   uintptr_t Args, MapKey, DescSize;
-  uint64_t p, pe, cr4, *m, *pd, *sp, *pml4t, *pdt1, *pdt2, *pdpt1, *pdpt2;
+  uint64_t *pd, *pml4t, *pdt1, *pdt2, *pdpt1, *pdpt2;
+  const char16_t *CmdLine;
+
+  extern char os asm("__hostos");
+  os = _HOSTMETAL;
 
   /*
    * Allocates and clears PC-compatible memory and copies image.  Marks the
@@ -171,34 +198,43 @@ __msabi noasan EFI_STATUS EfiMain(EFI_HANDLE ImageHandle,
   Address = 0x79000;
   SystemTable->BootServices->AllocatePages(
       AllocateAddress, EfiRuntimeServicesData,
-      (0x7e000 - 0x79000 + sizeof(struct EfiArgs) + 4095) / 4096, &Address);
+      (0x7f000 - 0x79000 + sizeof(struct EfiArgs) + 4095) / 4096, &Address);
   Address = IMAGE_BASE_PHYSICAL;
   SystemTable->BootServices->AllocatePages(
-      AllocateAddress, EfiRuntimeServicesData, ((_end - _base) + 4095) / 4096,
-      &Address);
-  mm = (struct mman *)0x0500;
+      AllocateAddress, EfiRuntimeServicesData,
+      ((_end - __executable_start) + 4095) / 4096, &Address);
+  mm = __get_mm_phy();
   SystemTable->BootServices->SetMem(mm, sizeof(*mm), 0);
   SystemTable->BootServices->SetMem(
-      (void *)0x79000, 0x7e000 - 0x79000 + sizeof(struct EfiArgs), 0);
-  SystemTable->BootServices->CopyMem((void *)IMAGE_BASE_PHYSICAL, _base,
-                                     _end - _base);
+      (void *)0x79000, 0x7f000 - 0x79000 + sizeof(struct EfiArgs), 0);
+  SystemTable->BootServices->CopyMem((void *)IMAGE_BASE_PHYSICAL,
+                                     __executable_start,
+                                     _end - __executable_start);
 
   /*
    * Converts UEFI shell arguments to argv.
    */
-  ArgBlock = (struct EfiArgs *)0x7e000;
+  ArgBlock = (struct EfiArgs *)0x7f000;
   SystemTable->BootServices->HandleProtocol(ImageHandle,
                                             &kEfiLoadedImageProtocol, &ImgInfo);
-  Args = GetDosArgv(ImgInfo->LoadOptions, ArgBlock->ArgBlock,
-                    sizeof(ArgBlock->ArgBlock), ArgBlock->Args,
-                    ARRAYLEN(ArgBlock->Args));
+  CmdLine = (const char16_t *)ImgInfo->LoadOptions;
+  if (!CmdLine || !CmdLine[0])
+    CmdLine = u"BOOTX64.EFI";
+  Args = GetDosArgv(CmdLine, ArgBlock->ArgBlock, sizeof(ArgBlock->ArgBlock),
+                    ArgBlock->Args, ARRAYLEN(ArgBlock->Args));
 
   /*
    * Gets information about our current video mode.  Clears the screen.
    * TODO: if needed, switch to a video mode that has a linear frame buffer
    * type we support.
    */
-  if (_weaken(vga_console)) EfiInitVga(mm, SystemTable);
+  if (_weaken(vga_console))
+    EfiInitVga(mm, SystemTable);
+
+  /*
+   * Gets a pointer to the ACPI RSDP.
+   */
+  EfiInitAcpi(mm, SystemTable);
 
   /*
    * Asks UEFI which parts of our RAM we're allowed to use.
@@ -217,7 +253,8 @@ __msabi noasan EFI_STATUS EfiMain(EFI_HANDLE ImageHandle,
       case EfiLoaderData:
       case EfiBootServicesCode:
       case EfiBootServicesData:
-        if (Desc->PhysicalStart != 0) break;
+        if (Desc->PhysicalStart != 0)
+          break;
         /* fallthrough */
       case EfiConventionalMemory:
         mm->e820[j].addr = Desc->PhysicalStart;
@@ -257,7 +294,7 @@ __msabi noasan EFI_STATUS EfiMain(EFI_HANDLE ImageHandle,
    * Switches to copied image and launches program.
    */
   _EfiPostboot(mm, pml4t, Args, ArgBlock->Args);
-  unreachable;
+  __builtin_unreachable();
 }
 
 #endif /* __x86_64__ */

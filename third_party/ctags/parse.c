@@ -1,4 +1,3 @@
-// clang-format off
 /*
 *   $Id: parse.c 597 2007-07-31 05:35:30Z dhiebert $
 *
@@ -14,6 +13,7 @@
 /*
 *   INCLUDE FILES
 */
+#include "libc/ctype.h"
 #include "third_party/ctags/general.h"  /* must always come first */
 
 #include "libc/mem/alg.h"

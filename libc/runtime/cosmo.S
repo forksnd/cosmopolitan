@@ -1,5 +1,5 @@
 /*-*- mode:unix-assembly; indent-tabs-mode:t; tab-width:8; coding:utf-8     -*-│
-│vi: set et ft=asm ts=8 tw=8 fenc=utf-8                                     :vi│
+│ vi: set noet ft=asm ts=8 sw=8 fenc=utf-8                                 :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2020 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -16,11 +16,10 @@
 │ TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR             │
 │ PERFORMANCE OF THIS SOFTWARE.                                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
-#include "libc/macros.internal.h"
-#include "libc/notice.inc"
+#include "libc/macros.h"
 #include "libc/sysv/consts/prot.h"
 #include "libc/sysv/consts/map.h"
-#include "libc/intrin/strace.internal.h"
+#include "libc/intrin/strace.h"
 #include "libc/sysv/consts/map.h"
 #include "libc/dce.h"
 #ifdef __x86_64__
@@ -40,12 +39,13 @@ cosmo:	push	%rbp
 	mov	%rdx,%r14
 	mov	%rcx,%r15
 
-#ifdef SYSDEBUG
+#if SYSDEBUG
 	call	__strace_init
 	mov	%eax,%r12d
 #endif /* SYSDEBUG */
 
-//	Windows always initializes FPU to douuble precision.
+#ifndef NOX87
+//	Windows always initializes FPU to double precision.
 //	WSL breaks Linux ABI by initializing FPU to double precision.
 //	This code makes long double long again.
 //
@@ -70,10 +70,24 @@ cosmo:	push	%rbp
 //	                          d││││rr││││││
 1:	.short	0b00000000000000000001101111111
 	.previous
+#endif
 
 #ifdef __FAST_MATH__
 	push	%rax
 	stmxcsr	(%rsp)
+//
+//	Enable hardware optimizations in violation of the IEEE standard.
+//
+//	- 0x0040 enables "DAZ: Denormals Are Zeros" in MXCSR. This causes the
+//	  processor to turn denormal inputs into zero, before computing them.
+//	  See Intel Manual Vol. 1 §10.2.3.4
+//
+//	- 0x8000 enables "FTZ: Flush To Zero" in MXCSR. This means a floating
+//	  point operation that results in underflow will be set to zero, with
+//	  the same sign, rather than producing a denormalized output. It will
+//	  happen only if underflow trapping hasnt been enabled. See the Intel
+//	  Manual Vol. 1 §10.2.3.3.
+//
 	orl	$0x8040,(%rsp)
 	ldmxcsr	(%rsp)
 	pop	%rax
@@ -83,19 +97,18 @@ cosmo:	push	%rbp
 	call	_init
 
 //	call constructors
-	ezlea	__init_array_end,ax		// static ctors in forward order
-	.weak	__init_array_end		// could be called multiple times
-	ezlea	__init_array_start,cx		// idempotency recommended
-	.weak	__init_array_start		// @see ape/ape.lds
-1:	cmp	%rax,%rcx
+	.weak	__init_array_end
+	.weak	__init_array_start
+	mov	$__init_array_start,%eax
+1:	cmp	$__init_array_end,%eax
 	je	2f
-	sub	$8,%rax
 	push	%rax
-	push	%rcx
+	push	%rax
 	call	.Largs
 	call	*(%rax)
-	pop	%rcx
 	pop	%rax
+	pop	%rax
+	add	$8,%eax
 	jmp	1b
 
 //	call main()
@@ -121,77 +134,7 @@ cosmo:	push	%rbp
 	pop	%rdi
 	.init.end 304,_init_tls
 
-#if !IsTiny()
-//	Creates deterministically addressed stack we can use
-//
-//	This helps debugging be more comprehensible, because
-//	when diagnosing low-level problems when error report
-//	isn't working, sometimes numbers are all you have to
-//	go on, and we can't use them if kernel hardening has
-//	configured that meaningful data to be randomized.
-//
-//	Having deterministic addresses is also key to ensure
-//	builds, execution, and other things are reproducible
-	.init.start 304,_init_stack
-	testb	IsWindows()
-	jnz	9f
-	testb	IsMetal()
-	jnz	9f
-	push	%rdi
-	push	%rsi
-
-//	allocate stack
-	movabs	$ape_stack_vaddr,%rdi
-	mov	$ape_stack_memsz,%esi
-	mov	$ape_stack_prot,%edx
-	mov	$MAP_STACK,%ecx
-	or	MAP_ANONYMOUS,%ecx
-	or	$-1,%r8
-	xor	%r9d,%r9d
-	push	%rsi
-	push	%rsi
-	call	mmap
-	pop	%r8
-	pop	%r8
-	pop	%rsi
-	pop	%rdi
-	cmp	$-1,%rax
-	je	9f
-
-//	switch stacks
-//
-//	we subtract 8 because the openbsd kernel always checks rsp
-//	is on a MAP_STACK interval non-inclusively of stack + size
-	leave
-	pop	%rcx			// return address
-	sub	$8,%r8d			// openbsd:stackbound
-	lea	(%rax,%r8),%rsp
-	mov	$ape_stack_align,%eax
-	neg	%rax
-	and	%rax,%rsp
-	push	%rcx
-	push	%rbp
-	mov	%rsp,%rbp
-
-9:	nop
-	.init.end 304,_init_stack
-	.weak	ape_stack_prot
-	.weak	ape_stack_vaddr
-	.weak	ape_stack_memsz
-	.weak	ape_stack_align
-#endif
-
-#if IsAsan()
-	.init.start 305,_init_symbols
-	push	%rdi
-	push	%rsi
-	call	__init_symbols
-	pop	%rsi
-	pop	%rdi
-	.init.end 305,_init_symbols
-#endif
-
-#ifdef __PG__
+#ifdef FTRACE
 	.init.start 306,_init_ftrace
 	push	%rdi
 	push	%rsi
@@ -200,21 +143,6 @@ cosmo:	push	%rbp
 	pop	%rsi
 	pop	%rdi
 	.init.end 306,_init_ftrace
-#endif
-
-#if IsModeDbg()
-#ifdef SYSDEBUG
-	.init.start 307,_init_printargs
-	cmpl	$0,__strace(%rip)
-	jz	1f
-	push	%rdi
-	push	%rsi
-	loadstr	STRACE_PROLOGUE,di
-	call	__printargs
-	pop	%rsi
-	pop	%rdi
-1:	.init.end 307,_init_printargs
-#endif
 #endif
 
 #endif /* __x86_64__ */

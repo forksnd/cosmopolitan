@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2022 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -20,14 +20,35 @@
 #include "libc/thread/thread.h"
 
 /**
- * Defines minimum stack size for thread.
+ * Specifies minimum stack size for thread, e.g.
+ *
+ *     pthread_t th;
+ *     pthread_attr_t attr;
+ *     pthread_attr_init(&attr);
+ *     pthread_attr_setguardsize(&attr, 4096);
+ *     pthread_attr_setstacksize(&attr, 61440);
+ *     pthread_create(&th, &attr, thfunc, arg);
+ *     pthread_attr_destroy(&attr);
+ *
+ * On Linux, if you're not using `cosmocc -mtiny`, and you're not using
+ * cosmo_dlopen(), and guard size is nonzero, then `MAP_GROWSDOWN` will
+ * be used to create your stack memory. This helps minimize virtual
+ * memory consumption. Please note this is only possible if `stacksize`
+ * is no larger than the current `RLIMIT_STACK`, otherwise the runtime
+ * will map your stack using plain old mmap().
+ *
+ * Non-custom stacks may be recycled by the cosmo runtime. You can
+ * control this behavior by calling cosmo_stack_setmaxstacks(). It's
+ * useful for both tuning performance and hardening security. See also
+ * pthread_attr_setguardsize() which is important for security too.
  *
  * @param stacksize contains stack size in bytes
  * @return 0 on success, or errno on error
  * @raise EINVAL if `stacksize` is less than `PTHREAD_STACK_MIN`
  */
 errno_t pthread_attr_setstacksize(pthread_attr_t *a, size_t stacksize) {
-  if (stacksize < PTHREAD_STACK_MIN) return EINVAL;
+  if (stacksize < PTHREAD_STACK_MIN)
+    return EINVAL;
   a->__stacksize = stacksize;
   return 0;
 }

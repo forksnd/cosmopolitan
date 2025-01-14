@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2022 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -40,7 +40,8 @@ static const char *GetElfSymbol(uintptr_t funcaddr) {
 static const char *GetDispatchName(int x) {
   const char *s;
   s = GetElfSymbol(LO(GetShadow(x)));
-  if (_startswith(s, "Dispatch")) s += 8;
+  if (startswith(s, "Dispatch"))
+    s += 8;
   return s;
 }
 

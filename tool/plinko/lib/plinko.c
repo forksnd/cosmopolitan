@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2022 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -16,34 +16,35 @@
 │ TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR             │
 │ PERFORMANCE OF THIS SOFTWARE.                                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
+#include "tool/plinko/lib/plinko.h"
 #include "libc/calls/calls.h"
 #include "libc/calls/struct/sigaction.h"
+#include "libc/calls/syscall-sysv.internal.h"
 #include "libc/errno.h"
 #include "libc/intrin/likely.h"
-#include "libc/intrin/strace.internal.h"
+#include "libc/intrin/strace.h"
 #include "libc/log/countbranch.h"
 #include "libc/log/countexpr.h"
 #include "libc/log/log.h"
-#include "libc/macros.internal.h"
+#include "libc/macros.h"
 #include "libc/nexgen32e/rdtsc.h"
 #include "libc/runtime/runtime.h"
 #include "libc/runtime/stack.h"
 #include "libc/runtime/symbols.internal.h"
 #include "libc/stdio/stdio.h"
 #include "libc/str/str.h"
+#include "libc/sysv/consts/arch.h"
 #include "libc/sysv/consts/map.h"
 #include "libc/sysv/consts/o.h"
 #include "libc/sysv/consts/prot.h"
 #include "libc/sysv/consts/sig.h"
-#include "libc/time/clockstonanos.internal.h"
-#include "third_party/getopt/getopt.h"
+#include "third_party/getopt/getopt.internal.h"
 #include "tool/build/lib/case.h"
 #include "tool/plinko/lib/char.h"
 #include "tool/plinko/lib/error.h"
 #include "tool/plinko/lib/gc.h"
 #include "tool/plinko/lib/histo.h"
 #include "tool/plinko/lib/index.h"
-#include "tool/plinko/lib/plinko.h"
 #include "tool/plinko/lib/print.h"
 #include "tool/plinko/lib/printf.h"
 #include "tool/plinko/lib/stack.h"
@@ -56,6 +57,13 @@ STATIC_STACK_SIZE(0x100000);
 
 #define DISPATCH(ea, tm, r, p1, p2) \
   GetDispatchFn(LO(ea))(ea, tm, r, p1, p2, GetShadow(LO(ea)))
+
+static inline uint64_t ClocksToNanos(uint64_t x, uint64_t y) {
+  // approximation of round(x*.323018) which is usually
+  // the ratio between inva rdtsc ticks and nanoseconds
+  uint128_t difference = x - y;
+  return (difference * 338709) >> 20;
+}
 
 static void Unwind(int S) {
   int s;
@@ -81,8 +89,10 @@ static void Backtrace(int S) {
 
 forceinline bool ShouldIgnoreGarbage(int A) {
   static unsigned cadence;
-  if (DEBUG_GARBAGE) return false;
-  if (!(++cadence & AVERSIVENESS)) return false;
+  if (DEBUG_GARBAGE)
+    return false;
+  if (!(++cadence & AVERSIVENESS))
+    return false;
   return true;
 }
 
@@ -99,13 +109,16 @@ static relegated dontinline int ErrorExpr(void) {
 }
 
 static int Order(int x, int y) {
-  if (x < y) return -1;
-  if (x > y) return +1;
+  if (x < y)
+    return -1;
+  if (x > y)
+    return +1;
   return 0;
 }
 
 static int Append(int x, int y) {
-  if (!x) return y;
+  if (!x)
+    return y;
   return Cons(Car(x), Append(Cdr(x), y));
 }
 
@@ -127,21 +140,25 @@ static int ReconstructAlist(int a) {
 static bool AtomEquals(int x, const char *s) {
   dword t;
   do {
-    if (!*s) return false;
+    if (!*s)
+      return false;
     t = Get(x);
-    if (LO(t) != *s++) return false;  // xxx: ascii
+    if (LO(t) != *s++)
+      return false;  // xxx: ascii
   } while ((x = HI(t)) != TERM);
   return !*s;
 }
 
 static pureconst int LastCons(int x) {
-  while (Cdr(x)) x = Cdr(x);
+  while (Cdr(x))
+    x = Cdr(x);
   return x;
 }
 
 static pureconst int LastChar(int x) {
   dword e;
-  do e = Get(x);
+  do
+    e = Get(x);
   while ((x = HI(e)) != TERM);
   return LO(e);
 }
@@ -155,21 +172,25 @@ forceinline pureconst bool IsQuote(int x) {
 }
 
 static int Quote(int x) {
-  if (IsClosure(x)) return x;
-  if (IsPrecious(x)) return x;
+  if (IsClosure(x))
+    return x;
+  if (IsPrecious(x))
+    return x;
   return List(kQuote, x);
 }
 
 static int QuoteList(int x) {
-  if (!x) return x;
+  if (!x)
+    return x;
   return Cons(Quote(Car(x)), QuoteList(Cdr(x)));
 }
 
 static int GetAtom(const char *s) {
-  int x, y, t, u;
+  int x, y;
   ax = y = TERM;
   x = *s++ & 255;
-  if (*s) y = GetAtom(s);
+  if (*s)
+    y = GetAtom(s);
   return Intern(x, y);
 }
 
@@ -180,7 +201,8 @@ static int Gensym(void) {
   n = 0;
   x = g++;
   B[n++] = L'G';
-  do B[n++] = L'0' + (x & 7);
+  do
+    B[n++] = L'0' + (x & 7);
   while ((x >>= 3));
   B[n] = 0;
   for (a = 1, b = n - 1; a < b; ++a, --b) {
@@ -193,8 +215,10 @@ static int Gensym(void) {
 
 static nosideeffect bool Member(int v, int x) {
   while (x) {
-    if (x > 0) return v == x;
-    if (v == Car(x)) return true;
+    if (x > 0)
+      return v == x;
+    if (v == Car(x))
+      return true;
     x = Cdr(x);
   }
   return false;
@@ -214,8 +238,10 @@ static int GetBindings(int x, int a) {
 
 static int Lambda(int e, int a, dword p1, dword p2) {
   int u;
-  if (p1) a = Alist(LO(p1), HI(p1), a);
-  if (p2) a = Alist(LO(p2), HI(p2), a);
+  if (p1)
+    a = Alist(LO(p1), HI(p1), a);
+  if (p2)
+    a = Alist(LO(p2), HI(p2), a);
   if (DEBUG_CLOSURE || logc) {
     u = FindFreeVariables(e, 0, 0);
     a = GetBindings(u, a);
@@ -225,8 +251,10 @@ static int Lambda(int e, int a, dword p1, dword p2) {
 
 static int Function(int e, int a, dword p1, dword p2) {
   int u;
-  if (e < 0 && Car(e) == kLambda) e = Lambda(e, a, p1, p2);
-  if (e >= 0 || Car(e) != kClosure) Error("not a closure");
+  if (e < 0 && Car(e) == kLambda)
+    e = Lambda(e, a, p1, p2);
+  if (e >= 0 || Car(e) != kClosure)
+    Error("not a closure");
   a = Cddr(e);
   e = Cadr(e);
   u = FindFreeVariables(e, 0, 0);
@@ -419,8 +447,10 @@ struct T DispatchLookup(dword ea, dword tm, dword r, dword p1, dword p2,
   DCHECK(!IsPrecious(e));
   DCHECK_GT(e, 0);
   DCHECK_LE(a, 0);
-  if (LO(p1) == LO(ea)) return Ret(MAKE(HI(p1), 0), tm, r);
-  if (LO(p2) == LO(ea)) return Ret(MAKE(HI(p2), 0), tm, r);
+  if (LO(p1) == LO(ea))
+    return Ret(MAKE(HI(p1), 0), tm, r);
+  if (LO(p2) == LO(ea))
+    return Ret(MAKE(HI(p2), 0), tm, r);
   if ((kv = Assoc(e, a))) {
     return Ret(MAKE(Cdr(kv), 0), tm, r);  // (eval 𝑘 (…(𝑘 𝑣)…)) ⟹ 𝑣
   } else {
@@ -471,10 +501,12 @@ struct T DispatchOrder(dword ea, dword tm, dword r, dword p1, dword p2,
 struct T DispatchCons(dword ea, dword tm, dword r, dword p1, dword p2,
                       dword d) {
   int x;
-  if (cx < cHeap) cHeap = cx;
+  if (cx < cHeap)
+    cHeap = cx;
   x = Car(Cdr(LO(ea)));
   x = FasterRecurse(x, HI(ea), p1, p2);
-  if (!HI(d)) return Ret(MAKE(Cons(x, 0), 0), tm, r);
+  if (!HI(d))
+    return Ret(MAKE(Cons(x, 0), 0), tm, r);
   if (~r & NEED_POP) {
     r |= NEED_POP;
     Push(LO(ea));
@@ -530,7 +562,7 @@ struct T DispatchIf(dword ea, dword tm, dword r, dword p1, dword p2, dword d) {
 struct T DispatchPrinc(dword ea, dword tm, dword r, dword p1, dword p2,
                        dword d) {
   bool b;
-  int x, e, A;
+  int e;
   e = LO(ea);
   SetFrame(r, e);
   b = literally;
@@ -543,7 +575,6 @@ struct T DispatchPrinc(dword ea, dword tm, dword r, dword p1, dword p2,
 
 struct T DispatchFlush(dword ea, dword tm, dword r, dword p1, dword p2,
                        dword d) {
-  int x, A;
   SetFrame(r, LO(ea));
   Flush(1);
   return Ret(MAKE(kIgnore0, 0), tm, r);
@@ -719,7 +750,8 @@ struct T DispatchExpand(dword ea, dword tm, dword r, dword p1, dword p2,
 }
 
 static int GrabArgs(int x, int a, dword p1, dword p2) {
-  if (x >= 0) return x;
+  if (x >= 0)
+    return x;
   return Cons(recurse(MAKE(Car(x), a), p1, p2), GrabArgs(Cdr(x), a, p1, p2));
 }
 
@@ -792,15 +824,11 @@ Delegate:
 
 struct T DispatchCall1(dword ea, dword tm, dword r, dword p1, dword p2,
                        dword d) {
-  int a, b, e, f, t, u, y, p, z;
+  int b, e, u, y, p;
   e = LO(ea);
-  a = HI(ea);
   DCHECK_LT(e, 0);
   SetFrame(r, e);
-  f = Car(e);
-  z = Cdr(e);
   y = HI(d);
-  t = Car(y);
   // (eval ((⅄ (λ 𝑥 𝑦) 𝑏) 𝑧) 𝑎) ↩ (eval ((λ 𝑥 𝑦) 𝑧) 𝑏)
   y = Cdr(y);  // ((λ 𝑥 𝑦) 𝑏)
   u = Cdr(y);  //          𝑏
@@ -814,15 +842,11 @@ struct T DispatchCall1(dword ea, dword tm, dword r, dword p1, dword p2,
 
 struct T DispatchCall2(dword ea, dword tm, dword r, dword p1, dword p2,
                        dword d) {
-  int a, b, e, f, t, u, y, p, z;
+  int b, e, u, y, p;
   e = LO(ea);
-  a = HI(ea);
   DCHECK_LT(e, 0);
   SetFrame(r, e);
-  f = Car(e);
-  z = Cdr(e);
   y = HI(d);
-  t = Car(y);
   // (eval ((⅄ (λ 𝑥 𝑦) 𝑏) 𝑧) 𝑎) ↩ (eval ((λ 𝑥 𝑦) 𝑧) 𝑏)
   y = Cdr(y);  // ((λ 𝑥 𝑦) 𝑏)
   u = Cdr(y);  //          𝑏
@@ -876,7 +900,7 @@ static void PrintStats(long usec) {
           -cHeap - -cFrost, usec, cGets, cSets, cAtoms, -cFrost);
 }
 
-static wontreturn Exit(void) {
+static wontreturn int Exit(void) {
   exit(0 <= fails && fails <= 255 ? fails : 255);
 }
 
@@ -901,9 +925,8 @@ static wontreturn void PrintUsage(void) {
 }
 
 int Plinko(int argc, char *argv[]) {
-  long *p;
+  int S, x;
   bool trace;
-  int S, x, u, j;
   uint64_t t1, t2;
   tick = kStartTsc;
 #ifndef NDEBUG
@@ -935,8 +958,8 @@ int Plinko(int argc, char *argv[]) {
     }
   }
 
-  if (arch_prctl(ARCH_SET_FS, 0x200000000000) == -1 ||
-      arch_prctl(ARCH_SET_GS, (intptr_t)DispatchPlan) == -1) {
+  if (sys_arch_prctl(ARCH_SET_FS, 0x200000000000) == -1 ||
+      sys_arch_prctl(ARCH_SET_GS, (intptr_t)DispatchPlan) == -1) {
     fputs("error: ", stderr);
     fputs(strerror(errno), stderr);
     fputs("\nyour operating system doesn't allow you change both "
@@ -947,7 +970,7 @@ int Plinko(int argc, char *argv[]) {
   }
 
   if (mmap((void *)0x200000000000,
-           ROUNDUP((TERM + 1) * sizeof(g_mem[0]), FRAMESIZE),
+           ROUNDUP((TERM + 1) * sizeof(g_mem[0]), getgransize()),
            PROT_READ | PROT_WRITE, MAP_ANONYMOUS | MAP_PRIVATE | MAP_FIXED, -1,
            0) == MAP_FAILED ||
       mmap((void *)(0x200000000000 +
@@ -956,7 +979,7 @@ int Plinko(int argc, char *argv[]) {
            PROT_READ | PROT_WRITE, MAP_ANONYMOUS | MAP_PRIVATE | MAP_FIXED, -1,
            0) == MAP_FAILED ||
       mmap((void *)0x400000000000,
-           ROUNDUP((TERM + 1) * sizeof(g_mem[0]), FRAMESIZE),
+           ROUNDUP((TERM + 1) * sizeof(g_mem[0]), getgransize()),
            PROT_READ | PROT_WRITE, MAP_ANONYMOUS | MAP_PRIVATE | MAP_FIXED, -1,
            0) == MAP_FAILED ||
       mmap((void *)(0x400000000000 +
@@ -999,7 +1022,8 @@ int Plinko(int argc, char *argv[]) {
   kTail[5] = DispatchTailGc;
   kTail[6] = DispatchTailImpossible;
   kTail[7] = DispatchTailTmcGc;
-  if (trace) EnableTracing();
+  if (trace)
+    EnableTracing();
 
   cx = -1;
   cFrost = cx;
@@ -1014,7 +1038,8 @@ int Plinko(int argc, char *argv[]) {
       if (!(x = setjmp(crash))) {
         x = Read(0);
         x = expand(x, globals);
-        if (stats) ResetStats();
+        if (stats)
+          ResetStats();
         if (x < 0 && Car(x) == kDefine) {
           globals = Define(x, globals);
           cFrost = cx;

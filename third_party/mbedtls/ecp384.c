@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:4;tab-width:4;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2021 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -16,7 +16,6 @@
 │ TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR             │
 │ PERFORMANCE OF THIS SOFTWARE.                                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
-#include "libc/intrin/asan.internal.h"
 #include "libc/nexgen32e/x86feature.h"
 #include "libc/runtime/runtime.h"
 #include "libc/str/str.h"
@@ -27,7 +26,6 @@
 #include "third_party/mbedtls/math.h"
 #include "third_party/mbedtls/profile.h"
 #include "third_party/mbedtls/select.h"
-/* clang-format off */
 
 static bool
 mbedtls_p384_isz( uint64_t p[6] )
@@ -39,7 +37,7 @@ static bool
 mbedtls_p384_gte( uint64_t p[7] )
 {
     return( (((int64_t)p[6] > 0) |
-             (!p[6] &
+             ((!p[6]) &
               ((p[5] > 0xffffffffffffffff) |
                ((p[5] == 0xffffffffffffffff) &
                 ((p[4] > 0xffffffffffffffff) |
@@ -189,13 +187,11 @@ mbedtls_p384_mul( uint64_t X[12],
         void *f = 0;
         if( A == X )
         {
-            A = memcpy( malloc( 6 * 8 ), A, 6 * 8 );
-            f = A;
+            A = f = memcpy( malloc( 6 * 8 ), A, 6 * 8 );
         }
         else if( B == X )
         {
-            B = memcpy( malloc( 6 * 8 ), B, 6 * 8 );
-            f = B;
+            B = f = memcpy( malloc( 6 * 8 ), B, 6 * 8 );
         }
         Mul( X, A, n, B, m );
         mbedtls_platform_zeroize( X + n + m, (12 - n - m) * 8 );
@@ -414,10 +410,8 @@ int mbedtls_p384_double_jac( const mbedtls_ecp_group *G,
 {
     int ret;
     uint64_t T[4][12];
-    if( IsAsan() ) __asan_verify( P, sizeof( *P ) );
-    if( IsAsan() ) __asan_verify( R, sizeof( *R ) );
     if( ( ret = mbedtls_p384_dim( R ) ) ) return( ret );
-    if( ( ret = mbedtls_p384_dim( P ) ) ) return( ret );
+    if( ( ret = mbedtls_p384_dim( (void *)P ) ) ) return( ret );
     mbedtls_platform_zeroize( T, sizeof( T ) );
     mbedtls_p384_mul( T[1], P->Z.p, 6, P->Z.p, 6 );
     mbedtls_p384_add( T[2], P->X.p, T[1] );
@@ -456,10 +450,6 @@ int mbedtls_p384_add_mixed( const mbedtls_ecp_group *G,
         uint64_t T1[12], T2[12], T3[12], T4[12];
         size_t Xn, Yn, Zn, QXn, QYn;
     } s;
-    if( IsAsan() ) __asan_verify( G, sizeof( *G ) );
-    if( IsAsan() ) __asan_verify( P, sizeof( *P ) );
-    if( IsAsan() ) __asan_verify( Q, sizeof( *Q ) );
-    if( IsAsan() ) __asan_verify( R, sizeof( *R ) );
     if( ( ret = mbedtls_p384_dim( R ) ) ) return( ret );
     mbedtls_platform_zeroize( &s, sizeof( s ) );
     s.Xn  = mbedtls_mpi_limbs( &P->X );

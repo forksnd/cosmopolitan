@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2020 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -17,8 +17,16 @@
 │ PERFORMANCE OF THIS SOFTWARE.                                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
 #include "libc/stdio/rand.h"
-#include "libc/stdio/internal.h"
 #include "libc/stdio/lcg.internal.h"
+
+static uint64_t rando;
+
+/**
+ * Seeds random number generator that's used by rand().
+ */
+void srand(unsigned seed) {
+  rando = seed;
+}
 
 /**
  * Returns 31-bit linear congruential pseudorandom number, e.g.
@@ -36,7 +44,8 @@
  * @note this function does well on bigcrush and practrand
  * @note this function is not intended for cryptography
  * @see lemur64(), _rand64(), rdrand()
+ * @threadunsafe
  */
 int rand(void) {
-  return KnuthLinearCongruentialGenerator(&g_rando) >> 33;
+  return KnuthLinearCongruentialGenerator(&rando) >> 33;
 }

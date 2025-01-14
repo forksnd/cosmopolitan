@@ -31,13 +31,12 @@
 │ cosmopolitan § new technology » processes                                ─╬─│┼
 ╚────────────────────────────────────────────────────────────────────────────│*/
 
-#if !(__ASSEMBLER__ + __LINKER__ + 0)
 COSMOPOLITAN_C_START_
 
 bool32 CreateProcess(const char16_t *opt_lpApplicationName,
                      char16_t *lpCommandLine,
-                     struct NtSecurityAttributes *opt_lpProcessAttributes,
-                     struct NtSecurityAttributes *opt_lpThreadAttributes,
+                     const struct NtSecurityAttributes *opt_lpProcessAttributes,
+                     const struct NtSecurityAttributes *opt_lpThreadAttributes,
                      bool32 bInheritHandles, uint32_t dwCreationFlags,
                      void *opt_lpEnvironment,
                      const char16_t *opt_lpCurrentDirectory,
@@ -51,12 +50,16 @@ void SetLastError(uint32_t dwErrCode);
 uint32_t FormatMessage(uint32_t dwFlags, const void *lpSource,
                        uint32_t dwMessageId, uint32_t dwLanguageId,
                        char16_t *lpBuffer, uint32_t nSize, va_list *Arguments);
+uint32_t FormatMessageA(uint32_t dwFlags, const void *lpSource,
+                        uint32_t dwMessageId, uint32_t dwLanguageId,
+                        char *lpBuffer, uint32_t nSize, va_list *Arguments);
 int64_t OpenProcess(uint32_t dwDesiredAccess, bool32 bInheritHandle,
                     uint32_t dwProcessId);
 uint32_t GetCurrentProcessId(void); /* %gs:0x40 */
 uint32_t GetEnvironmentVariable(const char16_t *lpName, char16_t *lpBuffer,
                                 uint32_t nSize);
-uint32_t SetEnvironmentVariable(const char16_t *lpName, char16_t *lpValue);
+uint32_t SetEnvironmentVariable(const char16_t *lpName,
+                                const char16_t *lpValue);
 int32_t SetEnvironmentStrings(char16_t *NewEnvironment);
 bool32 GetProcessAffinityMask(int64_t hProcess, uint64_t *lpProcessAffinityMask,
                               uint64_t *lpSystemAffinityMask);
@@ -77,9 +80,19 @@ int64_t CreateToolhelp32Snapshot(uint32_t dwFlags, uint32_t th32ProcessID);
 bool32 Process32First(int64_t hSnapshot, struct NtProcessEntry32 *in_out_lppe);
 bool32 Process32Next(int64_t hSnapshot, struct NtProcessEntry32 *out_lppe);
 
+bool32 EnumProcesses(uint32_t *out_lpidProcess, uint32_t cb,
+                     uint32_t *out_lpcbNeeded) paramsnonnull();
+bool32 EnumProcessModules(int64_t hProcess, int64_t *out_lphModule, uint32_t cb,
+                          uint32_t *out_lpcbNeeded) paramsnonnull();
+bool32 EnumProcessModulesEx(int64_t hProcess, int64_t *out_lphModule,
+                            uint32_t cb, uint32_t *out_lpcbNeeded,
+                            uint32_t dwFilterFlag) paramsnonnull();
+uint32_t GetModuleBaseName(int64_t hProcess, int64_t opt_hModule,
+                           char16_t *out_lpBaseName, uint32_t nSize)
+    paramsnonnull();
+
 #if ShouldUseMsabiAttribute()
 #include "libc/nt/thunk/process.inc"
 #endif /* ShouldUseMsabiAttribute() */
 COSMOPOLITAN_C_END_
-#endif /* !(__ASSEMBLER__ + __LINKER__ + 0) */
 #endif /* COSMOPOLITAN_LIBC_NT_PROCESS_H_ */

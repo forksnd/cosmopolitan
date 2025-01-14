@@ -1,4 +1,3 @@
-/* clang-format off */
 /* lexer.c -- Lexer for html parser
 
   (c) 1998-2008 (W3C) MIT, ERCIM, Keio University
@@ -41,7 +40,6 @@
 #include "third_party/tidy/utf8.h"
 #include "third_party/tidy/streamio.h"
 #include "libc/assert.h"
-#include "libc/fmt/fmt.h"
 #include "third_party/tidy/sprtf.h"
 
 #if defined(ENABLE_DEBUG_LOG)

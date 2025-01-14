@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2020 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -16,12 +16,17 @@
 │ TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR             │
 │ PERFORMANCE OF THIS SOFTWARE.                                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
+#include "third_party/regex/regex.h"
+#include "libc/mem/gc.h"
 #include "libc/mem/mem.h"
-#include "libc/mem/gc.internal.h"
+#include "libc/str/locale.h"
 #include "libc/str/str.h"
 #include "libc/testlib/ezbench.h"
 #include "libc/testlib/testlib.h"
-#include "third_party/regex/regex.h"
+
+void SetUpOnce(void) {
+  setlocale(LC_ALL, "C.UTF-8");
+}
 
 TEST(regex, test) {
   regex_t rx;
@@ -38,7 +43,7 @@ TEST(regex, testDns) {
   regex_t rx;
   EXPECT_EQ(REG_OK, regcomp(&rx, "^[-._0-9A-Za-z]*$", REG_EXTENDED));
   EXPECT_EQ(REG_OK, regexec(&rx, "", 0, NULL, 0));
-  EXPECT_EQ(REG_OK, regexec(&rx, "foo.com", 0, NULL, 0));
+  EXPECT_EQ(REG_OK, regexec(&rx, "foo", 0, NULL, 0));
   EXPECT_EQ(REG_NOMATCH, regexec(&rx, "bar@example", 0, NULL, 0));
   regfree(&rx);
 }
@@ -96,20 +101,77 @@ TEST(regex, testUnicodeCharacterClass) {
 void A(void) {
   regex_t rx;
   regcomp(&rx, "^[-._0-9A-Za-z]*$", REG_EXTENDED);
-  regexec(&rx, "foo.com", 0, NULL, 0);
+  regexec(&rx, "foo", 0, NULL, 0);
   regfree(&rx);
 }
 void B(regex_t *rx) {
-  regexec(rx, "foo.com", 0, NULL, 0);
+  regexec(rx, "foo", 0, NULL, 0);
 }
 void C(void) {
   regex_t rx;
   regcomp(&rx, "^[-._0-9A-Za-z]*$", 0);
-  regexec(&rx, "foo.com", 0, NULL, 0);
+  regexec(&rx, "foo", 0, NULL, 0);
   regfree(&rx);
 }
 void D(regex_t *rx, regmatch_t *m) {
   regexec(rx, "127.0.0.1", rx->re_nsub + 1, m, 0);
+}
+
+TEST(ape, testPeMachoDd) {
+  regex_t rx;
+  ASSERT_EQ(REG_OK, regcomp(&rx,
+                            "bs="             // dd block size arg
+                            "(['\"] *)?"      // #1 optional quote w/ space
+                            "(\\$\\(\\( *)?"  // #2 optional math w/ space
+                            "([[:digit:]]+)"  // #3
+                            "( *\\)\\))?"     // #4 optional math w/ space
+                            "( *['\"])?"      // #5 optional quote w/ space
+                            " +"              //
+                            "skip=",
+                            REG_EXTENDED));
+  EXPECT_EQ(REG_OK, regexec(&rx, "bs=123 skip=", 0, NULL, 0));
+  EXPECT_EQ(REG_OK, regexec(&rx, "bs=\"123\" skip=", 0, NULL, 0));
+  EXPECT_EQ(REG_OK, regexec(&rx, "bs=$((123 skip=", 0, NULL, 0));
+  EXPECT_EQ(REG_OK, regexec(&rx, "bs=\"$((123 skip=", 0, NULL, 0));
+  EXPECT_EQ(REG_NOMATCH, regexec(&rx, "bs= skip=", 0, NULL, 0));
+  EXPECT_EQ(REG_NOMATCH, regexec(&rx, "bs= 123 skip=", 0, NULL, 0));
+  EXPECT_EQ(REG_NOMATCH, regexec(&rx, "bs= 123skip=", 0, NULL, 0));
+  EXPECT_EQ(REG_OK, regexec(&rx, "bs=' 123'  skip=", 0, NULL, 0));
+  EXPECT_EQ(REG_OK, regexec(&rx, "bs=$(( 123)) skip=", 0, NULL, 0));
+  EXPECT_EQ(REG_OK, regexec(&rx, "bs=\"$(( 123 ))\" skip=", 0, NULL, 0));
+  regfree(&rx);
+}
+
+TEST(ape, testPeMachoDd2) {
+  regex_t rx;
+  ASSERT_EQ(REG_OK, regcomp(&rx,
+                            "bs="              // dd block size arg
+                            "(['\"] *)?"       //   #1 optional quote w/ space
+                            "(\\$\\(\\( *)?"   //   #2 optional math w/ space
+                            "([[:digit:]]+)"   //   #3
+                            "( *\\)\\))?"      //   #4 optional math w/ space
+                            "( *['\"])?"       //   #5 optional quote w/ space
+                            " +"               //
+                            "skip="            // dd skip arg
+                            "(['\"] *)?"       //   #6 optional quote w/ space
+                            "(\\$\\(\\( *)?"   //   #7 optional math w/ space
+                            "([[:digit:]]+)"   //   #8
+                            "( *\\)\\))?"      //   #9 optional math w/ space
+                            "( *['\"])?"       //  #10 optional quote w/ space
+                            " +"               //
+                            "count="           // dd count arg
+                            "(['\"] *)?"       //  #11 optional quote w/ space
+                            "(\\$\\(\\( *)?"   //  #12 optional math w/ space
+                            "([[:digit:]]+)",  //  #13
+                            REG_EXTENDED));
+  ASSERT_EQ(13, rx.re_nsub);
+  regmatch_t *m = gc(calloc(rx.re_nsub + 1, sizeof(regmatch_t)));
+  const char *s = "dd bs=123 skip=$(( 456)) count='7'";
+  EXPECT_EQ(REG_OK, regexec(&rx, s, rx.re_nsub + 1, m, 0));
+  EXPECT_STREQ("123", gc(strndup(s + m[3].rm_so, m[3].rm_eo - m[3].rm_so)));
+  EXPECT_STREQ("456", gc(strndup(s + m[8].rm_so, m[8].rm_eo - m[8].rm_so)));
+  EXPECT_STREQ("7", gc(strndup(s + m[13].rm_so, m[13].rm_eo - m[13].rm_so)));
+  regfree(&rx);
 }
 
 BENCH(regex, bench) {

@@ -1,4 +1,3 @@
-/* clang-format off */
 /* tmbstr.c -- Tidy string utility functions
 
   (c) 1998-2006 (W3C) MIT, ERCIM, Keio University
@@ -8,7 +7,6 @@
 
 #include "third_party/tidy/forward.h"
 #include "third_party/tidy/tmbstr.h"
-#include "libc/fmt/fmt.h"
 #include "third_party/tidy/lexer.h"
 
 /* like strdup but using an allocator */
@@ -266,7 +264,7 @@ void TY_(strrep)(tmbstr buffer, ctmbstr str, ctmbstr rep)
             }
             else
             {
-                strncpy(buf,buffer,strlen(buffer) - strlen(p));
+                strncpy(__veil("r", buf),__veil("r", buffer),__veil("r", strlen(buffer) - strlen(p)));
                 strcat(buf,rep);
                 strcat(buf,p+strlen(str));
             }

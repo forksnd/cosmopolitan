@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2022 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -119,9 +119,7 @@ int main(int argc, char *argv[]) {
       printf(U(argv[1]), argv[2], argv[3], argv[4], argv[5], argv[6], argv[7]);
       return 0;
     default:
-      if (argc > 0) {
-        fprintf(stderr, "%s: %s format [arguments]\n", argv[0], argv[0]);
-      }
+      fprintf(stderr, "%s: %s format [arguments]\n", argv[0], argv[0]);
       return 1;
   }
 }

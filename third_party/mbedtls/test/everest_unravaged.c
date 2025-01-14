@@ -1,18 +1,15 @@
-#include "libc/intrin/bits.h"
 #include "libc/limits.h"
-#include "libc/time/time.h"
+#include "libc/time.h"
 #include "third_party/mbedtls/asn1.h"
 #include "third_party/mbedtls/bignum.h"
 #include "third_party/mbedtls/common.h"
 #include "third_party/mbedtls/error.h"
+#include "libc/serialize.h"
 #include "third_party/mbedtls/platform.h"
 
-asm(".ident\t\"\\n\\n\
-Everest (Apache 2.0)\\n\
-Copyright 2016-2018 INRIA and Microsoft Corporation\"");
-asm(".include \"libc/disclaimer.inc\"");
+__notice(everest_notice, "Everest (Apache 2.0)\n\
+Copyright 2016-2018 INRIA and Microsoft Corporation");
 
-/* clang-format off */
 /*
  *  ECDH with curve-optimized implementation multiplexing
  *

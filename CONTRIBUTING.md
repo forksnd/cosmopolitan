@@ -2,23 +2,77 @@
 
 We'd love to accept your patches! Please read this guide first.
 
+## Identity Disclosure
+
+This project does not accept anonymous contributions. Justine Tunney
+won't merge pull requests from strangers. In order to change the Cosmo
+codebase, and have your changes be upstreamed, she has to know who you
+are. You're encouraged to disclose your full name and email address to
+the public too, by including them in your git commit messages; however
+that's not a requirement; as we're happy to respect the wishes of
+contributors who prefer to remain anonymous to the public.
+
 ## Copyright Assignment
 
-Please send an email to Justine Tunney <jtunney@gmail.com> stating that
-you intend to assign her the copyright to the changes you contribute to
-Cosmopolitan. Please use the same email address you use for git commits
-which should only contain original source code from you or other people
-who are also assigning copyright. Please note that, if you're employed,
-you may need to get your employer's approval beforehand. If you can not
-assign copyright due to local laws, then you may alternatively consider
-disclaiming it using the language in [Unlicense](https://unlicense.org)
-or [CC-0](http://creativecommons.org/share-your-work/public-domain/cc0)
+The first time you send a pull request, you need to send an email to
+Justine Tunney <jtunney@gmail.com> stating that you intend to assign her
+the copyright to the changes you contribute to Cosmopolitan. It only
+needs to happen once. This only applies to the code you *choose* to
+contribute. The email should be sent from an email address associated
+with your identity. Your email should link to your pull request.
 
-This is important because we can't produce 12kb single-file executables
-that comply with license requirements if we have to embed lots of them.
-Although that's less of an issue depending on the purpose of the files.
-For example, ownership is much less of a concern in the unit test files
-so you're encouraged to put your copyright on those, provided it's ISC.
+To make things easy, here's an example of a good email you can use:
+
+> **From**: YOUR NAME (yname@gmail.com)  
+> **To**: Justine Tunney (jtunney@gmail.com)  
+> **Subject**: Cosmopolitan Copyright Assignment for YOUR NAME
+>
+> Hi Justine,
+>
+> I made my first contribution to Cosmopolitan in
+> https://github.com/jart/cosmopolitan/pull/XXXX could you please take a
+> look? I intend to assign you the copyright to the changes I contribute
+> to Cosmopolitan.
+>
+> Thanks!
+
+Please note that in order to give Justine the copyright, it has to be
+yours to give in the first place. If you're employed, then you should
+get your employer's approval to do this beforehand. Even with big
+companies like Google, this process is quick and painless. Usually we
+see employers granting authorization in less than one day.
+
+If you live in a country that doesn't recognize one's ability to assign
+copyright, then you may alternatively consider disclaiming it using the
+language in [Unlicense](https://unlicense.org) or
+[CC-0](http://creativecommons.org/share-your-work/public-domain/cc0).
+
+If you're checking-in third party code, then you need to have headers at
+the top of each source file (but never header files) documenting its
+owners and the code should go in the `third_party/` folder. Every third
+party project should have a `README.cosmo` file that documents its
+provenance as well as any local changes you've made.
+
+## Copyright Policy Exceptions
+
+### Tests
+
+You're encoraged to claim ownership of your test code. If you add a new
+file under the `test/` directory, then you should put your name in the
+ISC license header at the top of the file. If you add new test cases to
+an existing unit test file, then you're encouraged to append a line with
+your name to the existing copyright header of that file.
+
+### Exceptional Features
+
+Let's say you discovered a faster better way to implement `log10()` and
+you want to give it to Cosmopolitan. In cases like this, it really isn't
+appropriate for Justine to own your code. What you could do instead, is
+write your own new and improved `log10.c` from scratch, put your name on
+the top with the ISC license, and then add a `__notice()` directive so
+that your name will be embedded inside every executable that links the
+`log10()` function. This will help you get your name out there. Please
+note you need get approval from Justine each time you want to do this.
 
 ## Style Guide
 
@@ -29,34 +83,4 @@ clang-format -i -style=file tool/net/redbean.c
 ```
 
 If you use Emacs this can be automated on save for Cosmopolitan using
-[tool/emacs/cosmo-format.el]([tool/emacs/cosmo-format.el]).
-
-### Source Files
-
-- Must use include paths relative to the root of the repository
-- Must have comment at top of file documenting copyright and license
-- Must have notice embedding if not owned by Justine (exception: tests)
-- May use language extensions that are supported by both GCC and Clang
-- Should use Google indentation (otherwise use `/* clang-format off */`)
-- Should use asm() instead of compiler APIs (exception: ctz, clz, memcpy)
-
-### Header Files
-
-- Must not have copyright or license comments
-- Must have once guards (otherwise change `.h` to `.inc`)
-- Must be ANSI C89 compatible to be included in the amalgamation header
-- Must include its dependencies (exception: libc/integral/normalize.inc)
-- Must not define objects (i.e. `cc -c -xc foo.h` will produce empty `.o`)
-- Should not use typedefs
-- Should not use forward declarations
-- Should not include documentation comments
-- Should not include parameter names in prototypes
-- Should not pose problems if included by C++ or Assembly sources
-- Should not declare non-ANSI code, at all, when the user requests ANSI
-
-### Build Config
-
-- Must not write files outside `o/`
-- Must not communicate with Internet
-- Must not depend on system libraries
-- Must not depend on system commands (exception: sh, make, gzip, zip)
+[tool/emacs/cosmo-format.el](tool/emacs/cosmo-format.el).

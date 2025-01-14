@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2020 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -16,8 +16,8 @@
 │ TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR             │
 │ PERFORMANCE OF THIS SOFTWARE.                                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
-#include "libc/calls/calls.h"
 #include "libc/intrin/popcnt.h"
+#include "libc/calls/calls.h"
 #include "libc/testlib/ezbench.h"
 #include "libc/testlib/hyperion.h"
 #include "libc/testlib/testlib.h"
@@ -28,14 +28,14 @@ void SetUpOnce(void) {
 
 TEST(popcnt, test) {
   EXPECT_EQ(32, popcnt(0x5555555555555555));
-  EXPECT_EQ(32, popcnt(VEIL("r", 0x5555555555555555)));
-  EXPECT_EQ(32, (popcnt)(VEIL("r", 0x5555555555555555)));
+  EXPECT_EQ(32, popcnt(__veil("r", 0x5555555555555555)));
+  EXPECT_EQ(32, (popcnt)(__veil("r", 0x5555555555555555)));
 }
 
 BENCH(popcnt, bench) {
   EZBENCH2("popcnt", donothing,
-           EXPROPRIATE(popcnt(VEIL("r", 0x5555555555555555))));
+           __expropriate(popcnt(__veil("r", 0x5555555555555555))));
   EZBENCH2("(popcnt)", donothing,
-           EXPROPRIATE((popcnt)(VEIL("r", 0x5555555555555555))));
+           __expropriate((popcnt)(__veil("r", 0x5555555555555555))));
   EZBENCH_N("_countbits", kHyperionSize, _countbits(kHyperion, kHyperionSize));
 }

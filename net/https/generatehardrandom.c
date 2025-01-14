@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2021 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -16,10 +16,15 @@
 │ TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR             │
 │ PERFORMANCE OF THIS SOFTWARE.                                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
+#include "libc/assert.h"
 #include "libc/stdio/rand.h"
 #include "net/https/https.h"
 
 int GenerateHardRandom(void *ctx, unsigned char *p, size_t n) {
-  rngset(p, n, rdseed, 0);
+  size_t i;
+  ssize_t rc;
+  for (i = 0; i < n; i += (size_t)rc) {
+    npassert((rc = getrandom(p + i, n - i, 0)) != -1);
+  }
   return 0;
 }

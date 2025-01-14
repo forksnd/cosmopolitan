@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2022 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -33,14 +33,16 @@
 /**
  * Returns true if host platform is WSL 1.0.
  */
-bool IsWsl1(void) {
+bool __iswsl1(void) {
   static char res;
-  if (res) return res & 1;
-  if (!IsLinux()) return res = 2, false;
+  if (res)
+    return res & 1;
+  if (!IsLinux())
+    return res = 2, false;
   int e = errno;
-  _unassert(__sys_mmap((void *)1, 4096, PROT_READ | PROT_WRITE,
-                       MAP_FIXED | MAP_PRIVATE | ANONYMOUS | GROWSDOWN, -1, 0,
-                       0) == MAP_FAILED);
+  unassert(__sys_mmap((void *)1, 4096, PROT_READ | PROT_WRITE,
+                      MAP_FIXED | MAP_PRIVATE | ANONYMOUS | GROWSDOWN, -1, 0,
+                      0) == MAP_FAILED);
   bool tmp = errno == ENOTSUP;
   errno = e;
   res = 2 | tmp;

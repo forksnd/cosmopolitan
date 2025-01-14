@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2021 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -16,14 +16,14 @@
 │ TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR             │
 │ PERFORMANCE OF THIS SOFTWARE.                                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
+#include "third_party/lua/lunix.h"
 #include "libc/assert.h"
 #include "libc/atomic.h"
 #include "libc/calls/calls.h"
 #include "libc/calls/cp.internal.h"
-#include "libc/calls/ioctl.h"
 #include "libc/calls/makedev.h"
 #include "libc/calls/pledge.h"
-#include "libc/calls/struct/bpf.h"
+#include "libc/calls/struct/bpf.internal.h"
 #include "libc/calls/struct/dirent.h"
 #include "libc/calls/struct/flock.h"
 #include "libc/calls/struct/itimerval.h"
@@ -38,25 +38,23 @@
 #include "libc/calls/struct/timeval.h"
 #include "libc/calls/struct/winsize.h"
 #include "libc/calls/ucontext.h"
+#include "libc/calls/weirdtypes.h"
 #include "libc/dce.h"
-#include "libc/dns/dns.h"
 #include "libc/errno.h"
 #include "libc/fmt/conv.h"
-#include "libc/fmt/fmt.h"
 #include "libc/fmt/itoa.h"
 #include "libc/fmt/magnumstrs.internal.h"
 #include "libc/intrin/atomic.h"
-#include "libc/intrin/bits.h"
-#include "libc/intrin/strace.internal.h"
+#include "libc/serialize.h"
+#include "libc/intrin/strace.h"
 #include "libc/limits.h"
 #include "libc/log/log.h"
-#include "libc/macros.internal.h"
-#include "libc/mem/fmt.h"
+#include "libc/macros.h"
 #include "libc/mem/mem.h"
+#include "libc/nt/process.h"
 #include "libc/nt/runtime.h"
 #include "libc/nt/synchronization.h"
 #include "libc/runtime/clktck.h"
-#include "libc/runtime/memtrack.internal.h"
 #include "libc/runtime/runtime.h"
 #include "libc/runtime/sysconf.h"
 #include "libc/sock/sock.h"
@@ -67,7 +65,6 @@
 #include "libc/sock/syslog.h"
 #include "libc/stdio/append.h"
 #include "libc/stdio/stdio.h"
-#include "libc/str/path.h"
 #include "libc/str/str.h"
 #include "libc/sysv/consts/af.h"
 #include "libc/sysv/consts/at.h"
@@ -100,21 +97,24 @@
 #include "libc/sysv/consts/sol.h"
 #include "libc/sysv/consts/st.h"
 #include "libc/sysv/consts/tcp.h"
+#include "libc/sysv/consts/termios.h"
 #include "libc/sysv/consts/utime.h"
 #include "libc/sysv/consts/w.h"
 #include "libc/sysv/errfuns.h"
 #include "libc/thread/thread.h"
-#include "libc/time/struct/tm.h"
-#include "libc/time/time.h"
+#include "libc/time.h"
 #include "libc/x/x.h"
 #include "third_party/lua/cosmo.h"
 #include "third_party/lua/lauxlib.h"
 #include "third_party/lua/lgc.h"
 #include "third_party/lua/lua.h"
 #include "third_party/lua/luaconf.h"
-#include "third_party/lua/lunix.h"
-#include "third_party/nsync/futex.internal.h"
+#include "libc/sysv/consts/clock.h"
+#include "libc/cosmo.h"
+#include "libc/cosmo.h"
 #include "tool/net/luacheck.h"
+
+#define DNS_NAME_MAX  253
 
 /**
  * @fileoverview UNIX system calls thinly wrapped for Lua
@@ -128,12 +128,13 @@ static void *LuaRealloc(lua_State *L, void *p, size_t n) {
   if ((p2 = realloc(p, n))) {
     return p2;
   }
-  if (IsLegalSize(n)) {
+  if (n < 0x100000000000) {
     WARNF("reacting to malloc() failure by running lua garbage collector...");
     luaC_fullgc(L, 1);
-    p2 = realloc(p, n);
+    if ((p2 = realloc(p, n)))
+      return p2;
   }
-  return p2;
+  return p;
 }
 
 static void *LuaAlloc(lua_State *L, size_t n) {
@@ -146,7 +147,7 @@ static void *LuaAllocOrDie(lua_State *L, size_t n) {
     return p;
   } else {
     luaL_error(L, "out of memory");
-    unreachable;
+    __builtin_unreachable();
   }
 }
 
@@ -158,8 +159,8 @@ static lua_Integer FixLimit(long x) {
   }
 }
 
-static void LuaPushSigset(lua_State *L, struct sigset set) {
-  struct sigset *sp = lua_newuserdatauv(L, sizeof(*sp), 1);
+static void LuaPushSigset(lua_State *L, sigset_t set) {
+  sigset_t *sp = lua_newuserdatauv(L, sizeof(*sp), 1);
   luaL_setmetatable(L, "unix.Sigset");
   *sp = set;
 }
@@ -203,10 +204,10 @@ static dontinline int ReturnString(lua_State *L, const char *x) {
 }
 
 int LuaUnixSysretErrno(lua_State *L, const char *call, int olderr) {
+  int unixerr, winerr;
   struct UnixErrno *ep;
-  int i, unixerr, winerr;
   unixerr = errno;
-  winerr = GetLastError();
+  winerr = IsWindows() ? GetLastError() : 0;
   if (!IsTiny() && !(0 < unixerr && unixerr < (!IsWindows() ? 4096 : 65536))) {
     WARNF("errno should not be %d", unixerr);
   }
@@ -253,7 +254,7 @@ static int MakeSockaddr(lua_State *L, int i, struct sockaddr_storage *ss,
     if (!memccpy(((struct sockaddr_un *)ss)->sun_path, luaL_checkstring(L, i),
                  0, sizeof(((struct sockaddr_un *)ss)->sun_path))) {
       luaL_error(L, "unix path too long");
-      unreachable;
+      __builtin_unreachable();
     }
     *salen = sizeof(struct sockaddr_un);
     return i + 1;
@@ -278,7 +279,7 @@ static int PushSockaddr(lua_State *L, const struct sockaddr_storage *ss) {
     return 1;
   } else {
     luaL_error(L, "bad family");
-    unreachable;
+    __builtin_unreachable();
   }
 }
 
@@ -591,7 +592,7 @@ static int LuaUnixExecve(lua_State *L) {
       return LuaUnixSysretErrno(L, "execve", olderr);
     }
   } else {
-    ezargs[0] = prog;
+    ezargs[0] = (char *)prog;
     ezargs[1] = 0;
     argv = ezargs;
     envp = environ;
@@ -736,7 +737,7 @@ static int LuaUnixWait(lua_State *L) {
 //     └─→ nil, unix.Errno
 static int LuaUnixFcntl(lua_State *L) {
   struct flock lock;
-  int rc, fd, cmd, olderr = errno;
+  int fd, cmd, olderr = errno;
   fd = luaL_checkinteger(L, 1);
   cmd = luaL_checkinteger(L, 2);
   if (cmd == F_SETLK || cmd == F_SETLKW || cmd == F_GETLK) {
@@ -920,7 +921,6 @@ static int LuaUnixSetresgid(lua_State *L) {
 //     ├─→ 0
 //     └─→ nil, unix.Errno
 static int LuaUnixUtimensat(lua_State *L) {
-  struct timespec ts;
   int olderr = errno;
   return SysretInteger(
       L, "utimensat", olderr,
@@ -937,7 +937,6 @@ static int LuaUnixUtimensat(lua_State *L) {
 //     ├─→ 0
 //     └─→ nil, unix.Errno
 static int LuaUnixFutimens(lua_State *L) {
-  struct timespec ts;
   int olderr = errno;
   return SysretInteger(
       L, "futimens", olderr,
@@ -953,7 +952,7 @@ static int LuaUnixFutimens(lua_State *L) {
 //     └─→ nil, unix.Errno
 static int LuaUnixGettime(lua_State *L) {
   struct timespec ts;
-  int rc, olderr = errno;
+  int olderr = errno;
   if (!clock_gettime(luaL_optinteger(L, 1, CLOCK_REALTIME), &ts)) {
     lua_pushinteger(L, ts.tv_sec);
     lua_pushinteger(L, ts.tv_nsec);
@@ -1010,7 +1009,7 @@ static int LuaUnixOpen(lua_State *L) {
   return SysretInteger(
       L, "open", olderr,
       openat(luaL_optinteger(L, 4, AT_FDCWD), luaL_checkstring(L, 1),
-             luaL_optinteger(L, 2, O_RDONLY), luaL_optinteger(L, 3, 0)));
+             luaL_optinteger(L, 2, O_RDONLY), luaL_optinteger(L, 3, 0644)));
 }
 
 // unix.tmpfd()
@@ -1178,14 +1177,14 @@ static bool IsSockoptBool(int l, int x) {
            x == SO_KEEPALIVE ||   //
            x == SO_ACCEPTCONN ||  //
            x == SO_DONTROUTE;     //
-  } else if (l = SOL_TCP) {
+  } else if (l == SOL_TCP) {
     return x == TCP_NODELAY ||           //
            x == TCP_CORK ||              //
            x == TCP_QUICKACK ||          //
            x == TCP_SAVE_SYN ||          //
            x == TCP_FASTOPEN_CONNECT ||  //
            x == TCP_DEFER_ACCEPT;        //
-  } else if (l = SOL_IP) {
+  } else if (l == SOL_IP) {
     return x == IP_HDRINCL;  //
   } else {
     return false;
@@ -1198,7 +1197,7 @@ static bool IsSockoptInt(int l, int x) {
            x == SO_RCVBUF ||    //
            x == SO_RCVLOWAT ||  //
            x == SO_SNDLOWAT;    //
-  } else if (l = SOL_TCP) {
+  } else if (l == SOL_TCP) {
     return x == TCP_FASTOPEN ||       //
            x == TCP_KEEPCNT ||        //
            x == TCP_MAXSEG ||         //
@@ -1207,7 +1206,7 @@ static bool IsSockoptInt(int l, int x) {
            x == TCP_WINDOW_CLAMP ||   //
            x == TCP_KEEPIDLE ||       //
            x == TCP_KEEPINTVL;        //
-  } else if (l = SOL_IP) {
+  } else if (l == SOL_IP) {
     return x == IP_TOS ||  //
            x == IP_MTU ||  //
            x == IP_TTL;    //
@@ -1230,7 +1229,7 @@ static int LuaUnixSetsockopt(lua_State *L) {
   struct linger l;
   uint32_t optsize;
   struct timeval tv;
-  int rc, fd, level, optname, optint, olderr = errno;
+  int fd, level, optname, optint, olderr = errno;
   fd = luaL_checkinteger(L, 1);
   level = luaL_checkinteger(L, 2);
   optname = luaL_checkinteger(L, 3);
@@ -1281,7 +1280,7 @@ static int LuaUnixGetsockopt(lua_State *L) {
   uint32_t size;
   struct linger l;
   struct timeval tv;
-  int rc, fd, level, optname, optval, olderr = errno;
+  int fd, level, optname, optval, olderr = errno;
   fd = luaL_checkinteger(L, 1);
   level = luaL_checkinteger(L, 2);
   optname = luaL_checkinteger(L, 3);
@@ -1488,7 +1487,7 @@ static int LuaUnixPledge(lua_State *L) {
   int olderr = errno;
   __pledge_mode = luaL_optinteger(L, 3, 0);
   return SysretBool(L, "pledge", olderr,
-                    pledge(luaL_checkstring(L, 1), luaL_optstring(L, 2, 0)));
+                    pledge(luaL_optstring(L, 1, 0), luaL_optstring(L, 2, 0)));
 }
 
 // sandbox.unveil([path:str[, permissions:str]])
@@ -1544,10 +1543,10 @@ static int LuaUnixAccept(lua_State *L) {
 //     └─→ nil, unix.Errno
 static int LuaUnixPoll(lua_State *L) {
   size_t nfds;
-  struct sigset *mask;
+  sigset_t *mask;
   struct timespec ts, *tsp;
   struct pollfd *fds, *fds2;
-  int i, fd, events, olderr = errno;
+  int i, events, olderr = errno;
   luaL_checktype(L, 1, LUA_TTABLE);
   if (!lua_isnoneornil(L, 2)) {
     ts = timespec_frommillis(luaL_checkinteger(L, 2));
@@ -1569,7 +1568,10 @@ static int LuaUnixPoll(lua_State *L) {
         fds = fds2;
         ++nfds;
       } else {
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wuse-after-free"
         free(fds);
+#pragma GCC diagnostic pop
         return LuaUnixSysretErrno(L, "poll", olderr);
       }
     } else {
@@ -1633,7 +1635,7 @@ static int LuaUnixRecv(lua_State *L) {
   size_t got;
   ssize_t rc;
   lua_Integer bufsiz;
-  int fd, flags, pushed, olderr = errno;
+  int fd, flags, olderr = errno;
   fd = luaL_checkinteger(L, 1);
   bufsiz = luaL_optinteger(L, 2, 1500);
   bufsiz = MIN(bufsiz, 0x7ffff000);
@@ -1655,9 +1657,8 @@ static int LuaUnixRecv(lua_State *L) {
 //     ├─→ sent:int
 //     └─→ nil, unix.Errno
 static int LuaUnixSend(lua_State *L) {
-  char *data;
-  ssize_t rc;
-  size_t sent, size;
+  size_t size;
+  const char *data;
   int fd, flags, olderr = errno;
   fd = luaL_checkinteger(L, 1);
   data = luaL_checklstring(L, 2, &size);
@@ -1670,9 +1671,9 @@ static int LuaUnixSend(lua_State *L) {
 //     ├─→ sent:int
 //     └─→ nil, unix.Errno
 static int LuaUnixSendto(lua_State *L) {
-  char *data;
   size_t size;
   uint32_t salen;
+  const char *data;
   struct sockaddr_storage ss;
   int i, fd, flags, olderr = errno;
   fd = luaL_checkinteger(L, 1);
@@ -1697,9 +1698,8 @@ static int LuaUnixShutdown(lua_State *L) {
 //     ├─→ oldmask:unix.Sigset
 //     └─→ nil, unix.Errno
 static int LuaUnixSigprocmask(lua_State *L) {
-  uint64_t imask;
+  sigset_t oldmask;
   int olderr = errno;
-  struct sigset oldmask;
   if (!sigprocmask(luaL_checkinteger(L, 1),
                    luaL_checkudata(L, 2, "unix.Sigset"), &oldmask)) {
     LuaPushSigset(L, oldmask);
@@ -1731,14 +1731,14 @@ static void LuaUnixOnSignal(int sig, siginfo_t *si, void *ctx) {
 //     ├─→ oldhandler:func|int, flags:int, mask:unix.Sigset
 //     └─→ nil, unix.Errno
 static int LuaUnixSigaction(lua_State *L) {
-  struct sigset *mask;
+  sigset_t *mask;
   int i, n, sig, olderr = errno;
   struct sigaction sa, oldsa, *saptr = &sa;
   sigemptyset(&sa.sa_mask);
   sig = luaL_checkinteger(L, 1);
   if (!(1 <= sig && sig <= NSIG)) {
     luaL_argerror(L, 1, "signal number invalid");
-    unreachable;
+    __builtin_unreachable();
   }
   if (lua_isnoneornil(L, 2)) {
     // if handler/flags/mask aren't passed,
@@ -1766,12 +1766,11 @@ static int LuaUnixSigaction(lua_State *L) {
     lua_pop(L, 1);
   } else {
     luaL_argerror(L, 2, "sigaction handler not integer or function");
-    unreachable;
+    __builtin_unreachable();
   }
   if (!lua_isnoneornil(L, 4)) {
     mask = luaL_checkudata(L, 4, "unix.Sigset");
-    sa.sa_mask.__bits[0] |= mask->__bits[0];
-    sa.sa_mask.__bits[1] |= mask->__bits[1];
+    sigorset(&sa.sa_mask, &sa.sa_mask, mask);
     lua_remove(L, 4);
   }
   if (lua_isnoneornil(L, 3)) {
@@ -1822,8 +1821,8 @@ static int LuaUnixSigsuspend(lua_State *L) {
 //     ├─→ mask:unix.Sigset
 //     └─→ nil, unix.Errno
 static int LuaUnixSigpending(lua_State *L) {
+  sigset_t mask;
   int olderr = errno;
-  struct sigset mask;
   if (!sigpending(&mask)) {
     LuaPushSigset(L, mask);
     return 1;
@@ -2017,7 +2016,13 @@ static int LuaUnixTiocgwinsz(lua_State *L) {
 
 // unix.sched_yield()
 static int LuaUnixSchedYield(lua_State *L) {
-  sched_yield();
+  pthread_yield();
+  return 0;
+}
+
+// unix.verynice()
+static int LuaUnixVerynice(lua_State *L) {
+  verynice();
   return 0;
 }
 
@@ -2628,7 +2633,8 @@ static int LuaUnixErrnoToString(lua_State *L) {
   struct UnixErrno *e;
   e = GetUnixErrno(L);
   if (e->call) {
-    strerror_wr(e->errno_, e->winerr, msg, sizeof(msg));
+    if (IsWindows()) SetLastError(e->winerr);
+    strerror_r(e->errno_, msg, sizeof(msg));
     lua_pushfstring(L, "%s() failed: %s", e->call, msg);
   } else {
     lua_pushstring(L, _strerrno(e->errno_));
@@ -2685,7 +2691,7 @@ static int LuaUnixMemoryRead(lua_State *L) {
     // extracts nul-terminated string
     if (i > m->size) {
       luaL_error(L, "out of range");
-      unreachable;
+      __builtin_unreachable();
     }
     n = strnlen(m->u.bytes + i, m->size - i);
   } else {
@@ -2694,7 +2700,7 @@ static int LuaUnixMemoryRead(lua_State *L) {
     n = luaL_checkinteger(L, 3);
     if (i > m->size || n >= m->size || i + n > m->size) {
       luaL_error(L, "out of range");
-      unreachable;
+      __builtin_unreachable();
     }
   }
   pthread_mutex_lock(m->lock);
@@ -2723,12 +2729,12 @@ static int LuaUnixMemoryWrite(lua_State *L) {
   }
   if (i > m->size) {
     luaL_error(L, "out of range");
-    unreachable;
+    __builtin_unreachable();
   }
   if (lua_isnoneornil(L, b)) {
     // unix.Memory:write(data:str[, offset:int])
     // writes binary data, plus a nul terminator
-    if (i < n < m->size) {
+    if (i < n && n < m->size) {
       // include lua string's implicit nul so this round trips with
       // unix.Memory:read(offset:int) even when we're overwriting a
       // larger string that was previously inserted
@@ -2743,13 +2749,13 @@ static int LuaUnixMemoryWrite(lua_State *L) {
     j = luaL_checkinteger(L, b);
     if (j > n) {
       luaL_argerror(L, b, "bytes is more than what's in data");
-      unreachable;
+      __builtin_unreachable();
     }
     n = j;
   }
   if (i + n > m->size) {
     luaL_error(L, "out of range");
-    unreachable;
+    __builtin_unreachable();
   }
   pthread_mutex_lock(m->lock);
   memcpy(m->u.bytes + i, s, n);
@@ -2764,7 +2770,7 @@ static atomic_long *GetWord(lua_State *L) {
   i = luaL_checkinteger(L, 2);
   if (i >= m->size / sizeof(*m->u.words)) {
     luaL_error(L, "out of range");
-    unreachable;
+    __builtin_unreachable();
   }
   return m->u.words + i;
 }
@@ -2836,11 +2842,11 @@ static int LuaUnixMemoryXor(lua_State *L) {
 static int LuaUnixMemoryWait(lua_State *L) {
   lua_Integer expect;
   int rc, olderr = errno;
-  struct timespec ts, now, *deadline;
+  struct timespec ts, *deadline;
   expect = luaL_checkinteger(L, 3);
   if (!(INT32_MIN <= expect && expect <= INT32_MAX)) {
     luaL_argerror(L, 3, "must be an int32_t");
-    unreachable;
+    __builtin_unreachable();
   }
   if (lua_isnoneornil(L, 4)) {
     deadline = 0;  // wait forever
@@ -2849,10 +2855,10 @@ static int LuaUnixMemoryWait(lua_State *L) {
     ts.tv_nsec = luaL_optinteger(L, 5, 0);
     deadline = &ts;
   }
-  BEGIN_CANCELLATION_POINT;
-  rc = nsync_futex_wait_((atomic_int *)GetWord(L), expect,
-                         PTHREAD_PROCESS_SHARED, deadline);
-  END_CANCELLATION_POINT;
+  BEGIN_CANCELATION_POINT;
+  rc = cosmo_futex_wait((atomic_int *)GetWord(L), expect,
+                         PTHREAD_PROCESS_SHARED, CLOCK_REALTIME, deadline);
+  END_CANCELATION_POINT;
   if (rc < 0) errno = -rc, rc = -1;
   return SysretInteger(L, "futex_wait", olderr, rc);
 }
@@ -2862,9 +2868,9 @@ static int LuaUnixMemoryWait(lua_State *L) {
 static int LuaUnixMemoryWake(lua_State *L) {
   int count, woken;
   count = luaL_optinteger(L, 3, INT_MAX);
-  woken = nsync_futex_wake_((atomic_int *)GetWord(L), count,
+  woken = cosmo_futex_wake((atomic_int *)GetWord(L), count,
                             PTHREAD_PROCESS_SHARED);
-  _npassert(woken >= 0);
+  npassert(woken >= 0);
   return ReturnInteger(L, woken);
 }
 
@@ -2881,7 +2887,7 @@ static int LuaUnixMemoryGc(lua_State *L) {
   struct Memory *m;
   m = luaL_checkudata(L, 1, "unix.Memory");
   if (m->u.bytes) {
-    _npassert(!munmap(m->map, m->mapsize));
+    npassert(!munmap(m->map, m->mapsize));
     m->u.bytes = 0;
   }
   return 0;
@@ -2927,15 +2933,15 @@ static int LuaUnixMapshared(lua_State *L) {
   n = luaL_checkinteger(L, 1);
   if (!n) {
     luaL_error(L, "can't map empty region");
-    unreachable;
+    __builtin_unreachable();
   }
   if (n % sizeof(long)) {
     luaL_error(L, "size must be multiple of word size");
-    unreachable;
+    __builtin_unreachable();
   }
-  if (!IsLegalSize(n)) {
+  if (n >= 0x100000000000) {
     luaL_error(L, "map size too big");
-    unreachable;
+    __builtin_unreachable();
   }
   c = n;
   c += sizeof(*m->lock);
@@ -2943,7 +2949,7 @@ static int LuaUnixMapshared(lua_State *L) {
   c = ROUNDUP(c, g);
   if (!(p = _mapshared(c))) {
     luaL_error(L, "out of memory");
-    unreachable;
+    __builtin_unreachable();
   }
   m = lua_newuserdatauv(L, sizeof(*m), 1);
   luaL_setmetatable(L, "unix.Memory");
@@ -2953,7 +2959,7 @@ static int LuaUnixMapshared(lua_State *L) {
   m->mapsize = c;
   m->lock = (pthread_mutex_t *)p;
   pthread_mutexattr_init(&mattr);
-  pthread_mutexattr_settype(&mattr, PTHREAD_MUTEX_NORMAL);
+  pthread_mutexattr_settype(&mattr, PTHREAD_MUTEX_DEFAULT);
   pthread_mutexattr_setpshared(&mattr, PTHREAD_PROCESS_SHARED);
   pthread_mutex_init(m->lock, &mattr);
   pthread_mutexattr_destroy(&mattr);
@@ -2967,15 +2973,11 @@ static int LuaUnixMapshared(lua_State *L) {
 //     └─→ unix.Sigset
 static int LuaUnixSigset(lua_State *L) {
   int i, n;
-  lua_Integer sig;
-  struct sigset set;
+  sigset_t set;
   sigemptyset(&set);
   n = lua_gettop(L);
   for (i = 1; i <= n; ++i) {
-    sig = luaL_checkinteger(L, i);
-    if (1 <= sig && sig <= NSIG) {
-      set.__bits[(sig - 1) >> 6] |= 1ull << ((sig - 1) & 63);
-    }
+    sigaddset(&set, luaL_checkinteger(L, i));
   }
   LuaPushSigset(L, set);
   return 1;
@@ -2983,61 +2985,54 @@ static int LuaUnixSigset(lua_State *L) {
 
 // unix.Sigset:add(sig:int)
 static int LuaUnixSigsetAdd(lua_State *L) {
+  sigset_t *set;
   lua_Integer sig;
-  struct sigset *set;
   set = luaL_checkudata(L, 1, "unix.Sigset");
   sig = luaL_checkinteger(L, 2);
-  if (1 <= sig && sig <= NSIG) {
-    set->__bits[(sig - 1) >> 6] |= 1ull << ((sig - 1) & 63);
-  }
+  sigaddset(set, sig);
   return 0;
 }
 
 // unix.Sigset:remove(sig:int)
 static int LuaUnixSigsetRemove(lua_State *L) {
+  sigset_t *set;
   lua_Integer sig;
-  struct sigset *set;
   set = luaL_checkudata(L, 1, "unix.Sigset");
   sig = luaL_checkinteger(L, 2);
-  if (1 <= sig && sig <= NSIG) {
-    set->__bits[(sig - 1) >> 6] &= ~(1ull << ((sig - 1) & 63));
-  }
+  sigdelset(set, sig);
   return 0;
 }
 
 // unix.Sigset:fill()
 static int LuaUnixSigsetFill(lua_State *L) {
-  struct sigset *set;
+  sigset_t *set;
   set = luaL_checkudata(L, 1, "unix.Sigset");
-  memset(set, -1, sizeof(*set));
+  sigfillset(set);
   return 0;
 }
 
 // unix.Sigset:clear()
 static int LuaUnixSigsetClear(lua_State *L) {
-  struct sigset *set;
+  sigset_t *set;
   set = luaL_checkudata(L, 1, "unix.Sigset");
-  bzero(set, sizeof(*set));
+  sigemptyset(set);
   return 0;
 }
 
 // unix.Sigset:contains(sig:int)
 //     └─→ bool
 static int LuaUnixSigsetContains(lua_State *L) {
+  sigset_t *set;
   lua_Integer sig;
-  struct sigset *set;
   set = luaL_checkudata(L, 1, "unix.Sigset");
   sig = luaL_checkinteger(L, 2);
-  return ReturnBoolean(
-      L, (1 <= sig && sig <= NSIG)
-             ? !!(set->__bits[(sig - 1) >> 6] & (1ull << ((sig - 1) & 63)))
-             : false);
+  return ReturnBoolean(L, sigismember(set, sig));
 }
 
 static int LuaUnixSigsetTostring(lua_State *L) {
   char *b = 0;
+  sigset_t *ss;
   int sig, first;
-  struct sigset *ss;
   ss = luaL_checkudata(L, 1, "unix.Sigset");
   appends(&b, "unix.Sigset");
   appendw(&b, '(');
@@ -3094,7 +3089,7 @@ static DIR *GetDirOrDie(lua_State *L) {
   dirp = GetUnixDirSelf(L);
   if (*dirp) return *dirp;
   luaL_argerror(L, 1, "unix.UnixDir is closed");
-  unreachable;
+  __builtin_unreachable();
 }
 
 // unix.Dir:close()
@@ -3339,12 +3334,14 @@ static const luaL_Reg kLuaUnix[] = {
     {"unlink", LuaUnixUnlink},            // remove file
     {"unveil", LuaUnixUnveil},            // filesystem sandboxing
     {"utimensat", LuaUnixUtimensat},      // change access/modified time
+    {"verynice", LuaUnixVerynice},        // lowest priority
     {"wait", LuaUnixWait},                // wait for child to change status
     {"write", LuaUnixWrite},              // write to file or socket
     {0},                                  //
 };
 
-static void LoadMagnums(lua_State *L, struct MagnumStr *ms, const char *pfx) {
+static void LoadMagnums(lua_State *L, const struct MagnumStr *ms,
+                        const char *pfx) {
   int i;
   char b[64], *p;
   p = stpcpy(b, pfx);
@@ -3368,12 +3365,18 @@ int LuaUnix(lua_State *L) {
   lua_setglobal(L, "__signal_handlers");
 
   LoadMagnums(L, kErrnoNames, "");
-  LoadMagnums(L, kOpenFlags, "O_");
   LoadMagnums(L, kSignalNames, "");
   LoadMagnums(L, kIpOptnames, "IP_");
   LoadMagnums(L, kTcpOptnames, "TCP_");
   LoadMagnums(L, kSockOptnames, "SO_");
   LoadMagnums(L, kClockNames, "CLOCK_");
+
+  // open()
+  LuaSetIntField(L, "O_RDONLY", O_RDONLY);
+  LuaSetIntField(L, "O_WRONLY", O_WRONLY);
+  LuaSetIntField(L, "O_RDWR", O_RDWR);
+  LuaSetIntField(L, "O_ACCMODE", O_ACCMODE);
+  LoadMagnums(L, kOpenFlags, "O_");
 
   // seek() whence
   LuaSetIntField(L, "SEEK_SET", SEEK_SET);
@@ -3437,12 +3440,14 @@ int LuaUnix(lua_State *L) {
   LuaSetIntField(L, "SHUT_RDWR", SHUT_RDWR);
 
   // recvfrom() / sendto() flags
-  LuaSetIntField(L, "MSG_WAITALL", MSG_WAITALL);
-  LuaSetIntField(L, "MSG_DONTROUTE", MSG_DONTROUTE);
-  LuaSetIntField(L, "MSG_PEEK", MSG_PEEK);
   LuaSetIntField(L, "MSG_OOB", MSG_OOB);
+  LuaSetIntField(L, "MSG_PEEK", MSG_PEEK);
+  LuaSetIntField(L, "MSG_DONTROUTE", MSG_DONTROUTE);
+  LuaSetIntField(L, "MSG_DONTWAIT", MSG_DONTWAIT);
   LuaSetIntField(L, "MSG_NOSIGNAL", MSG_NOSIGNAL);
-  LuaSetIntField(L, "MSG_MORE", MSG_MORE);
+  LuaSetIntField(L, "MSG_WAITALL", MSG_WAITALL);
+  LuaSetIntField(L, "MSG_TRUNC", MSG_TRUNC);
+  LuaSetIntField(L, "MSG_CTRUNC", MSG_CTRUNC);
 
   // readdir() type
   LuaSetIntField(L, "DT_UNKNOWN", DT_UNKNOWN);
@@ -3519,7 +3524,7 @@ int LuaUnix(lua_State *L) {
   LuaSetIntField(L, "RUSAGE_CHILDREN", RUSAGE_CHILDREN);
   LuaSetIntField(L, "RUSAGE_BOTH", RUSAGE_BOTH);
 
-  LuaSetIntField(L, "ARG_MAX", __arg_max());
+  LuaSetIntField(L, "ARG_MAX", __get_arg_max());
   LuaSetIntField(L, "BUFSIZ", BUFSIZ);
   LuaSetIntField(L, "CLK_TCK", CLK_TCK);
   LuaSetIntField(L, "NAME_MAX", _NAME_MAX);

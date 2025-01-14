@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2020 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -17,6 +17,7 @@
 │ PERFORMANCE OF THIS SOFTWARE.                                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
 #include "libc/math.h"
+#if !(LDBL_MANT_DIG == 53 && LDBL_MAX_EXP == 1024)
 
 /**
  * Returns maximum of two long doubles.
@@ -26,10 +27,14 @@
  * signed zeroes.
  */
 long double fmaxl(long double x, long double y) {
-  if (__builtin_isnan(x)) return y;
-  if (__builtin_isnan(y)) return x;
-  if (__builtin_signbitl(x) != __builtin_signbitl(y)) {
-    return __builtin_signbitl(x) ? y : x; /* C99 Annex F.9.9.2 */
+  if (isnan(x))
+    return y;
+  if (isnan(y))
+    return x;
+  if (signbit(x) != signbit(y)) {
+    return signbit(x) ? y : x; /* C99 Annex F.9.9.2 */
   }
   return x < y ? y : x;
 }
+
+#endif /* long double is long */

@@ -1,4 +1,3 @@
-// clang-format off
 /*
  *	 $Id: tex.c 666 2008-05-15 17:47:31Z dfishburn $
  *
@@ -19,14 +18,14 @@
 #include "third_party/ctags/general.h"	/* must always come first */
 #include "libc/str/str.h"	/* to define isalpha () */
 #include "libc/runtime/runtime.h"
+#include "libc/ctype.h"
+
 #ifdef DEBUG
 #include "libc/calls/calls.h"
-#include "libc/calls/dprintf.h"
+#include "libc/stdio/dprintf.h"
 #include "libc/calls/weirdtypes.h"
-#include "libc/fmt/fmt.h"
-#include "libc/mem/fmt.h"
 #include "libc/stdio/stdio.h"
-#include "libc/stdio/temp.h"
+#include "libc/temp.h"
 #include "third_party/musl/tempnam.h"
 #endif
 

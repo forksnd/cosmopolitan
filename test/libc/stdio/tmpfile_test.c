@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2021 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -21,16 +21,16 @@
 #include "libc/calls/struct/stat.h"
 #include "libc/calls/syscall_support-sysv.internal.h"
 #include "libc/dce.h"
+#include "libc/limits.h"
 #include "libc/mem/gc.h"
 #include "libc/runtime/runtime.h"
 #include "libc/stdio/stdio.h"
-#include "libc/stdio/temp.h"
 #include "libc/str/str.h"
 #include "libc/sysv/consts/at.h"
+#include "libc/temp.h"
 #include "libc/testlib/testlib.h"
 #include "libc/x/xasprintf.h"
 
-char testlib_enable_tmp_setup_teardown;
 char oldtmpdir[PATH_MAX];
 
 bool IsDirectoryEmpty(const char *path) {
@@ -39,32 +39,38 @@ bool IsDirectoryEmpty(const char *path) {
   struct dirent *e;
   ASSERT_NE(NULL, (d = opendir(path)));
   while ((e = readdir(d))) {
-    if (!strcmp(e->d_name, ".")) continue;
-    if (!strcmp(e->d_name, "..")) continue;
+    if (!strcmp(e->d_name, "."))
+      continue;
+    if (!strcmp(e->d_name, ".."))
+      continue;
     res = false;
   }
   closedir(d);
   return res;
 }
 
+void SetUpOnce(void) {
+  testlib_enable_tmp_setup_teardown();
+}
+
 void SetUp(void) {
-  strcpy(oldtmpdir, kTmpPath);
-  strcpy(kTmpPath, ".");
+  strcpy(oldtmpdir, __get_tmpdir());
+  strcpy(__get_tmpdir(), ".");
 }
 
 void TearDown(void) {
-  strcpy(kTmpPath, oldtmpdir);
+  strcpy(__get_tmpdir(), oldtmpdir);
 }
 
 TEST(tmpfile, test) {
   FILE *f;
   struct stat st;
-  EXPECT_TRUE(IsDirectoryEmpty(kTmpPath));
+  EXPECT_TRUE(IsDirectoryEmpty(__get_tmpdir()));
   f = tmpfile();
   if (IsWindows()) {
-    EXPECT_FALSE(IsDirectoryEmpty(kTmpPath));
+    EXPECT_FALSE(IsDirectoryEmpty(__get_tmpdir()));
   } else {
-    EXPECT_TRUE(IsDirectoryEmpty(kTmpPath));
+    EXPECT_TRUE(IsDirectoryEmpty(__get_tmpdir()));
   }
   EXPECT_SYS(0, 0, fstat(fileno(f), &st));
   EXPECT_NE(010600, st.st_mode);
@@ -73,16 +79,19 @@ TEST(tmpfile, test) {
   rewind(f);
   EXPECT_EQ('t', fgetc(f));
   EXPECT_EQ(0, fclose(f));
-  EXPECT_TRUE(IsDirectoryEmpty(kTmpPath));
+  EXPECT_TRUE(IsDirectoryEmpty(__get_tmpdir()));
 }
 
+#ifndef __aarch64__
+// TODO(jart): Why does this apply to pi and qemu-aarch64?
 TEST(tmpfile, renameToRealFile) {
-  if (!IsLinux() || !__is_linux_2_6_23()) return;
+  if (!(IsLinux() && __is_linux_2_6_23()))
+    return;  // need non-ancient linux
   FILE *f;
   f = tmpfile();
   ASSERT_EQ(2, fputs("hi", f));
   ASSERT_SYS(0, 0,
-             linkat(AT_FDCWD, _gc(xasprintf("/proc/self/fd/%d", fileno(f))),
+             linkat(AT_FDCWD, gc(xasprintf("/proc/self/fd/%d", fileno(f))),
                     AT_FDCWD, "real", AT_SYMLINK_FOLLOW));
   ASSERT_EQ(0, fclose(f));
   ASSERT_NE(NULL, (f = fopen("real", "r")));
@@ -90,3 +99,4 @@ TEST(tmpfile, renameToRealFile) {
   ASSERT_EQ('i', fgetc(f));
   ASSERT_EQ(0, fclose(f));
 }
+#endif

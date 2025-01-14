@@ -2,7 +2,6 @@
 #define NSYNC_MU_WAIT_H_
 #include "third_party/nsync/mu.h"
 #include "third_party/nsync/time.h"
-#if !(__ASSEMBLER__ + __LINKER__ + 0)
 COSMOPOLITAN_C_START_
 
 /* nsync_mu_wait() and nsync_mu_wait_with_deadline() can be used instead
@@ -98,7 +97,7 @@ void nsync_mu_wait(nsync_mu *mu, int (*condition)(const void *condition_arg),
 int nsync_mu_wait_with_deadline(
     nsync_mu *mu, int (*condition)(const void *condition_arg),
     const void *condition_arg,
-    int (*condition_arg_eq)(const void *a, const void *b),
+    int (*condition_arg_eq)(const void *a, const void *b), int clock,
     nsync_time abs_deadline, struct nsync_note_s_ *cancel_note);
 
 /* Unlock *mu, which must be held in write mode, and wake waiters, if
@@ -114,5 +113,4 @@ int nsync_mu_wait_with_deadline(
 void nsync_mu_unlock_without_wakeup(nsync_mu *mu);
 
 COSMOPOLITAN_C_END_
-#endif /* !(__ASSEMBLER__ + __LINKER__ + 0) */
 #endif /* NSYNC_MU_WAIT_H_ */

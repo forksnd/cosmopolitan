@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2020 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -16,8 +16,11 @@
 │ TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR             │
 │ PERFORMANCE OF THIS SOFTWARE.                                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
+#include "libc/calls/createfileflags.internal.h"
 #include "libc/calls/internal.h"
+#include "libc/calls/sig.internal.h"
 #include "libc/calls/state.internal.h"
+#include "libc/calls/struct/sigset.internal.h"
 #include "libc/calls/syscall_support-nt.internal.h"
 #include "libc/nt/createfile.h"
 #include "libc/nt/enum/fileflagandattributes.h"
@@ -28,28 +31,30 @@
 #include "libc/sysv/consts/o.h"
 #include "libc/sysv/errfuns.h"
 
-textwindows int sys_fadvise_nt(int fd, uint64_t offset, uint64_t len,
-                               int advice) {
+static textwindows int sys_fadvise_nt_impl(int fd, uint64_t offset,
+                                           uint64_t len, int advice) {
   int64_t h1, h2;
   int rc, flags, mode;
   uint32_t perm, share, attr;
 
-  if ((int64_t)len < 0) return einval();
-  if (!__isfdkind(fd, kFdFile)) return ebadf();
+  if ((int64_t)len < 0)
+    return einval();
+  if (!__isfdkind(fd, kFdFile))
+    return ebadf();
   h1 = g_fds.p[fd].handle;
   mode = g_fds.p[fd].mode;
   flags = g_fds.p[fd].flags;
-  flags &= ~(O_SEQUENTIAL | O_RANDOM);
+  flags &= ~(_O_SEQUENTIAL | _O_RANDOM);
 
   switch (advice) {
     case MADV_NORMAL:
       break;
     case MADV_RANDOM:
-      flags |= O_RANDOM;
+      flags |= _O_RANDOM;
       break;
     case MADV_WILLNEED:
     case MADV_SEQUENTIAL:
-      flags |= O_SEQUENTIAL;
+      flags |= _O_SEQUENTIAL;
       break;
     default:
       return einval();
@@ -83,5 +88,14 @@ textwindows int sys_fadvise_nt(int fd, uint64_t offset, uint64_t len,
   }
   __fds_unlock();
 
+  return rc;
+}
+
+textwindows int sys_fadvise_nt(int fd, uint64_t offset, uint64_t len,
+                               int advice) {
+  int rc;
+  BLOCK_SIGNALS;
+  rc = sys_fadvise_nt_impl(fd, offset, len, advice);
+  ALLOW_SIGNALS;
   return rc;
 }

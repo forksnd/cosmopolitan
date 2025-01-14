@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2021 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -17,25 +17,25 @@
 │ PERFORMANCE OF THIS SOFTWARE.                                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
 #include "libc/fmt/conv.h"
-#include "libc/fmt/fmt.h"
-#include "libc/mem/gc.internal.h"
+#include "libc/fmt/libgen.h"
+#include "libc/mem/gc.h"
 #include "libc/testlib/testlib.h"
 #include "libc/x/x.h"
 
 TEST(stripexts, test) {
-  char s[] = "foo/bar.com.dbg";
+  char s[] = "foo/bar.dbg";
   EXPECT_STREQ("foo/bar", stripexts(s));
 }
 
 TEST(stripexts, test2) {
-  char s[] = "foo/bar.com.dbg";
+  char s[] = "foo/bar.dbg";
   EXPECT_STREQ("bar", stripexts(basename(s)));
 }
 
 TEST(xstripexts, test) {
-  EXPECT_STREQ("foo/bar", gc(xstripexts("foo/bar.com.dbg")));
+  EXPECT_STREQ("foo/bar", gc(xstripexts("foo/bar.dbg")));
 }
 
 TEST(xstripexts, test2) {
-  EXPECT_STREQ("bar", gc(xstripexts(basename("foo/bar.com.dbg"))));
+  EXPECT_STREQ("bar", gc(xstripexts(basename("foo/bar.dbg"))));
 }

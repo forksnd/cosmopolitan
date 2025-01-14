@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2022 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -17,7 +17,7 @@
 │ PERFORMANCE OF THIS SOFTWARE.                                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
 #include "libc/calls/syscall_support-nt.internal.h"
-#include "libc/intrin/strace.internal.h"
+#include "libc/intrin/strace.h"
 #include "libc/nt/files.h"
 #include "libc/nt/thunk/msabi.h"
 
@@ -30,7 +30,8 @@ __msabi extern typeof(FindClose) *const __imp_FindClose;
 textwindows bool32 FindClose(int64_t hFindFile) {
   bool32 ok;
   ok = __imp_FindClose(hFindFile);
-  if (!ok) __winerr();
+  if (!ok)
+    __winerr();
   NTTRACE("FindClose(%ld) → %hhhd% m", hFindFile, ok);
   return ok;
 }

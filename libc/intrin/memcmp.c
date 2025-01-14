@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2020 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -25,7 +25,7 @@
 
 typedef char xmm_t __attribute__((__vector_size__(16), __aligned__(1)));
 
-#ifdef __x86_64__
+#if defined(__x86_64__) && !defined(__chibicc__)
 
 static dontinline antiquity int memcmp_sse(const unsigned char *p,
                                            const unsigned char *q, size_t n) {
@@ -56,9 +56,9 @@ static dontinline antiquity int memcmp_sse(const unsigned char *p,
   }
 }
 
-microarchitecture("avx") static int memcmp_avx(const unsigned char *p,
-                                               const unsigned char *q,
-                                               size_t n) {
+_Microarchitecture("avx") static int memcmp_avx(const unsigned char *p,
+                                                const unsigned char *q,
+                                                size_t n) {
   uint64_t w;
   unsigned u;
   if (n > 32) {
@@ -106,41 +106,48 @@ microarchitecture("avx") static int memcmp_avx(const unsigned char *p,
 /**
  * Compares memory byte by byte.
  *
- *     memcmp n=0                         992 picoseconds
- *     memcmp n=1                           1 ns/byte            738 mb/s
- *     memcmp n=2                         661 ps/byte          1,476 mb/s
- *     memcmp n=3                         551 ps/byte          1,771 mb/s
- *     memcmp n=4                         248 ps/byte          3,936 mb/s
- *     memcmp n=5                         198 ps/byte          4,920 mb/s
- *     memcmp n=6                         165 ps/byte          5,904 mb/s
- *     memcmp n=7                         141 ps/byte          6,889 mb/s
- *     memcmp n=8                         124 ps/byte          7,873 mb/s
- *     memcmp n=9                         110 ps/byte          8,857 mb/s
- *     memcmp n=15                         44 ps/byte         22,143 mb/s
- *     memcmp n=16                         41 ps/byte         23,619 mb/s
- *     memcmp n=17                         77 ps/byte         12,547 mb/s
- *     memcmp n=31                         42 ps/byte         22,881 mb/s
- *     memcmp n=32                         41 ps/byte         23,619 mb/s
- *     memcmp n=33                         60 ps/byte         16,238 mb/s
- *     memcmp n=80                         53 ps/byte         18,169 mb/s
- *     memcmp n=128                        38 ps/byte         25,194 mb/s
- *     memcmp n=256                        32 ps/byte         30,233 mb/s
- *     memcmp n=16384                      27 ps/byte         35,885 mb/s
- *     memcmp n=32768                      29 ps/byte         32,851 mb/s
- *     memcmp n=131072                     33 ps/byte         28,983 mb/s
+ *     memcmp n=0                           2 nanoseconds
+ *     memcmp n=1                           2 ns/byte            357 mb/s
+ *     memcmp n=2                           1 ns/byte            530 mb/s
+ *     memcmp n=3                           1 ns/byte            631 mb/s
+ *     𝗺𝗲𝗺𝗰𝗺𝗽 n=4                           1 ns/byte            849 mb/s
+ *     memcmp n=5                         816 ps/byte          1,195 mb/s
+ *     memcmp n=6                         888 ps/byte          1,098 mb/s
+ *     memcmp n=7                         829 ps/byte          1,176 mb/s
+ *     𝗺𝗲𝗺𝗰𝗺𝗽 n=8                         773 ps/byte          1,261 mb/s
+ *     memcmp n=9                         629 ps/byte          1,551 mb/s
+ *     memcmp n=15                        540 ps/byte          1,805 mb/s
+ *     𝗺𝗲𝗺𝗰𝗺𝗽 n=16                        211 ps/byte          4,623 mb/s
+ *     memcmp n=17                        268 ps/byte          3,633 mb/s
+ *     memcmp n=31                        277 ps/byte          3,524 mb/s
+ *     memcmp n=32                        153 ps/byte          6,351 mb/s
+ *     memcmp n=33                        179 ps/byte          5,431 mb/s
+ *     memcmp n=79                        148 ps/byte          6,576 mb/s
+ *     𝗺𝗲𝗺𝗰𝗺𝗽 n=80                         81 ps/byte             11 GB/s
+ *     memcmp n=128                        76 ps/byte             12 GB/s
+ *     memcmp n=256                        60 ps/byte             15 GB/s
+ *     memcmp n=16384                      51 ps/byte             18 GB/s
+ *     memcmp n=32768                      51 ps/byte             18 GB/s
+ *     memcmp n=131072                     52 ps/byte             18 GB/s
  *
- * @return unsigned char subtraction at stop index
+ * @return an integer that's (1) equal to zero if `a` is equal to `b`,
+ *     (2) less than zero if `a` is less than `b`, or (3) greater than
+ *     zero if `a` is greater than `b`
  * @asyncsignalsafe
  */
 int memcmp(const void *a, const void *b, size_t n) {
   int c;
+#if defined(__x86_64__) && !defined(__chibicc__)
   unsigned u;
   uint32_t k, i, j;
   uint64_t w, x, y;
+#endif
   const unsigned char *p, *q;
-  if ((p = a) == (q = b) || !n) return 0;
-  if ((c = *p - *q)) return c;
-#ifdef __x86_64__
+  if ((p = a) == (q = b) || !n)
+    return 0;
+  if ((c = *p - *q))
+    return c;
+#if defined(__x86_64__) && !defined(__chibicc__)
   if (!IsTiny()) {
     if (n <= 16) {
       if (n >= 8) {

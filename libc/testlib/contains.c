@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2020 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -20,8 +20,10 @@
 #include "libc/testlib/testlib.h"
 
 bool testlib_contains(size_t cw, const void *s, const void *needle) {
-  if (s == needle) return true;
-  if (!s || !needle) return false;
+  if (s == needle)
+    return true;
+  if (!s || !needle)
+    return false;
   return sizeof(cw) == sizeof(char16_t) ? !!strstr16(s, needle)
                                         : !!strstr(s, needle);
 }

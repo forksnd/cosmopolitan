@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2022 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -17,35 +17,21 @@
 │ PERFORMANCE OF THIS SOFTWARE.                                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
 #include "libc/calls/internal.h"
-#include "libc/calls/sig.internal.h"
+#include "libc/calls/struct/sigset.internal.h"
+#include "libc/calls/struct/timespec.h"
 #include "libc/calls/syscall_support-nt.internal.h"
-#include "libc/errno.h"
-#include "libc/intrin/strace.internal.h"
-#include "libc/nt/errors.h"
-#include "libc/nt/synchronization.h"
-#include "libc/sysv/errfuns.h"
+#ifdef __x86_64__
 
 textwindows int sys_pause_nt(void) {
-  long ms, totoms;
-  ms = 0;
-  totoms = 0;
-  for (;;) {
-
-    if (_check_interrupts(false, g_fds.p)) {
-      return -1;
-    }
-
-    if (SleepEx(__SIG_POLLING_INTERVAL_MS, true) == kNtWaitIoCompletion) {
-      POLLTRACE("IOCP EINTR");  // in case we ever figure it out
-      continue;
-    }
-
-#if defined(SYSDEBUG) && defined(_POLLTRACE)
-    ms += __SIG_POLLING_INTERVAL_MS;
-    if (ms >= __SIG_LOGGING_INTERVAL_MS) {
-      totoms += ms, ms = 0;
-      POLLTRACE("... pausing for %'lums...", totoms);
-    }
-#endif
-  }
+  // we don't strictly need to block signals, but it reduces signal
+  // delivery latency, by preventing other threads from delivering a
+  // signal asynchronously. it takes about ~5us to deliver a signal
+  // using SetEvent() whereas it takes ~30us to use SuspendThread(),
+  // GetThreadContext(), SetThreadContext(), and ResumeThread().
+  BLOCK_SIGNALS;
+  _park_norestart(timespec_max, 0);
+  ALLOW_SIGNALS;
+  return -1;
 }
+
+#endif /* __x86_64__ */

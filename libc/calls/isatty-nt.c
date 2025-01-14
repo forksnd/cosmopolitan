@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2020 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -17,15 +17,13 @@
 │ PERFORMANCE OF THIS SOFTWARE.                                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
 #include "libc/calls/internal.h"
-#include "libc/nt/enum/filetype.h"
-#include "libc/nt/files.h"
+#include "libc/intrin/fds.h"
+#include "libc/calls/syscall-nt.internal.h"
 #include "libc/sysv/errfuns.h"
 
-textwindows bool32 sys_isatty_nt(int fd) {
+bool32 sys_isatty(int fd) {
   if (__isfdopen(fd)) {
-    if (__isfdkind(fd, kFdConsole) ||
-        (__isfdkind(fd, kFdFile) &&
-         GetFileType(g_fds.p[fd].handle) == kNtFileTypeChar)) {
+    if (__isfdkind(fd, kFdConsole) || __isfdkind(fd, kFdSerial)) {
       return true;
     } else {
       enotty();

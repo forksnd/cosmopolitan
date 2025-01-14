@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2020 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -18,7 +18,7 @@
 ╚─────────────────────────────────────────────────────────────────────────────*/
 #include "libc/calls/calls.h"
 #include "libc/dce.h"
-#include "libc/intrin/strace.internal.h"
+#include "libc/intrin/strace.h"
 #include "libc/mem/mem.h"
 #include "libc/nt/runtime.h"
 #include "libc/nt/winsock.h"
@@ -30,24 +30,28 @@
 /**
  * Information about underlying Windows Sockets implementation.
  *
- * Cosmopolitan automatically calls YOINK() on this symbol when its
+ * Cosmopolitan automatically calls __yoink() on this symbol when its
  * Berkeley Socket wrappers are linked. The latest version of Winsock
  * was introduced alongside x64, so this should never fail.
  */
-_Hide struct NtWsaData kNtWsaData;
+struct NtWsaData kNtWsaData;
 
 static textwindows void WinSockCleanup(void) {
-  int i, rc;
+  int rc;
   rc = WSACleanup();
   NTTRACE("WSACleanup() → %d% lm", rc);
 }
 
-textwindows noasan void WinSockInit(void) {
+textwindows void WinSockInit(void) {
   int rc;
   atexit(WinSockCleanup);
   NTTRACE("WSAStartup()");
   if ((rc = WSAStartup(VERSION, &kNtWsaData)) != 0 ||
       kNtWsaData.wVersion != VERSION) {
-    ExitProcess(123);
+    _Exit(1);
   }
+}
+
+textwindows dontinstrument void WinSockFork(void) {
+  WSAStartup(VERSION, &kNtWsaData);
 }

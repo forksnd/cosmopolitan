@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2021 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -27,11 +27,9 @@
 int sys_openat(int dirfd, const char *file, int flags, unsigned mode) {
   static bool once, modernize;
   int d, e, f;
-  /*
-   * RHEL5 doesn't support O_CLOEXEC. It's hard to test for this.
-   * Sometimes the system call succeeds and it just doesn't set the
-   * flag. Other times, it return -530 which makes no sense.
-   */
+  // RHEL5 doesn't support O_CLOEXEC. It's hard to test for this.
+  // Sometimes the system call succeeds and it just doesn't set the
+  // flag. Other times, it return -530 which makes no sense.
   if (!IsLinux() || !(flags & O_CLOEXEC) || modernize) {
     d = __sys_openat(dirfd, file, flags, mode);
   } else if (once) {

@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2022 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -18,7 +18,6 @@
 ╚─────────────────────────────────────────────────────────────────────────────*/
 #include "libc/assert.h"
 #include "libc/dce.h"
-#include "libc/intrin/midpoint.h"
 #include "libc/mem/mem.h"
 #include "libc/mem/sortedints.internal.h"
 #include "libc/str/str.h"
@@ -28,7 +27,7 @@ bool ContainsInt(const struct SortedInts *t, int k) {
   l = 0;
   r = t->n - 1;
   while (l <= r) {
-    m = _midpoint(l, r);
+    m = (l & r) + ((l ^ r) >> 1);  // floor((a+b)/2)
     if (t->p[m] < k) {
       l = m + 1;
     } else if (t->p[m] > k) {
@@ -45,15 +44,15 @@ int LeftmostInt(const struct SortedInts *t, int k) {
   l = 0;
   r = t->n;
   while (l < r) {
-    m = _midpoint(l, r);
+    m = (l & r) + ((l ^ r) >> 1);  // floor((a+b)/2)
     if (t->p[m] < k) {
       l = m + 1;
     } else {
       r = m;
     }
   }
-  _unassert(l == 0 || k >= t->p[l - 1]);
-  _unassert(l == t->n || k <= t->p[l]);
+  unassert(l == 0 || k >= t->p[l - 1]);
+  unassert(l == t->n || k <= t->p[l]);
   return l;
 }
 
@@ -71,8 +70,8 @@ int CountInt(const struct SortedInts *t, int k) {
 
 bool InsertInt(struct SortedInts *t, int k, bool u) {
   int l;
-  _unassert(t->n >= 0);
-  _unassert(t->n <= t->c);
+  unassert(t->n >= 0);
+  unassert(t->n <= t->c);
   if (t->n == t->c) {
     ++t->c;
     if (!IsModeDbg()) {

@@ -1,6 +1,5 @@
 #ifndef COSMOPOLITAN_THIRD_PARTY_MUSL_GLOB_H_
 #define COSMOPOLITAN_THIRD_PARTY_MUSL_GLOB_H_
-#if !(__ASSEMBLER__ + __LINKER__ + 0)
 COSMOPOLITAN_C_START_
 
 #define GLOB_ERR      0x01
@@ -31,6 +30,11 @@ typedef struct {
 int glob(const char *, int, int (*)(const char *, int), glob_t *);
 void globfree(glob_t *);
 
+#ifdef _LARGEFILE64_SOURCE
+#define glob64 glob
+#define globfree64 globfree
+#define glob64_t glob_t
+#endif
+
 COSMOPOLITAN_C_END_
-#endif /* !(__ASSEMBLER__ + __LINKER__ + 0) */
 #endif /* COSMOPOLITAN_THIRD_PARTY_MUSL_GLOB_H_ */

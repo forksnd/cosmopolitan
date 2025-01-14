@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2022 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -46,7 +46,7 @@ struct T DispatchRecur2(dword ea, dword tm, dword r, dword p1, dword p2,
 
 struct T DispatchYcombine(dword ea, dword tm, dword r, dword p1, dword p2,
                           dword d) {
-  int ycomb, z, u, t, p, b, name, lambda, closure;
+  int ycomb, p, name, lambda, closure;
   SetFrame(r, LO(ea));
   r |= NEED_GC;
   ycomb = recurse(MAKE(Car(LO(ea)), HI(ea)), p1, p2);
@@ -55,7 +55,8 @@ struct T DispatchYcombine(dword ea, dword tm, dword r, dword p1, dword p2,
   lambda = recurse(MAKE(Cadr(ea), HI(ea)), p1, p2);
   closure =
       recurse(MAKE(Caddr(ycomb), Alist(Car(Cadr(ycomb)), lambda, 0)), 0, 0);
-  if (Car(lambda) == kClosure) lambda = Car(Cdr(lambda));
+  if (Car(lambda) == kClosure)
+    lambda = Car(Cdr(lambda));
   DCHECK_EQ(kClosure, Car(closure));
   DCHECK_EQ(kLambda, Car(lambda));
   DCHECK_EQ(kLambda, Car(Car(Cdr(closure))));

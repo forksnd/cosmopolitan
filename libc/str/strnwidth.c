@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2020 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -17,10 +17,7 @@
 │ PERFORMANCE OF THIS SOFTWARE.                                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
 #include "libc/intrin/bsf.h"
-#include "libc/intrin/pcmpgtb.h"
-#include "libc/intrin/pmovmskb.h"
-#include "libc/intrin/psubb.h"
-#include "libc/macros.internal.h"
+#include "libc/macros.h"
 #include "libc/str/str.h"
 #include "libc/str/thompike.h"
 #include "libc/str/unicode.h"
@@ -65,7 +62,8 @@ int strnwidth(const char *s, size_t n, size_t o) {
         case kUtf8:
           if (ThomPikeCont(c)) {
             w = ThomPikeMerge(w, c);
-            if (--r) break;
+            if (--r)
+              break;
           }
           l += MAX(0, wcwidth(w));
           t = kAscii;
@@ -83,7 +81,7 @@ int strnwidth(const char *s, size_t n, size_t o) {
           }
           break;
         default:
-          unreachable;
+          __builtin_unreachable();
       }
     } else {
       break;

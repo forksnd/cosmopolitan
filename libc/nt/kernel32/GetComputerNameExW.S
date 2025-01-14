@@ -1,12 +1,13 @@
 #include "libc/nt/codegen.h"
-.imp	kernel32,__imp_GetComputerNameExW,GetComputerNameExW,0
+.imp	kernel32,__imp_GetComputerNameExW,GetComputerNameExW
 
 	.text.windows
+	.ftrace1
 GetComputerNameEx:
+	.ftrace2
 #ifdef __x86_64__
 	push	%rbp
 	mov	%rsp,%rbp
-	.profilable
 	mov	__imp_GetComputerNameExW(%rip),%rax
 	jmp	__sysv2nt
 #elif defined(__aarch64__)

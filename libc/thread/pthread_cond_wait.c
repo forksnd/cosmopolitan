@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2022 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -16,6 +16,7 @@
 │ TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR             │
 │ PERFORMANCE OF THIS SOFTWARE.                                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
+#include "libc/thread/posixthread.internal.h"
 #include "libc/thread/thread.h"
 #include "libc/thread/thread2.h"
 
@@ -37,8 +38,10 @@
  * @see pthread_cond_timedwait
  * @see pthread_cond_broadcast
  * @see pthread_cond_signal
- * @cancellationpoint
+ * @cancelationpoint
  */
-errno_t pthread_cond_wait(pthread_cond_t *cond, pthread_mutex_t *mutex) {
+errno_t _pthread_cond_wait(pthread_cond_t *cond, pthread_mutex_t *mutex) {
   return pthread_cond_timedwait(cond, mutex, 0);
 }
+
+__weak_reference(_pthread_cond_wait, pthread_cond_wait);

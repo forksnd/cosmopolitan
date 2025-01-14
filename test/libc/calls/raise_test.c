@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2022 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -20,92 +20,70 @@
 #include "libc/calls/struct/sigaction.h"
 #include "libc/calls/struct/siginfo.h"
 #include "libc/dce.h"
+#include "libc/mem/leaks.h"
+#include "libc/runtime/runtime.h"
 #include "libc/sysv/consts/sa.h"
 #include "libc/sysv/consts/sicode.h"
 #include "libc/sysv/consts/sig.h"
+#include "libc/testlib/ezbench.h"
 #include "libc/testlib/subprocess.h"
 #include "libc/testlib/testlib.h"
-#include "libc/thread/spawn.h"
+#include "libc/thread/thread.h"
 
-////////////////////////////////////////////////////////////////////////////////
-// SIGTRAP
-
-TEST(raise, trap_sysv) {
-  if (IsWindows()) return;
+TEST(raise, trap) {
+  AssertNoLocksAreHeld();
   signal(SIGTRAP, SIG_DFL);
   SPAWN(fork);
   raise(SIGTRAP);
   TERMS(SIGTRAP);
 }
 
-TEST(raise, trap_windows) {
-  if (!IsWindows()) return;
-  signal(SIGTRAP, SIG_DFL);
-  SPAWN(fork);
-  raise(SIGTRAP);
-  EXITS(128 + SIGTRAP);
-}
-
-////////////////////////////////////////////////////////////////////////////////
-// SIGFPE
-
-TEST(raise, fpe_sysv) {
-  if (IsWindows()) return;
+TEST(raise, fpe) {
   signal(SIGFPE, SIG_DFL);
   SPAWN(fork);
   raise(SIGFPE);
   TERMS(SIGFPE);
 }
 
-TEST(raise, fpe_windows) {
-  if (!IsWindows()) return;
-  signal(SIGFPE, SIG_DFL);
-  SPAWN(fork);
-  raise(SIGFPE);
-  EXITS(128 + SIGFPE);
-}
-
-////////////////////////////////////////////////////////////////////////////////
-// SIGUSR1
-
-TEST(raise, usr1_sysv) {
-  if (IsWindows()) return;
+TEST(raise, usr1) {
+  AssertNoLocksAreHeld();
   SPAWN(fork);
   raise(SIGUSR1);
   TERMS(SIGUSR1);
 }
 
-TEST(raise, usr1_windows) {
-  if (!IsWindows()) return;
-  SPAWN(fork);
-  raise(SIGUSR1);
-  EXITS(128 + SIGUSR1);
-}
-
-////////////////////////////////////////////////////////////////////////////////
-// THREADS
-
 int threadid;
 
 void WorkerQuit(int sig, siginfo_t *si, void *ctx) {
   ASSERT_EQ(SIGILL, sig);
-  if (!IsXnu() && !IsOpenbsd()) {
+  if (!IsXnu() && !IsOpenbsd())
     ASSERT_EQ(SI_TKILL, si->si_code);
-  }
   ASSERT_EQ(threadid, gettid());
 }
 
-int Worker(void *arg, int tid) {
+void *Worker(void *arg) {
   struct sigaction sa = {.sa_sigaction = WorkerQuit, .sa_flags = SA_SIGINFO};
   ASSERT_EQ(0, sigaction(SIGILL, &sa, 0));
-  threadid = tid;
+  threadid = gettid();
   ASSERT_EQ(0, raise(SIGILL));
   return 0;
 }
 
 TEST(raise, threaded) {
+  SPAWN(fork);
+  AssertNoLocksAreHeld();
   signal(SIGILL, SIG_DFL);
-  struct spawn worker;
-  ASSERT_SYS(0, 0, _spawn(Worker, 0, &worker));
-  ASSERT_SYS(0, 0, _join(&worker));
+  pthread_t worker;
+  ASSERT_EQ(0, pthread_create(&worker, 0, Worker, 0));
+  ASSERT_EQ(0, pthread_join(worker, 0));
+  pthread_exit(0);
+  EXITS(0);
+}
+
+void OnRaise(int sig) {
+}
+
+BENCH(raise, bench) {
+  signal(SIGUSR1, OnRaise);
+  EZBENCH2("raise", donothing, raise(SIGUSR1));
 }

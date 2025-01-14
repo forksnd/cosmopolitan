@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2013-2021 MaxMind Incorporated                                     │
 │                                                                              │
@@ -15,14 +15,14 @@
 │ See the License for the specific language governing permissions and          │
 │ limitations under the License.                                               │
 ╚─────────────────────────────────────────────────────────────────────────────*/
+#include "third_party/maxmind/maxminddb.h"
 #include "libc/assert.h"
 #include "libc/calls/calls.h"
 #include "libc/calls/struct/stat.h"
 #include "libc/calls/weirdtypes.h"
 #include "libc/errno.h"
 #include "libc/fmt/conv.h"
-#include "libc/fmt/fmt.h"
-#include "libc/intrin/bits.h"
+#include "libc/serialize.h"
 #include "libc/inttypes.h"
 #include "libc/limits.h"
 #include "libc/mem/mem.h"
@@ -35,17 +35,15 @@
 #include "libc/sysv/consts/o.h"
 #include "libc/sysv/consts/prot.h"
 #include "libc/sysv/consts/sock.h"
-#include "third_party/maxmind/maxminddb.h"
 #include "tool/build/lib/case.h"
 
-asm(".ident\t\"\\n\\n\
-libmaxminddb (Apache 2.0)\\n\
-Copyright 2013-2021 MaxMind Incorporated\"");
-asm(".include \"libc/disclaimer.inc\"");
+__notice(libmaxminddb_notice, "\
+libmaxminddb (Apache 2.0)\n\
+Copyright 2013-2021 MaxMind Incorporated");
 
 #define METADATA_MARKER              "\xab\xcd\xefMaxMind.com"
 #define METADATA_BLOCK_MAX_SIZE      131072 /* This is 128kb */
-#define MMDB_POOL_INIT_SIZE          64 /* 64 means 4kb on 64bit */
+#define MMDB_POOL_INIT_SIZE          64     /* 64 means 4kb on 64bit */
 #define MMDB_DATA_SECTION_SEPARATOR  16
 #define MAXIMUM_DATA_STRUCTURE_DEPTH 512
 
@@ -269,7 +267,7 @@ static inline uint32_t get_ptr_from(uint8_t ctrl, uint8_t const *const ptr,
     case 4:
       return READ32BE(ptr);
     default:
-      unreachable;
+      __builtin_unreachable();
   }
 }
 
@@ -686,7 +684,7 @@ static record_info_s record_info_for_database(const MMDB_s *const mmdb) {
     record_info.right_record_getter = &get_uint32;
     record_info.right_record_offset = 4;
   } else {
-    unreachable;
+    __builtin_unreachable();
   }
   return record_info;
 }

@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2022 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -18,13 +18,14 @@
 ╚─────────────────────────────────────────────────────────────────────────────*/
 #include "libc/calls/calls.h"
 #include "libc/calls/pledge.internal.h"
-#include "libc/calls/struct/seccomp.h"
+#include "libc/calls/struct/seccomp.internal.h"
 #include "libc/calls/syscall_support-sysv.internal.h"
 #include "libc/dce.h"
 #include "libc/errno.h"
-#include "libc/intrin/promises.internal.h"
+#include "libc/intrin/promises.h"
 #include "libc/runtime/runtime.h"
 #include "libc/sock/sock.h"
+#include "libc/stdio/stdio.h"
 #include "libc/sysv/consts/af.h"
 #include "libc/sysv/consts/ipproto.h"
 #include "libc/sysv/consts/sig.h"
@@ -33,11 +34,15 @@
 #include "libc/testlib/testlib.h"
 
 void SetUp(void) {
-  if (!__is_linux_2_6_23() && !IsOpenbsd()) exit(0);
+  if (pledge(0, 0) == -1) {
+    fprintf(stderr, "warning: pledge() not supported on this system\n");
+    exit(0);
+  }
 }
 
 TEST(pledge, testSoftError) {
-  if (IsOpenbsd()) return;
+  if (IsOpenbsd())
+    return;
   SPAWN(fork);
   __pledge_mode = PLEDGE_PENALTY_RETURN_EPERM;
   ASSERT_SYS(0, 0, pledge("stdio", 0));
@@ -63,7 +68,8 @@ TEST(pledge, testKillProcessMode) {
 }
 
 TEST(pledge, testLogMessage_inSoftyMode) {
-  if (IsOpenbsd()) return;
+  if (IsOpenbsd())
+    return;
   int fds[2];
   char msg[256] = {0};
   ASSERT_SYS(0, 0, pipe(fds));
@@ -74,10 +80,10 @@ TEST(pledge, testLogMessage_inSoftyMode) {
   ASSERT_SYS(EPERM, -1, socket(AF_INET, SOCK_STREAM, IPPROTO_TCP));
   EXITS(0);
   close(fds[1]);
-  read(fds[0], msg, sizeof(msg));
+  read(fds[0], msg, sizeof(msg) - 1);
   close(fds[0]);
   if (IsLinux()) {
-    ASSERT_STARTSWITH("error: pledge inet for socket", msg);
+    ASSERT_STARTSWITH("error: protected syscall socket", msg);
   }
 }
 
@@ -95,7 +101,7 @@ TEST(pledge, testLogMessage_onKillProcess) {
   read(fds[0], msg, sizeof(msg));
   close(fds[0]);
   if (IsLinux()) {
-    ASSERT_STARTSWITH("error: pledge inet for socket", msg);
+    ASSERT_STARTSWITH("error: protected syscall socket", msg);
   }
 }
 

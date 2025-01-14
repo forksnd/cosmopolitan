@@ -3,7 +3,6 @@
 #include "libc/mem/alloca.h"
 #include "libc/sock/struct/sockaddr.h"
 #include "libc/sock/struct/sockaddr6-bsd.internal.h"
-#if !(__ASSEMBLER__ + __LINKER__ + 0)
 COSMOPOLITAN_C_START_
 
 struct sockaddr_bsd {
@@ -41,8 +40,13 @@ union sockaddr_storage_linux {
   struct sockaddr_un sun;
 };
 
-const char *DescribeSockaddr(char[128], const struct sockaddr *, size_t);
-#define DescribeSockaddr(sa, sz) DescribeSockaddr(alloca(128), sa, sz)
+const char *_DescribeSockaddr(char[128], const struct sockaddr *, size_t);
+#define DescribeSockaddr(sa, sz) _DescribeSockaddr(alloca(128), sa, sz)
+
+void __convert_bsd_to_sockaddr(struct sockaddr_storage *);
+void __convert_sockaddr_to_bsd(struct sockaddr_storage *);
+uint8_t __get_sockaddr_len(const struct sockaddr_storage *);
+void __write_sockaddr(const struct sockaddr_storage *, void *, uint32_t *);
 
 int sockaddr2bsd(const void *, uint32_t, union sockaddr_storage_bsd *,
                  uint32_t *);
@@ -50,5 +54,4 @@ void sockaddr2linux(const union sockaddr_storage_bsd *, uint32_t,
                     union sockaddr_storage_linux *, uint32_t *);
 
 COSMOPOLITAN_C_END_
-#endif /* !(__ASSEMBLER__ + __LINKER__ + 0) */
 #endif /* COSMOPOLITAN_LIBC_SOCK_STRUCT_SOCKADDR_INTERNAL_H_ */

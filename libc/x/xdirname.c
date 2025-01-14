@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2020 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -16,7 +16,7 @@
 │ TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR             │
 │ PERFORMANCE OF THIS SOFTWARE.                                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
-#include "libc/fmt/conv.h"
+#include "libc/fmt/libgen.h"
 #include "libc/mem/mem.h"
 #include "libc/x/x.h"
 
@@ -25,8 +25,9 @@
  */
 char *xdirname(const char *path) {
   char *dirp;
-  path = xstrdup(path);
-  dirp = xstrdup(dirname(path));
-  free(path);
+  char *path2;
+  path2 = xstrdup(path);
+  dirp = xstrdup(dirname(path2));
+  free(path2);
   return dirp;
 }

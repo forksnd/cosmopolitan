@@ -1,7 +1,7 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
-│ Copyright 2020 Justine Alexandra Roberts Tunney                              │
+│ Copyright 2023 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
 │ Permission to use, copy, modify, and/or distribute this software for         │
 │ any purpose with or without fee is hereby granted, provided that the         │
@@ -16,17 +16,17 @@
 │ TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR             │
 │ PERFORMANCE OF THIS SOFTWARE.                                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
+#include "third_party/stb/stb_image_resize.h"
 #include "libc/assert.h"
-#include "libc/macros.internal.h"
+#include "libc/macros.h"
 #include "libc/math.h"
 #include "libc/mem/mem.h"
 #include "libc/str/str.h"
-#include "third_party/stb/stb_image_resize.h"
 
-asm(".ident\t\"\\n\\n\
-stb_image_resize (Public Domain)\\n\
-Credit: Jorge L Rodriguez (@VinoBS), Sean Barrett, et al.\\n\
-http://nothings.org/stb\"");
+__notice(stb_image_resize_notice, "\
+stb_image_resize (Public Domain)\n\
+Credit: Jorge L Rodriguez (@VinoBS), Sean Barrett, et al.\n\
+http://nothings.org/stb");
 
 #define STBIR_ASSERT(x)       assert(x)
 #define STBIR_MALLOC(size, c) ((void)(c), malloc(size))
@@ -655,9 +655,14 @@ static void stbir__calculate_coefficients_upsample(
     total_filter += coefficient_group[i];
   }
 
-  STBIR_ASSERT(stbir__filter_info_table[filter].kernel(
-                   (float)(in_last_pixel + 1) + 0.5f - in_center_of_out,
-                   1 / scale) == 0);
+  // NOTE(fg): Not actually true in general, nor is there any reason to expect
+  // it should be. It would be true in exact math but is at best approximately
+  // true in floating-point math, and it would not make sense to try and put
+  // actual bounds on this here because it depends on the image aspect ratio
+  // which can get pretty extreme.
+  // STBIR_ASSERT(stbir__filter_info_table[filter].kernel(
+  //                 (float)(in_last_pixel + 1) + 0.5f - in_center_of_out,
+  //                 1 / scale) == 0);
 
   STBIR_ASSERT(total_filter > 0.9);
   STBIR_ASSERT(total_filter < 1.1f);  // Make sure it's not way off.
@@ -701,9 +706,14 @@ static void stbir__calculate_coefficients_downsample(
         stbir__filter_info_table[filter].kernel(x, scale_ratio) * scale_ratio;
   }
 
-  STBIR_ASSERT(stbir__filter_info_table[filter].kernel(
-                   (float)(out_last_pixel + 1) + 0.5f - out_center_of_in,
-                   scale_ratio) == 0);
+  // NOTE(fg): Not actually true in general, nor is there any reason to expect
+  // it should be. It would be true in exact math but is at best approximately
+  // true in floating-point math, and it would not make sense to try and put
+  // actual bounds on this here because it depends on the image aspect ratio
+  // which can get pretty extreme.
+  // STBIR_ASSERT(stbir__filter_info_table[filter].kernel(
+  //                 (float)(out_last_pixel + 1) + 0.5f - out_center_of_in,
+  //                 scale_ratio) == 0);
 
   for (i = out_last_pixel - out_first_pixel; i >= 0; i--) {
     if (coefficient_group[i]) break;
@@ -851,10 +861,9 @@ static float* stbir__get_decode_buffer(stbir__info* stbir_info) {
 }
 
 #define STBIR__DECODE(type, colorspace) \
-  ((type) * (STBIR_MAX_COLORSPACES) + (colorspace))
+  ((int)(type) * (STBIR_MAX_COLORSPACES) + (int)(colorspace))
 
-static optimizespeed void stbir__decode_scanline(stbir__info* stbir_info,
-                                                 int n) {
+static void stbir__decode_scanline(stbir__info* stbir_info, int n) {
   int c;
   int channels = stbir_info->channels;
   int alpha_channel = stbir_info->alpha_channel;
@@ -1200,7 +1209,6 @@ static void stbir__resample_horizontal_downsample(stbir__info* stbir_info,
           int out_pixel_index = k * 1;
           float coefficient =
               horizontal_coefficients[coefficient_group + k - n0];
-          STBIR_ASSERT(coefficient != 0);
           output_buffer[out_pixel_index + 0] +=
               decode_buffer[in_pixel_index + 0] * coefficient;
         }
@@ -1221,7 +1229,6 @@ static void stbir__resample_horizontal_downsample(stbir__info* stbir_info,
           int out_pixel_index = k * 2;
           float coefficient =
               horizontal_coefficients[coefficient_group + k - n0];
-          STBIR_ASSERT(coefficient != 0);
           output_buffer[out_pixel_index + 0] +=
               decode_buffer[in_pixel_index + 0] * coefficient;
           output_buffer[out_pixel_index + 1] +=
@@ -1244,7 +1251,6 @@ static void stbir__resample_horizontal_downsample(stbir__info* stbir_info,
           int out_pixel_index = k * 3;
           float coefficient =
               horizontal_coefficients[coefficient_group + k - n0];
-          STBIR_ASSERT(coefficient != 0);
           output_buffer[out_pixel_index + 0] +=
               decode_buffer[in_pixel_index + 0] * coefficient;
           output_buffer[out_pixel_index + 1] +=
@@ -1269,7 +1275,6 @@ static void stbir__resample_horizontal_downsample(stbir__info* stbir_info,
           int out_pixel_index = k * 4;
           float coefficient =
               horizontal_coefficients[coefficient_group + k - n0];
-          STBIR_ASSERT(coefficient != 0);
           output_buffer[out_pixel_index + 0] +=
               decode_buffer[in_pixel_index + 0] * coefficient;
           output_buffer[out_pixel_index + 1] +=

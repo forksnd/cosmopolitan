@@ -1,6 +1,5 @@
 #ifndef COSMOPOLITAN_DSP_CORE_C331_H_
 #define COSMOPOLITAN_DSP_CORE_C331_H_
-#if !(__ASSEMBLER__ + __LINKER__ + 0)
 COSMOPOLITAN_C_START_
 
 /**
@@ -9,9 +8,8 @@ COSMOPOLITAN_C_START_
  * @define (3*a + 3*b + 1*c) / 7
  * @see C1331()
  */
-static inline pureconst artificial unsigned char C331(unsigned char al,
-                                                      unsigned char bl,
-                                                      unsigned char cl) {
+__funline unsigned char C331(unsigned char al, unsigned char bl,
+                             unsigned char cl) {
   unsigned eax, ebx, ecx;
   eax = al;
   ebx = bl;
@@ -26,5 +24,4 @@ static inline pureconst artificial unsigned char C331(unsigned char al,
 }
 
 COSMOPOLITAN_C_END_
-#endif /* !(__ASSEMBLER__ + __LINKER__ + 0) */
 #endif /* COSMOPOLITAN_DSP_CORE_C331_H_ */

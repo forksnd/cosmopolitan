@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2020 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -28,6 +28,7 @@
  */
 int strcmp16(const char16_t *l, const char16_t *r) {
   size_t i = 0;
-  while (l[i] == r[i] && r[i]) ++i;
+  while (l[i] == r[i] && r[i])
+    ++i;
   return l[i] - r[i];
 }

@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2020 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -16,7 +16,7 @@
 │ TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR             │
 │ PERFORMANCE OF THIS SOFTWARE.                                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
-#include "libc/macros.internal.h"
+#include "libc/macros.h"
 #include "tool/viz/lib/graphic.h"
 
 void WriteToFrameBuffer(size_t dyn, size_t dxn, unsigned char dst[dyn][dxn][4],
@@ -27,11 +27,16 @@ void WriteToFrameBuffer(size_t dyn, size_t dxn, unsigned char dst[dyn][dxn][4],
   unsigned y, x, k, upix[4];
   for (y = 0; y < yn; ++y) {
     for (x = 0; x < xn; ++x) {
-      for (k = 0; k < 4; ++k) fpix[k] = src[y][x][k];
-      for (k = 0; k < 4; ++k) fpix[k] *= 255;
-      for (k = 0; k < 4; ++k) ipix[k] = fpix[k] + .5f;
-      for (k = 0; k < 4; ++k) upix[k] = MAX(0, ipix[k]);
-      for (k = 0; k < 4; ++k) upix[k] = MIN(255, upix[k]);
+      for (k = 0; k < 4; ++k)
+        fpix[k] = src[y][x][k];
+      for (k = 0; k < 4; ++k)
+        fpix[k] *= 255;
+      for (k = 0; k < 4; ++k)
+        ipix[k] = fpix[k] + .5f;
+      for (k = 0; k < 4; ++k)
+        upix[k] = MAX(0, ipix[k]);
+      for (k = 0; k < 4; ++k)
+        upix[k] = MIN(255, upix[k]);
       dst[y][x][0] = upix[2];
       dst[y][x][1] = upix[1];
       dst[y][x][2] = upix[0];

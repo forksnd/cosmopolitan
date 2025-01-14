@@ -1,4 +1,3 @@
-/* clang-format off */
 //===-- lib/divsf3.c - Single-precision division ------------------*- C -*-===//
 //
 //                     The LLVM Compiler Infrastructure
@@ -17,7 +16,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-STATIC_YOINK("huge_compiler_rt_license");
+__static_yoink("huge_compiler_rt_license");
 
 #define SINGLE_PRECISION
 #include "libc/literal.h"

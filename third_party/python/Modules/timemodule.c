@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:4;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=4 sts=4 sw=4 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=4 sts=4 sw=4 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Python 3                                                                     │
 │ https://docs.python.org/3/license.html                                       │
@@ -10,15 +10,14 @@
 #include "libc/calls/struct/tms.h"
 #include "libc/dce.h"
 #include "libc/errno.h"
-#include "libc/fmt/conv.h"
+#include "libc/fmt/wintime.internal.h"
 #include "libc/nt/accounting.h"
 #include "libc/nt/runtime.h"
 #include "libc/runtime/clktck.h"
 #include "libc/sock/select.h"
 #include "libc/sysv/consts/clock.h"
 #include "libc/sysv/consts/rusage.h"
-#include "libc/time/struct/tm.h"
-#include "libc/time/time.h"
+#include "libc/time.h"
 #include "third_party/python/Include/abstract.h"
 #include "third_party/python/Include/boolobject.h"
 #include "third_party/python/Include/ceval.h"
@@ -36,7 +35,6 @@
 #include "third_party/python/Include/structseq.h"
 #include "third_party/python/Include/yoink.h"
 #include "third_party/python/pyconfig.h"
-/* clang-format off */
 
 PYTHON_PROVIDE("time");
 PYTHON_PROVIDE("time.CLOCK_MONOTONIC");
@@ -1054,14 +1052,9 @@ _PyTime_GetProcessTimeWithInfo(_PyTime_t *tp, _Py_clock_info_t *info)
         *tp = (ReadFileTime(kernel_time) + ReadFileTime(user_time)) * 100;
         return 0;
     }
-    if (CLOCK_PROF != -1 || CLOCK_PROCESS_CPUTIME_ID != -1) {
-        if (CLOCK_PROF != -1) {
-            clk_id = CLOCK_PROF;
-            function = "clock_gettime(CLOCK_PROF)";
-        } else {
-            clk_id = CLOCK_PROCESS_CPUTIME_ID;
-            function = "clock_gettime(CLOCK_PROCESS_CPUTIME_ID)";
-        }
+    if (CLOCK_PROCESS_CPUTIME_ID != -1) {
+        clk_id = CLOCK_PROCESS_CPUTIME_ID;
+        function = "clock_gettime(CLOCK_PROCESS_CPUTIME_ID)";
         if (!clock_gettime(clk_id, &ts)) {
             if (info) {
                 info->implementation = function;
@@ -1520,7 +1513,6 @@ pysleep(_PyTime_t secs)
 {
     _PyTime_t deadline, monotonic;
 #ifndef MS_WINDOWS
-    struct timeval timeout;
     struct timespec timeout2;
     int err = 0;
 #else
@@ -1597,7 +1589,12 @@ pysleep(_PyTime_t secs)
     return 0;
 }
 
-_Section(".rodata.pytab.1") const struct _inittab _PyImport_Inittab_time = {
+#ifdef __aarch64__
+_Section(".rodata.pytab.1 //")
+#else
+_Section(".rodata.pytab.1")
+#endif
+ const struct _inittab _PyImport_Inittab_time = {
     "time",
     PyInit_time,
 };

@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2022 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -17,8 +17,8 @@
 │ PERFORMANCE OF THIS SOFTWARE.                                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
 #include "libc/calls/syscall_support-nt.internal.h"
-#include "libc/intrin/describeflags.internal.h"
-#include "libc/intrin/strace.internal.h"
+#include "libc/intrin/describeflags.h"
+#include "libc/intrin/strace.h"
 #include "libc/nt/memory.h"
 #include "libc/nt/process.h"
 #include "libc/nt/struct/securityattributes.h"
@@ -38,7 +38,8 @@ textwindows int64_t OpenProcess(uint32_t dwDesiredAccess, bool32 bInheritHandle,
                                 uint32_t dwProcessId) {
   int64_t hHandle;
   hHandle = __imp_OpenProcess(dwDesiredAccess, bInheritHandle, dwProcessId);
-  if (!hHandle) __winerr();
+  if (!hHandle)
+    __winerr();
   NTTRACE("OpenProcess(%s, %hhhd, %u) → %ld% m",
           DescribeNtProcAccessFlags(dwDesiredAccess), bInheritHandle,
           dwProcessId, hHandle);

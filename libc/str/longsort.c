@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2021 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -16,7 +16,7 @@
 │ TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR             │
 │ PERFORMANCE OF THIS SOFTWARE.                                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
-#include "libc/intrin/strace.internal.h"
+#include "libc/intrin/strace.h"
 #include "libc/runtime/runtime.h"
 
 static inline void InsertionSort(long *A, long n) {
@@ -38,9 +38,12 @@ static void LongSort(long *A, long n) {
     InsertionSort(A, n);
   } else {
     for (p = A[n >> 1], i = 0, j = n - 1;; i++, j--) {
-      while (A[i] < p) i++;
-      while (A[j] > p) j--;
-      if (i >= j) break;
+      while (A[i] < p)
+        i++;
+      while (A[j] > p)
+        j--;
+      if (i >= j)
+        break;
       t = A[i];
       A[i] = A[j];
       A[j] = t;

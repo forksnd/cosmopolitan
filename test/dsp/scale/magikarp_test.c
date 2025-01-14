@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2020 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -23,9 +23,9 @@
 #include "libc/fmt/bing.internal.h"
 #include "libc/log/check.h"
 #include "libc/math.h"
+#include "libc/mem/gc.h"
 #include "libc/mem/mem.h"
 #include "libc/nexgen32e/x86feature.h"
-#include "libc/mem/gc.internal.h"
 #include "libc/str/str.h"
 #include "libc/testlib/ezbench.h"
 #include "libc/testlib/testlib.h"
@@ -124,21 +124,21 @@ TEST(magikarp, testHalfYX) {
   Magikarp2xX(32, 61, M, 16, 61);
   EXPECT_STREQ(u"\n\
 nooppppqqqqqqqqqqqqqqqqqpppooon\n\
-opppqqqqqppppoppoppppqqqqqppppo\n\
-ppqqqqpppooooommmoooopppqqqqppp\n\
-pqqqppponmmllllllllmmmnpppqqqqp\n\
-qqqppoomllllllllllllllmnoppqqqq\n\
-qqppoomlllllllmmmllllllmnoppqqq\n\
-qppponlllllmoqttspnlllllmnoppqq\n\
-qpponmllllmosyzz{vqnllllmmoppqq\n\
-qpponmllllmorwzzyupnllllmmoppqq\n\
-qqpponlllllloprrqomlllllmnoppqq\n\
+opppqqqqqpppppoooppppqqqqqppppo\n\
+ppqqqqpppoooonnnnnooopppqqqqppp\n\
+pqqqppponnmllllllllmnnnoppqqqqp\n\
+qqqppoommlllllllllllllmnoppqqqq\n\
+qqpponmllllllmmmmllllllmnoppqqq\n\
+qppponlllllmoqttspolllllmnoppqq\n\
+qpponmllllmosxzzyvqnllllmmoppqq\n\
+qpponmllllmorwyyyupnllllmmoppqq\n\
+qqpponllllllnprrqomlllllmnoppqq\n\
 qqpponnmlllllllllllllllmnnppqqq\n\
-qqqppponmlllllllllllllnooppqqqp\n\
-pqqqqpppoommmlllllmmmoopppqqqpp\n\
-pppqqqqpppooooooooooppppqqqqppp\n\
+qqqppponmllllllllllllmmooppqqqp\n\
+pqqqqppoonmmmlllllmmnoopppqqqpp\n\
+pppqqqqpppooooooooooopppqqqqppp\n\
 oopppqqqqqqpppppppppqqqqqqpppoo\n\
-noopopppqqqqqqqqqqqqqqqppoooonn",
+noooopppqqqqqqqqqqqqqqqppoooonn",
                gc(bingblit(32, 61, M, 16, 31)));
 }
 
@@ -146,7 +146,6 @@ noopopppqqqqqqqqqqqqqqqppoooonn",
 #define HDY (1080 / 4)
 
 BENCH(magikarp, bench) { /* 30ms */
-  unsigned char kMagkern[16] = {4, 12, 12, 4};
   signed char kMagikarp[16] = {-1, -3, 3, 17, 17, 3, -3, -1};
   unsigned char(*Me)[HDY][HDX] = gc(malloc((HDX + 1) * (HDY + 1)));
   unsigned char(*Mo)[HDY][HDX] = gc(malloc((HDX + 1) * (HDY + 1)));

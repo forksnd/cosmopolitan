@@ -1,6 +1,5 @@
 #ifndef COSMOPOLITAN_LIBC_STR_UNICODE_H_
 #define COSMOPOLITAN_LIBC_STR_UNICODE_H_
-#if !(__ASSEMBLER__ + __LINKER__ + 0)
 COSMOPOLITAN_C_START_
 
 struct lconv {
@@ -30,11 +29,13 @@ struct lconv {
   char int_n_sign_posn;
 };
 
-int wcwidth(wchar_t) pureconst;
+pureconst int wcwidth(wchar_t) libcesque;
 int wcswidth(const wchar_t *, size_t) strlenesque;
-int wcsnwidth(const wchar_t *, size_t, int) strlenesque;
-struct lconv *localeconv(void);
+struct lconv *localeconv(void) libcesque;
+
+#ifdef _COSMO_SOURCE
+int wcsnwidth(const wchar_t *, size_t, size_t) strlenesque;
+#endif /* _COSMO_SOURCE */
 
 COSMOPOLITAN_C_END_
-#endif /* !(__ASSEMBLER__ + __LINKER__ + 0) */
 #endif /* COSMOPOLITAN_LIBC_STR_UNICODE_H_ */

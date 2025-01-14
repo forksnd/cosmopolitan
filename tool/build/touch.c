@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2022 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -17,30 +17,32 @@
 │ PERFORMANCE OF THIS SOFTWARE.                                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
 #include "libc/calls/calls.h"
-#include "libc/errno.h"
 #include "libc/runtime/runtime.h"
 #include "libc/stdio/stdio.h"
-#include "libc/str/str.h"
 
 /**
- * @fileoverview Command for updating timestamps on files.
+ * @fileoverview file timestamp update command
  */
 
 int main(int argc, char *argv[]) {
   int i;
-  const char *s, *prog;
-  prog = argc > 0 ? argv[0] : "touch.com";
+  const char *prog;
+
+  prog = argv[0];
+  if (!prog)
+    prog = "touch";
+
+  if (argc < 2) {
+    tinyprint(2, prog, ": missing operand\n", NULL);
+    exit(1);
+  }
+
   for (i = 1; i < argc; ++i) {
     if (touch(argv[i], 0666) == -1) {
-      s = _strerdoc(errno);
-      fputs(prog, stderr);
-      fputs(": cannot touch '", stderr);
-      fputs(argv[i], stderr);
-      fputs("': ", stderr);
-      fputs(s, stderr);
-      fputs("\n", stderr);
+      perror(argv[i]);
       exit(1);
     }
   }
+
   return 0;
 }

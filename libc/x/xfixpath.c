@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2022 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -36,7 +36,8 @@ void xfixpath(void) {
 
     // turn backslash into slash
     for (p = path; *p; ++p) {
-      if (*p == '\\') *p = '/';
+      if (*p == '\\')
+        *p = '/';
     }
 
     // turn c:/... into /c/...
@@ -54,7 +55,8 @@ void xfixpath(void) {
 
     // turn semicolon into colon
     for (p = path; *p; ++p) {
-      if (*p == ';') *p = ':';
+      if (*p == ';')
+        *p = ':';
     }
 
     setenv("PATH", path, true);

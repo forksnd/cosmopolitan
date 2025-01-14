@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:t;c-basic-offset:8;tab-width:8;coding:utf-8   -*-│
-│vi: set et ft=c ts=8 tw=8 fenc=utf-8                                       :vi│
+│ vi: set noet ft=c ts=8 sw=8 fenc=utf-8                                   :vi │
 ╚──────────────────────────────────────────────────────────────────────────────╝
 │                                                                              │
 │  Musl Libc                                                                   │
@@ -28,12 +28,7 @@
 #include "libc/intrin/likely.h"
 #include "libc/math.h"
 #include "libc/tinymath/internal.h"
-
-asm(".ident\t\"\\n\\n\
-Musl libc (MIT License)\\n\
-Copyright 2005-2014 Rich Felker, et. al.\"");
-asm(".include \"libc/disclaimer.inc\"");
-// clang-format off
+__static_yoink("musl_libc_notice");
 
 #define FENV_SUPPORT 1
 
@@ -58,7 +53,7 @@ static inline uint64_t mul64(uint64_t a, uint64_t b)
  */
 double sqrt(double x)
 {
-#if defined(__x86_64__) && defined(__SSE2__)
+#if defined(__x86_64__)
 
 	asm("sqrtsd\t%1,%0" : "=x"(x) : "x"(x));
 	return x;
@@ -220,3 +215,7 @@ double sqrt(double x)
 
 #endif /* __x86_64__ */
 }
+
+#if LDBL_MANT_DIG == 53 && LDBL_MAX_EXP == 1024
+__weak_reference(sqrt, sqrtl);
+#endif

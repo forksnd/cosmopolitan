@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2021 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -16,11 +16,11 @@
 │ TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR             │
 │ PERFORMANCE OF THIS SOFTWARE.                                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
-#include "libc/dce.h"
-#include "libc/intrin/strace.internal.h"
+#include "libc/cxxabi.h"
+#include "libc/intrin/cxaatexit.h"
+#include "libc/intrin/strace.h"
 #include "libc/intrin/weaken.h"
 #include "libc/runtime/internal.h"
-#include "libc/runtime/runtime.h"
 
 /**
  * Exits process with grace.
@@ -37,17 +37,20 @@
  * @noreturn
  */
 wontreturn void exit(int exitcode) {
-  const uintptr_t *p;
   STRACE("exit(%d)", exitcode);
-  if (_weaken(__cxa_finalize)) {
-    _weaken(__cxa_finalize)(NULL);
-  }
+
+  // call thread local c++ object destructors
+  __cxa_thread_finalize();
+
+  // call atexit() and __cxa_atexit() destructors
+  __cxa_finalize(NULL);
+
+  // call __destructor__ and finiarray destructors
+  const uintptr_t *p;
   for (p = __fini_array_end; p > __fini_array_start;) {
     ((void (*)(void))(*--p))();
   }
-#if SupportsWindows()
-  _Exitr(exitcode);
-#else
+
+  // terminate process
   _Exit(exitcode);
-#endif
 }

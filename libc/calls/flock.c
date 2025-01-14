@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2020 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -21,7 +21,7 @@
 #include "libc/calls/syscall-nt.internal.h"
 #include "libc/calls/syscall-sysv.internal.h"
 #include "libc/dce.h"
-#include "libc/intrin/strace.internal.h"
+#include "libc/intrin/strace.h"
 
 /**
  * Acquires lock on file.
@@ -31,12 +31,12 @@
  * @param op can have LOCK_{SH,EX,NB,UN} for shared, exclusive,
  *     non-blocking, and unlocking
  * @return 0 on success, or -1 w/ errno
- * @cancellationpoint
+ * @cancelationpoint
  * @restartable
  */
 int flock(int fd, int op) {
   int rc;
-  BEGIN_CANCELLATION_POINT;
+  BEGIN_CANCELATION_POINT;
 
   if (!IsWindows()) {
     rc = sys_flock(fd, op);
@@ -44,7 +44,7 @@ int flock(int fd, int op) {
     rc = sys_flock_nt(fd, op);
   }
 
-  END_CANCELLATION_POINT;
+  END_CANCELATION_POINT;
   STRACE("flock(%d, %d) → %d% m", fd, op, rc);
   return rc;
 }

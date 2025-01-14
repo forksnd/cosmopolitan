@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2021 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -22,9 +22,7 @@
 mbedtls_pk_context *InitializeKey(struct Cert *ca,
                                   mbedtls_x509write_cert *wcert,
                                   mbedtls_md_type_t md_alg, int type) {
-  mbedtls_pk_context *k;
-  mbedtls_ctr_drbg_context kr;
-  k = calloc(1, sizeof(mbedtls_pk_context));
+  mbedtls_pk_context *k = calloc(1, sizeof(mbedtls_pk_context));
   mbedtls_x509write_crt_init(wcert);
   mbedtls_x509write_crt_set_issuer_key(wcert, ca ? ca->key : k);
   mbedtls_x509write_crt_set_subject_key(wcert, k);

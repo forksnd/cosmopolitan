@@ -1,5 +1,5 @@
 /*bin/echo   ' -*- mode:sh; indent-tabs-mode:nil; tab-width:8; coding:utf-8 -*-│
-│vi: set net ft=sh ts=2 sts=2 sw=2 fenc=utf-8                               :vi│
+│ vi: set noet ft=sh ts=8 sts=8 sw=8 fenc=utf-8                            :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2020 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -47,15 +47,16 @@ dos	kNtErrorGenFailure              EACCES
 dos	kNtErrorGracefulDisconnect	EPIPE
 dos	kNtErrorHostDown                EHOSTUNREACH
 dos	kNtErrorHostUnreachable         EHOSTUNREACH
-dos	kNtErrorInsufficientBuffer	EFAULT
+dos	kNtErrorInsufficientBuffer	ENOBUFS
 dos	kNtErrorNoaccess                EFAULT
 dos	kNtErrorInvalidAddress          EADDRNOTAVAIL
 dos	kNtErrorNotAReparsePoint	EINVAL
 dos	kNtErrorInvalidFunction         EINVAL
 dos	kNtErrorNegativeSeek		EINVAL
+dos	kNtErrorInvalidName		EINVAL
 dos	kNtErrorInvalidNetname          EADDRNOTAVAIL
 dos	kNtErrorInvalidUserBuffer	EMSGSIZE
-dos	kNtErrorIoPending               EINPROGRESS
+dos	kNtErrorIoPending		EINPROGRESS
 dos	kNtErrorLockViolation           EAGAIN
 dos	kNtErrorMoreData                EMSGSIZE
 dos	kNtErrorNetnameDeleted          ECONNABORTED
@@ -88,6 +89,8 @@ dos	kNtErrorUnexpNetErr             ECONNABORTED
 dos	kNtErrorWorkingSetQuota         ENOMEM
 dos	kNtErrorWriteProtect            EACCES
 dos	kNtErrorWrongDisk               EACCES
+dos	kNtErrorExeMarkedInvalid	ENOEXEC
+dos	kNtErrorExeMachineTypeMismatch	ENOEXEC
 dos	WSAEACCES                       EACCES
 dos	WSAEDISCON                      EPIPE
 dos	WSAEFAULT                       EFAULT

@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2020 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -29,9 +29,11 @@
 #include "libc/intrin/repstosb.h"
 #include "libc/log/libfatal.internal.h"
 #include "libc/runtime/runtime.h"
+#include "libc/runtime/stack.h"
+#include "libc/runtime/syslib.internal.h"
 #include "libc/str/str.h"
 #include "libc/sysv/consts/sa.h"
-#ifdef __x86_64__
+#include "libc/sysv/consts/sig.h"
 
 /**
  * @fileoverview XNU kernel callback normalization.
@@ -345,10 +347,37 @@ struct __darwin_mcontext_avx512_64_full {
   struct __darwin_x86_avx512_state64 __fs;
 };
 
+struct __darwin_arm_exception_state64 {
+  uint64_t far;
+  uint32_t esr;
+  uint32_t exception;
+};
+
+struct __darwin_arm_thread_state64 {
+  uint64_t __x[29];
+  uint64_t __fp;
+  uint64_t __lr;
+  uint64_t __sp;
+  uint64_t __pc;
+  uint32_t __cpsr;
+  uint32_t __pad;
+};
+
+struct __darwin_arm_vfp_state {
+  uint32_t __r[64];
+  uint32_t __fpscr;
+};
+
 struct __darwin_mcontext64 {
+#ifdef __x86_64__
   struct __darwin_x86_exception_state64 __es;
   struct __darwin_x86_thread_state64 __ss;
   struct __darwin_x86_float_state64 __fs;
+#elif defined(__aarch64__)
+  struct __darwin_arm_exception_state64 __es;
+  struct __darwin_arm_thread_state64 __ss;
+  struct __darwin_arm_vfp_state __fs;
+#endif
 };
 
 struct __darwin_ucontext {
@@ -359,6 +388,8 @@ struct __darwin_ucontext {
   uint64_t uc_mcsize;
   struct __darwin_mcontext64 *uc_mcontext;
 };
+
+#ifdef __x86_64__
 
 static privileged void xnuexceptionstate2linux(
     mcontext_t *mc, struct __darwin_x86_exception_state64 *xnues) {
@@ -425,7 +456,7 @@ static privileged void linuxthreadstate2xnu(
 static privileged void CopyFpXmmRegs(void *d, const void *s) {
   size_t i;
   for (i = 0; i < (8 + 16) * 16; i += 16) {
-    __builtin_memcpy((char *)d + i, (const char *)s + i, 16);
+    __memcpy((char *)d + i, (const char *)s + i, 16);
   }
 }
 
@@ -455,28 +486,63 @@ static privileged void linuxssefpustate2xnu(
   CopyFpXmmRegs(&xnufs->__fpu_stmm0, fs->st);
 }
 
+#endif /* __x86_64__ */
+
+#ifdef __x86_64__
 privileged void __sigenter_xnu(void *fn, int infostyle, int sig,
                                struct siginfo_xnu *xnuinfo,
                                struct __darwin_ucontext *xnuctx) {
-  intptr_t ax;
-  int rva, flags;
+#else
+privileged void __sigenter_xnu(int sig, struct siginfo_xnu *xnuinfo,
+                               struct __darwin_ucontext *xnuctx) {
+#endif
+
+  // allocate signal frame on stack
+#pragma GCC push_options
+#pragma GCC diagnostic ignored "-Wframe-larger-than="
   struct Goodies {
     ucontext_t uc;
     siginfo_t si;
   } g;
-  rva = __sighandrvas[sig & (NSIG - 1)];
+  CheckLargeStackAllocation(&g, sizeof(g));
+#pragma GCC pop_options
+
+  // handle signal
+  int rva, flags;
+  rva = __sighandrvas[sig];
   if (rva >= kSigactionMinRva) {
-    flags = __sighandflags[sig & (NSIG - 1)];
+    flags = __sighandflags[sig];
+
+#ifdef __aarch64__
+
+    // xnu silicon claims to support sa_resethand but it does nothing
+    // this can be tested, since it clears the bit from flags as well
+    if (flags & SA_RESETHAND) {
+      struct sigaction sa = {0};
+      __syslib->__sigaction(sig, &sa, 0);
+      __sighandflags[sig] = 0;
+      __sighandrvas[sig] = 0;
+    }
+
+    // unlike amd64, the instruction pointer on arm64 isn't advanced
+    // past the debugger breakpoint instruction automatically. we need
+    // this so execution can resume after __builtin_trap().
+    if (xnuctx && sig == SIGTRAP)
+      xnuctx->uc_mcontext->__ss.__pc += 4;
+
+#endif
+
     if (~flags & SA_SIGINFO) {
-      ((sigaction_f)(_base + rva))(sig, 0, 0);
+      ((sigaction_f)(__executable_start + rva))(sig, 0, 0);
     } else {
       __repstosb(&g, 0, sizeof(g));
+
       if (xnuctx) {
-        g.uc.uc_sigmask.__bits[0] = xnuctx->uc_sigmask;
-        g.uc.uc_sigmask.__bits[1] = 0;
+        g.uc.uc_sigmask = xnuctx->uc_sigmask;
         g.uc.uc_stack.ss_sp = xnuctx->uc_stack.ss_sp;
         g.uc.uc_stack.ss_flags = xnuctx->uc_stack.ss_flags;
         g.uc.uc_stack.ss_size = xnuctx->uc_stack.ss_size;
+#ifdef __x86_64__
         g.uc.uc_mcontext.fpregs = &g.uc.__fpustate;
         if (xnuctx->uc_mcontext) {
           if (xnuctx->uc_mcsize >=
@@ -493,16 +559,25 @@ privileged void __sigenter_xnu(void *fn, int infostyle, int sig,
             xnussefpustate2linux(&g.uc.__fpustate, &xnuctx->uc_mcontext->__fs);
           }
         }
+#elif defined(__aarch64__)
+        if (xnuctx->uc_mcontext) {
+          __memcpy(g.uc.uc_mcontext.regs, &xnuctx->uc_mcontext->__ss.__x,
+                   33 * 8);
+        }
+#endif /* __x86_64__ */
       }
+
       if (xnuinfo) {
         __siginfo2cosmo(&g.si, (void *)xnuinfo);
       }
-      ((sigaction_f)(_base + rva))(sig, &g.si, &g.uc);
+      ((sigaction_f)(__executable_start + rva))(sig, &g.si, &g.uc);
+
       if (xnuctx) {
         xnuctx->uc_stack.ss_sp = g.uc.uc_stack.ss_sp;
         xnuctx->uc_stack.ss_flags = g.uc.uc_stack.ss_flags;
         xnuctx->uc_stack.ss_size = g.uc.uc_stack.ss_size;
-        xnuctx->uc_sigmask = g.uc.uc_sigmask.__bits[0];
+        xnuctx->uc_sigmask = g.uc.uc_sigmask;
+#ifdef __x86_64__
         if (xnuctx->uc_mcontext) {
           if (xnuctx->uc_mcsize >=
               sizeof(struct __darwin_x86_exception_state64)) {
@@ -519,14 +594,22 @@ privileged void __sigenter_xnu(void *fn, int infostyle, int sig,
             linuxssefpustate2xnu(&xnuctx->uc_mcontext->__fs, &g.uc.__fpustate);
           }
         }
+#elif defined(__aarch64__)
+        if (xnuctx->uc_mcontext) {
+          __memcpy(&xnuctx->uc_mcontext->__ss.__x, g.uc.uc_mcontext.regs,
+                   33 * 8);
+        }
+#endif /* __x86_64__ */
       }
     }
   }
+
+#ifdef __x86_64__
+  intptr_t ax;
   asm volatile("syscall"
                : "=a"(ax)
                : "0"(0x20000b8 /* sigreturn */), "D"(xnuctx), "S"(infostyle)
                : "rcx", "r11", "memory", "cc");
   notpossible;
+#endif /* __x86_64__ */
 }
-
-#endif

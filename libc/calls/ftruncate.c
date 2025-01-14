@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2020 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -23,7 +23,7 @@
 #include "libc/calls/syscall-sysv.internal.h"
 #include "libc/dce.h"
 #include "libc/errno.h"
-#include "libc/intrin/strace.internal.h"
+#include "libc/intrin/strace.h"
 #include "libc/sysv/errfuns.h"
 
 /**
@@ -53,23 +53,22 @@
  * @raise ECANCELED if thread was cancelled in masked mode
  * @raise EIO if a low-level i/o error happened
  * @raise EFBIG or EINVAL if `length` is too huge
- * @raise ENOTSUP if `fd` is a zip file descriptor
  * @raise EBADF if `fd` isn't an open file descriptor
  * @raise EINVAL if `fd` is a non-file, e.g. pipe, socket
  * @raise EINVAL if `fd` wasn't opened in a writeable mode
+ * @raise EROFS if `fd` is on a read-only filesystem (e.g. zipos)
  * @raise ENOSYS on bare metal
- * @cancellationpoint
+ * @cancelationpoint
  * @asyncsignalsafe
- * @threadsafe
  */
 int ftruncate(int fd, int64_t length) {
   int rc;
-  BEGIN_CANCELLATION_POINT;
+  BEGIN_CANCELATION_POINT;
 
   if (fd < 0) {
     rc = ebadf();
   } else if (__isfdkind(fd, kFdZip)) {
-    rc = enotsup();
+    rc = erofs();
   } else if (IsMetal()) {
     rc = enosys();
   } else if (!IsWindows()) {
@@ -83,7 +82,9 @@ int ftruncate(int fd, int64_t length) {
     rc = ebadf();
   }
 
-  END_CANCELLATION_POINT;
+  END_CANCELATION_POINT;
   STRACE("ftruncate(%d, %'ld) → %d% m", fd, length, rc);
   return rc;
 }
+
+__weak_reference(ftruncate, ftruncate64);

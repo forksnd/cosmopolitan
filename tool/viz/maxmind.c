@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2021 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -17,11 +17,11 @@
 │ PERFORMANCE OF THIS SOFTWARE.                                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
 #include "libc/calls/calls.h"
-#include "libc/intrin/bits.h"
 #include "libc/log/check.h"
 #include "libc/log/log.h"
-#include "libc/mem/gc.internal.h"
+#include "libc/mem/gc.h"
 #include "libc/mem/mem.h"
+#include "libc/serialize.h"
 #include "libc/stdio/stdio.h"
 #include "net/http/http.h"
 #include "net/http/ip.h"
@@ -125,7 +125,8 @@ int main(int argc, char *argv[]) {
            MMDB_open("/usr/local/share/maxmind/GeoLite2-ASN.mmdb", 0, asdb));
   for (rc = 0, i = 1; i < argc; ++i) {
     if (PrintIpInfo(argv[i]) != -1) {
-      if (i + 1 < argc) printf("\n");
+      if (i + 1 < argc)
+        printf("\n");
     } else {
       fprintf(stderr, "NOT FOUND: %s\n", argv[i]);
       rc = 1;

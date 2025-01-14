@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2020 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -18,19 +18,14 @@
 ╚─────────────────────────────────────────────────────────────────────────────*/
 #include "dsp/tty/quant.h"
 #include "libc/assert.h"
-#include "libc/runtime/buffer.internal.h"
+#include "libc/mem/mem.h"
 #include "tool/viz/lib/graphic.h"
 
-/**
- * Allocates graphic.
- *
- * @param g should be zero initialized before first call
- * @note bfree(g->b) needs to be called later
- */
+// TODO(jart): DELETE
+
 struct Graphic *resizegraphic(struct Graphic *g, size_t yn, size_t xn) {
-  /* assert(xn % 2 == 0); */ /* todo: ughhh this whole thing is wrong */
   yn &= ~1;
-  balloc(&g->b, 64, yn * xn * sizeof(ttyrgb_m128) + /* wut */ PAGESIZE);
+  g->b = pvalloc(yn * xn * sizeof(ttyrgb_m128));
   g->yn = yn;
   g->xn = xn;
   return g;

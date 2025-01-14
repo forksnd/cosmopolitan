@@ -1,12 +1,13 @@
 #include "libc/nt/codegen.h"
-.imp	kernel32,__imp_Process32NextW,Process32NextW,0
+.imp	kernel32,__imp_Process32NextW,Process32NextW
 
 	.text.windows
+	.ftrace1
 Process32Next:
+	.ftrace2
 #ifdef __x86_64__
 	push	%rbp
 	mov	%rsp,%rbp
-	.profilable
 	mov	__imp_Process32NextW(%rip),%rax
 	jmp	__sysv2nt
 #elif defined(__aarch64__)

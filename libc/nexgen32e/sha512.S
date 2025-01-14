@@ -48,12 +48,13 @@
 /////////////////////////////////////////////////////////////////////////
 // This code schedules 1 blocks at a time, with 4 lanes per block
 /////////////////////////////////////////////////////////////////////////
-#include "libc/macros.internal.h"
+#include "libc/macros.h"
 
-.ident "\n\
-AVX2 SHA2 (BSD-2 License)\n\
-Copyright 2013 Intel Corporation\n"
-.include "libc/disclaimer.inc"
+.section .notice,"aR",@progbits
+.asciz "\n\n\
+AVX2 SHA512 (BSD-2 License)\n\
+Copyright 2013 Intel Corporation"
+.previous
 
 # Virtual Registers
 Y_0 = %ymm4
@@ -571,10 +572,11 @@ frame_size = frame_GPRSAVE + GPRSAVE_SIZE
 # of SHA512 message blocks.
 # "blocks" is the message length in SHA512 blocks
 ########################################################################
+	.ftrace1
 sha512_transform_rorx:
+	.ftrace2
 	push	%rbp
 	mov	%rsp,%rbp
-	.profilable
 	# Allocate Stack Space
 	mov	%rsp, %rax
 	sub	$frame_size, %rsp

@@ -1,15 +1,16 @@
-#include "libc/macros.internal.h"
+#include "libc/macros.h"
 .text.unlikely
 
+	.ftrace1
 epfnosupport:
+	.ftrace2
 #ifdef __x86_64__
 	.leafprologue
-	.profilable
 	mov	EPFNOSUPPORT(%rip),%ecx
 	jmp	__errfun
 #elif defined(__aarch64__)
 	adrp	x1,EPFNOSUPPORT
-	ldr	w0,[x1,#:lo12:EPFNOSUPPORT]
+	ldrsw	x0,[x1,#:lo12:EPFNOSUPPORT]
 	b	__errfun
 #else
 #error "unsupported architecture"

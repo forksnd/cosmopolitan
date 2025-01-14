@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:t;c-basic-offset:8;tab-width:8;coding:utf-8   -*-│
-│vi: set et ft=c ts=8 tw=8 fenc=utf-8                                       :vi│
+│ vi: set noet ft=c ts=8 sw=8 fenc=utf-8                                   :vi │
 ╚──────────────────────────────────────────────────────────────────────────────╝
 │                                                                              │
 │  The author of this software is David M. Gay.                                │
@@ -30,9 +30,9 @@
 │                                                                              │
 ╚─────────────────────────────────────────────────────────────────────────────*/
 #include "libc/errno.h"
+#include "libc/fmt/conv.h"
 #include "libc/runtime/fenv.h"
 #include "third_party/gdtoa/gdtoa.internal.h"
-/* clang-format off */
 
 #define Avoid_Underflow
 #define dplen 1
@@ -236,8 +236,8 @@ dig_done:
 							word1(&rv) = bits[0];
 						}
 						else {
-							word0(&rv) = NAN_WORD0;
-							word1(&rv) = NAN_WORD1;
+							word0(&rv) = 0x7ff80000;
+							word1(&rv) = 0x0;
 						}
 						goto ret;
 					}
@@ -685,3 +685,5 @@ ret:
 		*se = (char *)s;
 	return sign ? -dval(&rv) : dval(&rv);
 }
+
+__weak_reference(strtod, strtod_l);

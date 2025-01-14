@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:t;c-basic-offset:8;tab-width:8;coding:utf-8   -*-│
-│vi: set et ft=c ts=8 tw=8 fenc=utf-8                                       :vi│
+│ vi: set noet ft=c ts=8 sw=8 fenc=utf-8                                   :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2016 Google Inc.                                                   │
 │                                                                              │
@@ -17,27 +17,22 @@
 ╚─────────────────────────────────────────────────────────────────────────────*/
 #include "libc/calls/blockcancel.internal.h"
 #include "libc/mem/mem.h"
+#include "libc/thread/thread.h"
 #include "third_party/nsync/atomic.h"
 #include "third_party/nsync/atomic.internal.h"
 #include "third_party/nsync/common.internal.h"
-#include "third_party/nsync/dll.h"
 #include "third_party/nsync/mu_semaphore.h"
 #include "third_party/nsync/races.internal.h"
 #include "third_party/nsync/wait_s.internal.h"
 #include "third_party/nsync/waiter.h"
-
-asm(".ident\t\"\\n\\n\
-*NSYNC (Apache 2.0)\\n\
-Copyright 2016 Google, Inc.\\n\
-https://github.com/google/nsync\"");
-// clang-format off
+__static_yoink("nsync_notice");
 
 int nsync_wait_n (void *mu, void (*lock) (void *), void (*unlock) (void *),
-		  nsync_time abs_deadline,
+		  int clock, nsync_time abs_deadline,
 		  int count, struct nsync_waitable_s *waitable[]) {
 	int ready;
 	IGNORE_RACES_START ();
-	BLOCK_CANCELLATIONS;  /* TODO(jart): Does this need pthread cancellations? */
+	BLOCK_CANCELATION;
 	for (ready = 0; ready != count &&
 			nsync_time_cmp ((*waitable[ready]->funcs->ready_time) (
 						waitable[ready]->v, NULL),
@@ -56,9 +51,11 @@ int nsync_wait_n (void *mu, void (*lock) (void *), void (*unlock) (void *),
 			nw = (struct nsync_waiter_s *) malloc (count * sizeof (nw[0]));
 		}
 		for (i = 0; i != count && enqueued; i++) {
+#if NSYNC_DEBUG
 			nw[i].tag = NSYNC_WAITER_TAG;
+#endif
 			nw[i].sem = &w->sem;
-			nsync_dll_init_ (&nw[i].q, &nw[i]);
+			dll_init (&nw[i].q);
 			ATM_STORE (&nw[i].waiting, 0);
 			nw[i].flags = 0;
 			enqueued = (*waitable[i]->funcs->enqueue) (waitable[i]->v, &nw[i]);
@@ -82,7 +79,7 @@ int nsync_wait_n (void *mu, void (*lock) (void *), void (*unlock) (void *),
 				}
 			} while (nsync_time_cmp (min_ntime, nsync_time_zero) > 0 &&
 				 nsync_mu_semaphore_p_with_deadline (&w->sem,
-					min_ntime) == 0);
+					clock, min_ntime) == 0);
 		}
 
 		/* An attempt was made above to enqueue waitable[0..i-1].
@@ -104,9 +101,7 @@ int nsync_wait_n (void *mu, void (*lock) (void *), void (*unlock) (void *),
 			(*lock) (mu);
 		}
 	}
-	ALLOW_CANCELLATIONS;
+	ALLOW_CANCELATION;
 	IGNORE_RACES_END ();
 	return (ready);
 }
-
-

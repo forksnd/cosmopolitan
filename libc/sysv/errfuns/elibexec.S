@@ -1,15 +1,16 @@
-#include "libc/macros.internal.h"
+#include "libc/macros.h"
 .text.unlikely
 
+	.ftrace1
 elibexec:
+	.ftrace2
 #ifdef __x86_64__
 	.leafprologue
-	.profilable
 	mov	ELIBEXEC(%rip),%ecx
 	jmp	__errfun
 #elif defined(__aarch64__)
 	adrp	x1,ELIBEXEC
-	ldr	w0,[x1,#:lo12:ELIBEXEC]
+	ldrsw	x0,[x1,#:lo12:ELIBEXEC]
 	b	__errfun
 #else
 #error "unsupported architecture"

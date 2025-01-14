@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:4;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=4 sts=4 sw=4 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=4 sts=4 sw=4 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │                                                                              │
 │  Copyright (C) 2005-2010 Gerhard Häring <gh@ghaering.de>                     │
@@ -35,12 +35,6 @@
 #include "third_party/python/Modules/_sqlite/util.h"
 
 PYTHON_YOINK("sqlite3.dump");
-
-asm(".ident\t\"\\n\\n\
-pysqlite (zlib license)\\n\
-Copyright (C) 2005-2010 Gerhard Häring <gh@ghaering.de>\"");
-asm(".include \"libc/disclaimer.inc\"");
-/* clang-format off */
 
 #define ACTION_FINALIZE 1
 #define ACTION_RESET 2

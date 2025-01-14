@@ -1,6 +1,5 @@
-/* clang-format off */
-/* Record version and build host architecture for GNU make.
-Copyright (C) 1988-2020 Free Software Foundation, Inc.
+/* Record version and build host architecture for GNU Make.
+Copyright (C) 1988-2023 Free Software Foundation, Inc.
 This file is part of GNU Make.
 
 GNU Make is free software; you can redistribute it and/or modify it under the
@@ -13,18 +12,18 @@ WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
 A PARTICULAR PURPOSE.  See the GNU General Public License for more details.
 
 You should have received a copy of the GNU General Public License along with
-this program.  If not, see <http://www.gnu.org/licenses/>.  */
+this program.  If not, see <https://www.gnu.org/licenses/>.  */
 
 /* We use <config.h> instead of "config.h" so that a compilation
    using -I. -I$srcdir will use ./config.h rather than $srcdir/config.h
    (which it would do because makeint.h was found in $srcdir).  */
-#include "third_party/make/config.h"
+#include "config.h"
 
 #ifndef MAKE_HOST
 # define MAKE_HOST "unknown"
 #endif
 
-const char *version_string = VERSION;
+const char *version_string = PACKAGE_VERSION;
 const char *make_host = MAKE_HOST;
 
 /*

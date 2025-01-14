@@ -1,9 +1,10 @@
 #ifndef COSMOPOLITAN_LIBC_BITS_PUSHPOP_H_
 #define COSMOPOLITAN_LIBC_BITS_PUSHPOP_H_
-#include "libc/macros.internal.h"
-#if !(__ASSEMBLER__ + __LINKER__ + 0)
+#ifdef _COSMO_SOURCE
+#include "libc/macros.h"
 
-#if !defined(__GNUC__) || defined(__STRICT_ANSI__) || !defined(__x86_64__)
+#if !defined(__GNUC__) || defined(__STRICT_ANSI__) || !defined(__x86_64__) || \
+    !defined(__MNO_RED_ZONE__)
 #define pushpop(x) (x)
 #else
 /**
@@ -31,7 +32,8 @@
   })
 #endif
 
-#if !defined(__GNUC__) || defined(__STRICT_ANSI__) || !defined(__x86_64__)
+#if !defined(__GNUC__) || defined(__STRICT_ANSI__) || !defined(__x86_64__) || \
+    !defined(__MNO_RED_ZONE__)
 #define pushmov(d, x) (*(d) = (x))
 #else
 #define pushmov(d, x)                                       \
@@ -51,5 +53,5 @@
   })
 #endif
 
-#endif /* !(__ASSEMBLER__ + __LINKER__ + 0) */
+#endif /* _COSMO_SOURCE */
 #endif /* COSMOPOLITAN_LIBC_BITS_PUSHPOP_H_ */

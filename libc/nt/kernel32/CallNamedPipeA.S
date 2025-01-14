@@ -1,12 +1,13 @@
 #include "libc/nt/codegen.h"
-.imp	kernel32,__imp_CallNamedPipeA,CallNamedPipeA,110
+.imp	kernel32,__imp_CallNamedPipeA,CallNamedPipeA
 
 	.text.windows
+	.ftrace1
 CallNamedPipeA:
+	.ftrace2
 #ifdef __x86_64__
 	push	%rbp
 	mov	%rsp,%rbp
-	.profilable
 	mov	__imp_CallNamedPipeA(%rip),%rax
 	jmp	__sysv2nt8
 #elif defined(__aarch64__)

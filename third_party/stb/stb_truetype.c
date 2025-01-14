@@ -1,5 +1,5 @@
-/*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:3;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=3 sts=3 sw=3 fenc=utf-8                                :vi│
+/*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │                                                                              │
 │  stb_truetype                                                                │
@@ -25,22 +25,20 @@
 │  SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.                      │
 │                                                                              │
 ╚─────────────────────────────────────────────────────────────────────────────*/
+#include "third_party/stb/stb_truetype.h"
 #include "libc/assert.h"
-#include "libc/intrin/bits.h"
+#include "libc/serialize.h"
 #include "libc/intrin/likely.h"
-#include "libc/macros.internal.h"
+#include "libc/macros.h"
 #include "libc/math.h"
 #include "libc/mem/mem.h"
 #include "libc/runtime/runtime.h"
 #include "libc/str/str.h"
 #include "third_party/stb/stb_rect_pack.h"
-#include "third_party/stb/stb_truetype.h"
 
-asm(".ident\t\"\\n\\n\
-stb_truetype (MIT License)\\n\
-Copyright 2017 Sean Barrett\"");
-asm(".include \"libc/disclaimer.inc\"");
-/* clang-format off */
+__notice(stb_truetype_notice, "\
+stb_truetype (MIT License)\n\
+Copyright 2017 Sean Barrett");
 
 // stb_truetype.h - v1.26 - public domain
 // authored from 2009-2021 by Sean Barrett / RAD Game Tools
@@ -1562,7 +1560,7 @@ static int stbtt__GetGlyphKernInfoAdvance(const stbtt_fontinfo *info, int glyph1
    r = ttUSHORT(data+10) - 1;
    needle = glyph1 << 16 | glyph2;
    while (l <= r) {
-      m = (l + r) >> 1;
+      m = (l & r) + ((l ^ r) >> 1);  // floor((a+b)/2)
       straw = ttULONG(data+18+(m*6)); // note: unaligned read
       if (needle < straw)
          r = m - 1;
@@ -1586,7 +1584,7 @@ static int32_t stbtt__GetCoverageIndex(uint8_t *coverageTable, int glyph)
          while (l <= r) {
             uint8_t *glyphArray = coverageTable + 4;
             uint16_t glyphID;
-            m = (l + r) >> 1;
+            m = (l & r) + ((l ^ r) >> 1);  // floor((a+b)/2)
             glyphID = ttUSHORT(glyphArray + 2 * m);
             straw = glyphID;
             if (needle < straw)
@@ -1607,7 +1605,7 @@ static int32_t stbtt__GetCoverageIndex(uint8_t *coverageTable, int glyph)
          int strawStart, strawEnd, needle=glyph;
          while (l <= r) {
             uint8_t *rangeRecord;
-            m = (l + r) >> 1;
+            m = (l & r) + ((l ^ r) >> 1);  // floor((a+b)/2)
             rangeRecord = rangeArray + 6 * m;
             strawStart = ttUSHORT(rangeRecord);
             strawEnd = ttUSHORT(rangeRecord + 2);
@@ -1648,7 +1646,7 @@ static int32_t  stbtt__GetGlyphClass(uint8_t *classDefTable, int glyph)
          int strawStart, strawEnd, needle=glyph;
          while (l <= r) {
             uint8_t *classRangeRecord;
-            m = (l + r) >> 1;
+            m = (l & r) + ((l ^ r) >> 1);  // floor((a+b)/2)
             classRangeRecord = classRangeRecords + 6 * m;
             strawStart = ttUSHORT(classRangeRecord);
             strawEnd = ttUSHORT(classRangeRecord + 2);
@@ -1719,7 +1717,7 @@ static int32_t stbtt__GetGlyphGPOSInfoAdvance(const stbtt_fontinfo *info, int gl
                   while (l <= r) {
                      uint16_t secondGlyph;
                      uint8_t *pairValue;
-                     m = (l + r) >> 1;
+                     m = (l & r) + ((l ^ r) >> 1);  // floor((a+b)/2)
                      pairValue = pairValueArray + (2 + valueRecordPairSizeInBytes) * m;
                      secondGlyph = ttUSHORT(pairValue);
                      straw = secondGlyph;

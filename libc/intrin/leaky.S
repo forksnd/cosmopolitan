@@ -1,5 +1,5 @@
 /*-*- mode:unix-assembly; indent-tabs-mode:t; tab-width:8; coding:utf-8     -*-│
-│vi: set et ft=asm ts=8 tw=8 fenc=utf-8                                     :vi│
+│ vi: set noet ft=asm ts=8 sw=8 fenc=utf-8                                 :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2022 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -16,10 +16,10 @@
 │ TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR             │
 │ PERFORMANCE OF THIS SOFTWARE.                                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
-#include "libc/macros.internal.h"
+#include "libc/macros.h"
 
 //	Decentralized section for leaky functions.
-	.section .piro.relo.sort.leaky.1,"aw",@nobits
+	.section .piro.relo.sort.leaky.1,"aw",@progbits
 	.type	_leaky_start,@object
 	.type	_leaky_end,@object
 	.globl	_leaky_start,_leaky_end
@@ -32,7 +32,7 @@ _leaky_start:
 	...
 	decentralized content
 	...
-	*/.section .piro.relo.sort.leaky.3,"aw",@nobits
+	*/.section .piro.relo.sort.leaky.3,"aw",@progbits
 _leaky_end:
 	.quad	0
 	.overrun

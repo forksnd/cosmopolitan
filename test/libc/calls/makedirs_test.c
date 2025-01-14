@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2022 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -17,13 +17,17 @@
 │ PERFORMANCE OF THIS SOFTWARE.                                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
 #include "libc/calls/calls.h"
+#include "libc/dce.h"
 #include "libc/errno.h"
-#include "libc/mem/gc.internal.h"
+#include "libc/mem/gc.h"
 #include "libc/mem/mem.h"
 #include "libc/testlib/testlib.h"
-#include "libc/thread/spawn.h"
 #include "libc/thread/thread.h"
 #include "libc/x/x.h"
+
+void SetUpOnce(void) {
+  testlib_enable_tmp_setup_teardown();
+}
 
 TEST(makedirs, empty) {
   ASSERT_SYS(ENOENT, -1, makedirs("", 0755));
@@ -52,14 +56,12 @@ TEST(makedirs, basic) {
   ASSERT_TRUE(isdirectory("a/b/c/d/e"));
 }
 
-#define DIR                                                                    \
-  "a/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t/u/v/w/x/y/z/A/B/C/D/E/F/G/H/I/J/K/" \
-  "L/M/N/O/P/Q/R/S/T/U/V/W/X/Y/Z"
+#define DIR \
+  "a/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t/u/v/w/x/y/z/A/B/C/D/E/F/G/H/I/J"
 
 pthread_barrier_t barrier;
-char testlib_enable_tmp_setup_teardown;
 
-int Worker(void *arg, int tid) {
+void *Worker(void *arg) {
   pthread_barrier_wait(&barrier);
   ASSERT_EQ(0, makedirs(DIR, 0755));
   return 0;
@@ -67,9 +69,11 @@ int Worker(void *arg, int tid) {
 
 TEST(makedirs, test) {
   int i, n = 8;
-  struct spawn *t = gc(malloc(sizeof(struct spawn) * n));
+  pthread_t *t = gc(malloc(sizeof(pthread_t) * n));
   ASSERT_EQ(0, pthread_barrier_init(&barrier, 0, n));
-  for (i = 0; i < n; ++i) ASSERT_SYS(0, 0, _spawn(Worker, 0, t + i));
-  for (i = 0; i < n; ++i) EXPECT_SYS(0, 0, _join(t + i));
+  for (i = 0; i < n; ++i)
+    ASSERT_EQ(0, pthread_create(t + i, 0, Worker, 0));
+  for (i = 0; i < n; ++i)
+    EXPECT_EQ(0, pthread_join(t[i], 0));
   ASSERT_EQ(0, pthread_barrier_destroy(&barrier));
 }

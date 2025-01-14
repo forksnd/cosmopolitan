@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2022 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -19,15 +19,17 @@
 #include "ape/sections.internal.h"
 #include "libc/calls/calls.h"
 #include "libc/calls/pledge.internal.h"
-#include "libc/calls/struct/bpf.h"
-#include "libc/calls/struct/filter.h"
-#include "libc/calls/struct/seccomp.h"
+#include "libc/calls/prctl.internal.h"
+#include "libc/calls/struct/bpf.internal.h"
+#include "libc/calls/struct/filter.internal.h"
+#include "libc/calls/struct/seccomp.internal.h"
 #include "libc/calls/struct/sigaction.h"
 #include "libc/calls/syscall_support-sysv.internal.h"
+#include "libc/calls/ucontext.h"
 #include "libc/intrin/bsr.h"
 #include "libc/intrin/likely.h"
-#include "libc/intrin/promises.internal.h"
-#include "libc/macros.internal.h"
+#include "libc/intrin/promises.h"
+#include "libc/macros.h"
 #include "libc/runtime/runtime.h"
 #include "libc/runtime/stack.h"
 #include "libc/sysv/consts/audit.h"
@@ -35,7 +37,6 @@
 #include "libc/sysv/consts/o.h"
 #include "libc/sysv/consts/pr.h"
 #include "libc/sysv/consts/prot.h"
-#ifdef __x86_64__
 
 /**
  * @fileoverview OpenBSD pledge() Polyfill Payload for GNU/Systemd
@@ -60,6 +61,7 @@
 #define SELF      0x8000
 #define ADDRLESS  0x2000
 #define INET      0x2000
+#define ANET      0x8000
 #define LOCK      0x4000
 #define NOEXEC    0x8000
 #define EXEC      0x4000
@@ -75,6 +77,18 @@
 
 #define PLEDGE(pledge) pledge, ARRAYLEN(pledge)
 #define OFF(f)         offsetof(struct seccomp_data, f)
+
+#ifdef __x86_64__
+#define MCONTEXT_SYSCALL_RESULT_REGISTER rax
+#define MCONTEXT_INSTRUCTION_POINTER     rip
+#define ARCHITECTURE                     AUDIT_ARCH_X86_64
+#elif defined(__aarch64__)
+#define MCONTEXT_SYSCALL_RESULT_REGISTER regs[0]
+#define MCONTEXT_INSTRUCTION_POINTER     pc
+#define ARCHITECTURE                     AUDIT_ARCH_AARCH64
+#else
+#error "unsupported architecture"
+#endif
 
 struct Filter {
   size_t n;
@@ -93,10 +107,16 @@ static const struct thatispacked SyscallName {
     {__NR_linux_close, "close"},                                      //
     {__NR_linux_stat, "stat"},                                        //
     {__NR_linux_fstat, "fstat"},                                      //
+#ifdef __NR_linux_lstat                                               //
     {__NR_linux_lstat, "lstat"},                                      //
+#endif                                                                //
+#ifdef __NR_linux_poll                                                //
     {__NR_linux_poll, "poll"},                                        //
+#endif                                                                //
     {__NR_linux_ppoll, "ppoll"},                                      //
+#ifdef __NR_linux_brk                                                 //
     {__NR_linux_brk, "brk"},                                          //
+#endif                                                                //
     {__NR_linux_sigreturn, "sigreturn"},                              //
     {__NR_linux_lseek, "lseek"},                                      //
     {__NR_linux_mmap, "mmap"},                                        //
@@ -110,9 +130,15 @@ static const struct thatispacked SyscallName {
     {__NR_linux_pwrite, "pwrite"},                                    //
     {__NR_linux_readv, "readv"},                                      //
     {__NR_linux_writev, "writev"},                                    //
+#ifdef __NR_linux_access                                              //
     {__NR_linux_access, "access"},                                    //
+#endif                                                                //
+#ifdef __NR_linux_pipe                                                //
     {__NR_linux_pipe, "pipe"},                                        //
+#endif                                                                //
+#ifdef __NR_linux_select                                              //
     {__NR_linux_select, "select"},                                    //
+#endif                                                                //
     {__NR_linux_pselect6, "pselect6"},                                //
     {__NR_linux_sched_yield, "sched_yield"},                          //
     {__NR_linux_mremap, "mremap"},                                    //
@@ -122,12 +148,18 @@ static const struct thatispacked SyscallName {
     {__NR_linux_shmat, "shmat"},                                      //
     {__NR_linux_shmctl, "shmctl"},                                    //
     {__NR_linux_dup, "dup"},                                          //
+#ifdef __NR_linux_dup2                                                //
     {__NR_linux_dup2, "dup2"},                                        //
+#endif                                                                //
+#ifdef __NR_linux_pause                                               //
     {__NR_linux_pause, "pause"},                                      //
+#endif                                                                //
     {__NR_linux_nanosleep, "nanosleep"},                              //
     {__NR_linux_getitimer, "getitimer"},                              //
     {__NR_linux_setitimer, "setitimer"},                              //
+#ifdef __NR_linux_alarm                                               //
     {__NR_linux_alarm, "alarm"},                                      //
+#endif                                                                //
     {__NR_linux_getpid, "getpid"},                                    //
     {__NR_linux_sendfile, "sendfile"},                                //
     {__NR_linux_socket, "socket"},                                    //
@@ -145,8 +177,12 @@ static const struct thatispacked SyscallName {
     {__NR_linux_socketpair, "socketpair"},                            //
     {__NR_linux_setsockopt, "setsockopt"},                            //
     {__NR_linux_getsockopt, "getsockopt"},                            //
+#ifdef __NR_linux_fork                                                //
     {__NR_linux_fork, "fork"},                                        //
+#endif                                                                //
+#ifdef __NR_linux_vfork                                               //
     {__NR_linux_vfork, "vfork"},                                      //
+#endif                                                                //
     {__NR_linux_execve, "execve"},                                    //
     {__NR_linux_wait4, "wait4"},                                      //
     {__NR_linux_kill, "kill"},                                        //
@@ -173,19 +209,39 @@ static const struct thatispacked SyscallName {
     {__NR_linux_getcwd, "getcwd"},                                    //
     {__NR_linux_chdir, "chdir"},                                      //
     {__NR_linux_fchdir, "fchdir"},                                    //
+#ifdef __NR_linux_rename                                              //
     {__NR_linux_rename, "rename"},                                    //
+#endif                                                                //
+#ifdef __NR_linux_mkdir                                               //
     {__NR_linux_mkdir, "mkdir"},                                      //
+#endif                                                                //
+#ifdef __NR_linux_rmdir                                               //
     {__NR_linux_rmdir, "rmdir"},                                      //
+#endif                                                                //
+#ifdef __NR_linux_creat                                               //
     {__NR_linux_creat, "creat"},                                      //
+#endif                                                                //
+#ifdef __NR_linux_link                                                //
     {__NR_linux_link, "link"},                                        //
+#endif                                                                //
     {__NR_linux_unlink, "unlink"},                                    //
+#ifdef __NR_linux_symlink                                             //
     {__NR_linux_symlink, "symlink"},                                  //
+#endif                                                                //
+#ifdef __NR_linux_readlink                                            //
     {__NR_linux_readlink, "readlink"},                                //
+#endif                                                                //
+#ifdef __NR_linux_chmod                                               //
     {__NR_linux_chmod, "chmod"},                                      //
+#endif                                                                //
     {__NR_linux_fchmod, "fchmod"},                                    //
+#ifdef __NR_linux_chown                                               //
     {__NR_linux_chown, "chown"},                                      //
+#endif                                                                //
     {__NR_linux_fchown, "fchown"},                                    //
+#ifdef __NR_linux_lchown                                              //
     {__NR_linux_lchown, "lchown"},                                    //
+#endif                                                                //
     {__NR_linux_umask, "umask"},                                      //
     {__NR_linux_gettimeofday, "gettimeofday"},                        //
     {__NR_linux_getrlimit, "getrlimit"},                              //
@@ -197,7 +253,9 @@ static const struct thatispacked SyscallName {
     {__NR_linux_getuid, "getuid"},                                    //
     {__NR_linux_getgid, "getgid"},                                    //
     {__NR_linux_getppid, "getppid"},                                  //
+#ifdef __NR_linux_getpgrp                                             //
     {__NR_linux_getpgrp, "getpgrp"},                                  //
+#endif                                                                //
     {__NR_linux_setsid, "setsid"},                                    //
     {__NR_linux_getsid, "getsid"},                                    //
     {__NR_linux_getpgid, "getpgid"},                                  //
@@ -217,7 +275,9 @@ static const struct thatispacked SyscallName {
     {__NR_linux_sigpending, "sigpending"},                            //
     {__NR_linux_sigsuspend, "sigsuspend"},                            //
     {__NR_linux_sigaltstack, "sigaltstack"},                          //
+#ifdef __NR_linux_mknod                                               //
     {__NR_linux_mknod, "mknod"},                                      //
+#endif                                                                //
     {__NR_linux_mknodat, "mknodat"},                                  //
     {__NR_linux_statfs, "statfs"},                                    //
     {__NR_linux_fstatfs, "fstatfs"},                                  //
@@ -242,8 +302,12 @@ static const struct thatispacked SyscallName {
     {__NR_linux_sigtimedwait, "sigtimedwait"},                        //
     {__NR_linux_sigqueueinfo, "sigqueueinfo"},                        //
     {__NR_linux_personality, "personality"},                          //
+#ifdef __NR_linux_ustat                                               //
     {__NR_linux_ustat, "ustat"},                                      //
+#endif                                                                //
+#ifdef __NR_linux_sysfs                                               //
     {__NR_linux_sysfs, "sysfs"},                                      //
+#endif                                                                //
     {__NR_linux_sched_setparam, "sched_setparam"},                    //
     {__NR_linux_sched_getparam, "sched_getparam"},                    //
     {__NR_linux_sched_setscheduler, "sched_setscheduler"},            //
@@ -252,19 +316,29 @@ static const struct thatispacked SyscallName {
     {__NR_linux_sched_get_priority_min, "sched_get_priority_min"},    //
     {__NR_linux_sched_rr_get_interval, "sched_rr_get_interval"},      //
     {__NR_linux_vhangup, "vhangup"},                                  //
+#ifdef __NR_linux_modify_ldt                                          //
     {__NR_linux_modify_ldt, "modify_ldt"},                            //
+#endif                                                                //
     {__NR_linux_pivot_root, "pivot_root"},                            //
+#ifdef __NR_linux__sysctl                                             //
     {__NR_linux__sysctl, "_sysctl"},                                  //
+#endif                                                                //
     {__NR_linux_prctl, "prctl"},                                      //
+#ifdef __NR_linux_arch_prctl                                          //
     {__NR_linux_arch_prctl, "arch_prctl"},                            //
+#endif                                                                //
     {__NR_linux_adjtimex, "adjtimex"},                                //
     {__NR_linux_umount2, "umount2"},                                  //
     {__NR_linux_swapon, "swapon"},                                    //
     {__NR_linux_swapoff, "swapoff"},                                  //
     {__NR_linux_sethostname, "sethostname"},                          //
     {__NR_linux_setdomainname, "setdomainname"},                      //
+#ifdef __NR_linux_iopl                                                //
     {__NR_linux_iopl, "iopl"},                                        //
+#endif                                                                //
+#ifdef __NR_linux_ioperm                                              //
     {__NR_linux_ioperm, "ioperm"},                                    //
+#endif                                                                //
     {__NR_linux_init_module, "init_module"},                          //
     {__NR_linux_delete_module, "delete_module"},                      //
     {__NR_linux_gettid, "gettid"},                                    //
@@ -289,11 +363,17 @@ static const struct thatispacked SyscallName {
     {__NR_linux_io_submit, "io_submit"},                              //
     {__NR_linux_io_cancel, "io_cancel"},                              //
     {__NR_linux_lookup_dcookie, "lookup_dcookie"},                    //
+#ifdef __NR_linux_epoll_create                                        //
     {__NR_linux_epoll_create, "epoll_create"},                        //
+#endif                                                                //
+#ifdef __NR_linux_epoll_wait                                          //
     {__NR_linux_epoll_wait, "epoll_wait"},                            //
+#endif                                                                //
     {__NR_linux_epoll_ctl, "epoll_ctl"},                              //
     {__NR_linux_getdents, "getdents"},                                //
+#ifdef __NR_linux_oldgetdents                                         //
     {__NR_linux_oldgetdents, "oldgetdents"},                          //
+#endif                                                                //
     {__NR_linux_set_tid_address, "set_tid_address"},                  //
     {__NR_linux_restart_syscall, "restart_syscall"},                  //
     {__NR_linux_semtimedop, "semtimedop"},                            //
@@ -324,15 +404,23 @@ static const struct thatispacked SyscallName {
     {__NR_linux_keyctl, "keyctl"},                                    //
     {__NR_linux_ioprio_set, "ioprio_set"},                            //
     {__NR_linux_ioprio_get, "ioprio_get"},                            //
+#ifdef __NR_linux_inotify_init                                        //
     {__NR_linux_inotify_init, "inotify_init"},                        //
+#endif                                                                //
+#ifdef __NR_linux_inotify_add_watch                                   //
     {__NR_linux_inotify_add_watch, "inotify_add_watch"},              //
+#endif                                                                //
+#ifdef __NR_linux_inotify_rm_watch                                    //
     {__NR_linux_inotify_rm_watch, "inotify_rm_watch"},                //
+#endif                                                                //
     {__NR_linux_openat, "openat"},                                    //
     {__NR_linux_mkdirat, "mkdirat"},                                  //
     {__NR_linux_fchownat, "fchownat"},                                //
     {__NR_linux_utime, "utime"},                                      //
     {__NR_linux_utimes, "utimes"},                                    //
+#ifdef __NR_linux_futimesat                                           //
     {__NR_linux_futimesat, "futimesat"},                              //
+#endif                                                                //
     {__NR_linux_fstatat, "fstatat"},                                  //
     {__NR_linux_unlinkat, "unlinkat"},                                //
     {__NR_linux_renameat, "renameat"},                                //
@@ -360,9 +448,13 @@ static const struct thatispacked SyscallName {
     {__NR_linux_perf_event_open, "perf_event_open"},                  //
     {__NR_linux_inotify_init1, "inotify_init1"},                      //
     {__NR_linux_tgsigqueueinfo, "tgsigqueueinfo"},                    //
+#ifdef __NR_linux_signalfd                                            //
     {__NR_linux_signalfd, "signalfd"},                                //
+#endif                                                                //
     {__NR_linux_signalfd4, "signalfd4"},                              //
+#ifdef __NR_linux_eventfd                                             //
     {__NR_linux_eventfd, "eventfd"},                                  //
+#endif                                                                //
     {__NR_linux_eventfd2, "eventfd2"},                                //
     {__NR_linux_timerfd_create, "timerfd_create"},                    //
     {__NR_linux_timerfd_settime, "timerfd_settime"},                  //
@@ -422,18 +514,31 @@ static const struct thatispacked SyscallName {
     {__NR_linux_process_madvise, "process_madvise"},                  //
     {__NR_linux_epoll_pwait2, "epoll_pwait2"},                        //
     {__NR_linux_mount_setattr, "mount_setattr"},                      //
+#ifdef __NR_linux_quotactl_fd                                         //
     {__NR_linux_quotactl_fd, "quotactl_fd"},                          //
+#endif                                                                //
     {__NR_linux_landlock_create_ruleset, "landlock_create_ruleset"},  //
     {__NR_linux_landlock_add_rule, "landlock_add_rule"},              //
     {__NR_linux_landlock_restrict_self, "landlock_restrict_self"},    //
+#ifdef __NR_linux_memfd_secret                                        //
     {__NR_linux_memfd_secret, "memfd_secret"},                        //
+#endif                                                                //
+#ifdef __NR_linux_process_mrelease                                    //
     {__NR_linux_process_mrelease, "process_mrelease"},                //
+#endif                                                                //
+#ifdef __NR_linux_futex_waitv                                         //
     {__NR_linux_futex_waitv, "futex_waitv"},                          //
+#endif                                                                //
+#ifdef __NR_linux_set_mempolicy_home_node                             //
     {__NR_linux_set_mempolicy_home_node, "set_mempolicy_home_node"},  //
+#endif                                                                //
 };
 
 static const uint16_t kPledgeDefault[] = {
-    __NR_linux_exit,  // thread return / exit()
+    __NR_linux_exit,          // thread return / exit()
+#ifdef __NR_linux_arch_prctl  //
+    __NR_linux_arch_prctl,    // or else launching musl process crashes (tls)
+#endif                        //
 };
 
 // stdio contains all the benign system calls. openbsd makes the
@@ -464,7 +569,9 @@ static const uint16_t kPledgeStdio[] = {
     __NR_linux_preadv,             //
     __NR_linux_preadv2,            //
     __NR_linux_dup,                //
+#ifdef __NR_linux_dup2             //
     __NR_linux_dup2,               //
+#endif                             //
     __NR_linux_dup3,               //
     __NR_linux_fchdir,             //
     __NR_linux_fcntl | STDIO,      //
@@ -476,7 +583,9 @@ static const uint16_t kPledgeStdio[] = {
     __NR_linux_getrandom,          //
     __NR_linux_getgroups,          //
     __NR_linux_getpgid,            //
+#ifdef __NR_linux_getpgrp          //
     __NR_linux_getpgrp,            //
+#endif                             //
     __NR_linux_getpid,             //
     __NR_linux_gettid,             //
     __NR_linux_getuid,             //
@@ -500,42 +609,67 @@ static const uint16_t kPledgeStdio[] = {
     __NR_linux_splice,             //
     __NR_linux_lseek,              //
     __NR_linux_tee,                //
+#ifdef __NR_linux_brk              //
     __NR_linux_brk,                //
+#endif                             //
     __NR_linux_msync,              //
     __NR_linux_mmap | NOEXEC,      //
+    __NR_linux_mlock,              //
+    __NR_linux_mlock2,             //
+    __NR_linux_munlock,            //
     __NR_linux_mremap,             //
     __NR_linux_munmap,             //
     __NR_linux_mincore,            //
     __NR_linux_madvise,            //
     __NR_linux_fadvise,            //
     __NR_linux_mprotect | NOEXEC,  //
+#ifdef __NR_linux_arch_prctl       //
     __NR_linux_arch_prctl,         //
+#endif                             //
     __NR_linux_migrate_pages,      //
     __NR_linux_sync_file_range,    //
     __NR_linux_set_tid_address,    //
     __NR_linux_membarrier,         //
     __NR_linux_nanosleep,          //
+#ifdef __NR_linux_pipe             //
     __NR_linux_pipe,               //
+#endif                             //
     __NR_linux_pipe2,              //
+#ifdef __NR_linux_poll             //
     __NR_linux_poll,               //
+#endif                             //
     __NR_linux_ppoll,              //
+#ifdef __NR_linux_select           //
     __NR_linux_select,             //
+#endif                             //
     __NR_linux_pselect6,           //
+#ifdef __NR_linux_epoll_create     //
     __NR_linux_epoll_create,       //
+#endif                             //
     __NR_linux_epoll_create1,      //
     __NR_linux_epoll_ctl,          //
+#ifdef __NR_linux_epoll_wait       //
     __NR_linux_epoll_wait,         //
+#endif                             //
     __NR_linux_epoll_pwait,        //
     __NR_linux_epoll_pwait2,       //
     __NR_linux_recvfrom,           //
     __NR_linux_sendto | ADDRLESS,  //
     __NR_linux_ioctl | RESTRICT,   //
+#ifdef __NR_linux_alarm            //
     __NR_linux_alarm,              //
+#endif                             //
+#ifdef __NR_linux_pause            //
     __NR_linux_pause,              //
+#endif                             //
     __NR_linux_shutdown,           //
+#ifdef __NR_linux_eventfd          //
     __NR_linux_eventfd,            //
+#endif                             //
     __NR_linux_eventfd2,           //
+#ifdef __NR_linux_signalfd         //
     __NR_linux_signalfd,           //
+#endif                             //
     __NR_linux_signalfd4,          //
     __NR_linux_sigaction,          //
     __NR_linux_sigaltstack,        //
@@ -573,18 +707,27 @@ static const uint16_t kPledgeRpath[] = {
     __NR_linux_open | READONLY,    //
     __NR_linux_openat | READONLY,  //
     __NR_linux_stat,               //
+#ifdef __NR_linux_lstat            //
     __NR_linux_lstat,              //
+#endif                             //
     __NR_linux_fstat,              //
     __NR_linux_fstatat,            //
+    __NR_linux_statx,              //
+#ifdef __NR_linux_access           //
     __NR_linux_access,             //
+#endif                             //
     __NR_linux_faccessat,          //
     __NR_linux_faccessat2,         //
+#ifdef __NR_linux_readlink         //
     __NR_linux_readlink,           //
+#endif                             //
     __NR_linux_readlinkat,         //
     __NR_linux_statfs,             //
     __NR_linux_fstatfs,            //
     __NR_linux_getdents,           //
+#ifdef __NR_linux_oldgetdents      //
     __NR_linux_oldgetdents,        //
+#endif                             //
 };
 
 static const uint16_t kPledgeWpath[] = {
@@ -593,14 +736,21 @@ static const uint16_t kPledgeWpath[] = {
     __NR_linux_openat | WRITEONLY,  //
     __NR_linux_stat,                //
     __NR_linux_fstat,               //
+#ifdef __NR_linux_lstat             //
     __NR_linux_lstat,               //
+#endif                              //
     __NR_linux_fstatat,             //
+    __NR_linux_statx,               //
+#ifdef __NR_linux_access            //
     __NR_linux_access,              //
+#endif                              //
     __NR_linux_truncate,            //
     __NR_linux_faccessat,           //
     __NR_linux_faccessat2,          //
     __NR_linux_readlinkat,          //
+#ifdef __NR_linux_chmod             //
     __NR_linux_chmod | NOBITS,      //
+#endif                              //
     __NR_linux_fchmod | NOBITS,     //
     __NR_linux_fchmodat | NOBITS,   //
 };
@@ -608,33 +758,51 @@ static const uint16_t kPledgeWpath[] = {
 static const uint16_t kPledgeCpath[] = {
     __NR_linux_open | CREATONLY,    //
     __NR_linux_openat | CREATONLY,  //
+#ifdef __NR_linux_creat             //
     __NR_linux_creat | RESTRICT,    //
+#endif                              //
+#ifdef __NR_linux_rename            //
     __NR_linux_rename,              //
+#endif                              //
     __NR_linux_renameat,            //
     __NR_linux_renameat2,           //
+#ifdef __NR_linux_link              //
     __NR_linux_link,                //
+#endif                              //
     __NR_linux_linkat,              //
+#ifdef __NR_linux_symlink           //
     __NR_linux_symlink,             //
+#endif                              //
     __NR_linux_symlinkat,           //
+#ifdef __NR_linux_rmdir             //
     __NR_linux_rmdir,               //
+#endif                              //
     __NR_linux_unlink,              //
     __NR_linux_unlinkat,            //
+#ifdef __NR_linux_mkdir             //
     __NR_linux_mkdir,               //
+#endif                              //
     __NR_linux_mkdirat,             //
 };
 
 static const uint16_t kPledgeDpath[] = {
+#ifdef __NR_linux_mknod  //
     __NR_linux_mknod,    //
+#endif                   //
     __NR_linux_mknodat,  //
 };
 
 static const uint16_t kPledgeFattr[] = {
+#ifdef __NR_linux_chmod            //
     __NR_linux_chmod | NOBITS,     //
+#endif                             //
     __NR_linux_fchmod | NOBITS,    //
     __NR_linux_fchmodat | NOBITS,  //
     __NR_linux_utime,              //
     __NR_linux_utimes,             //
+#ifdef __NR_linux_futimesat        //
     __NR_linux_futimesat,          //
+#endif                             //
     __NR_linux_utimensat,          //
 };
 
@@ -644,6 +812,22 @@ static const uint16_t kPledgeInet[] = {
     __NR_linux_bind,                   //
     __NR_linux_sendto,                 //
     __NR_linux_connect,                //
+    __NR_linux_accept,                 //
+    __NR_linux_accept4,                //
+    __NR_linux_ioctl | INET,           //
+    __NR_linux_getsockopt | RESTRICT,  //
+    __NR_linux_setsockopt | RESTRICT,  //
+    __NR_linux_getpeername,            //
+    __NR_linux_getsockname,            //
+};
+
+// anet is similar to init, but without connect;
+// this allows to accept, but not initiate socket connections
+static const uint16_t kPledgeAnet[] = {
+    __NR_linux_socket | ANET,          //
+    __NR_linux_listen,                 //
+    __NR_linux_bind,                   //
+    __NR_linux_sendto,                 //
     __NR_linux_accept,                 //
     __NR_linux_accept4,                //
     __NR_linux_ioctl | INET,           //
@@ -695,8 +879,12 @@ static const uint16_t kPledgeSendfd[] = {
 };
 
 static const uint16_t kPledgeProc[] = {
+#ifdef __NR_linux_fork                  //
     __NR_linux_fork,                    //
+#endif                                  //
+#ifdef __NR_linux_vfork                 //
     __NR_linux_vfork,                   //
+#endif                                  //
     __NR_linux_clone | RESTRICT,        //
     __NR_linux_kill,                    //
     __NR_linux_tgkill,                  //
@@ -733,9 +921,13 @@ static const uint16_t kPledgeId[] = {
 };
 
 static const uint16_t kPledgeChown[] = {
+#ifdef __NR_linux_chown   //
     __NR_linux_chown,     //
+#endif                    //
     __NR_linux_fchown,    //
+#ifdef __NR_linux_lchown  //
     __NR_linux_lchown,    //
+#endif                    //
     __NR_linux_fchownat,  //
 };
 
@@ -762,18 +954,20 @@ static const uint16_t kPledgeUnveil[] = {
 
 // placeholder group
 //
-// pledge.com checks this to do auto-unveiling
+// pledge checks this to do auto-unveiling
 static const uint16_t kPledgeVminfo[] = {
     __NR_linux_sched_yield,  //
 };
 
 // placeholder group
 //
-// pledge.com uses this to auto-unveil /tmp and $TMPPATH with rwc
+// pledge uses this to auto-unveil /tmp and $TMPPATH with rwc
 // permissions. pledge() alone (without unveil() too) offers very
 // little security here. consider using them together.
 static const uint16_t kPledgeTmppath[] = {
+#ifdef __NR_linux_lstat   //
     __NR_linux_lstat,     //
+#endif                    //
     __NR_linux_unlink,    //
     __NR_linux_unlinkat,  //
 };
@@ -787,6 +981,7 @@ const struct Pledges kPledge[PROMISE_LEN_] = {
     [PROMISE_FLOCK] = {"flock", PLEDGE(kPledgeFlock)},             //
     [PROMISE_FATTR] = {"fattr", PLEDGE(kPledgeFattr)},             //
     [PROMISE_INET] = {"inet", PLEDGE(kPledgeInet)},                //
+    [PROMISE_ANET] = {"anet", PLEDGE(kPledgeAnet)},                //
     [PROMISE_UNIX] = {"unix", PLEDGE(kPledgeUnix)},                //
     [PROMISE_DNS] = {"dns", PLEDGE(kPledgeDns)},                   //
     [PROMISE_TTY] = {"tty", PLEDGE(kPledgeTty)},                   //
@@ -806,17 +1001,21 @@ const struct Pledges kPledge[PROMISE_LEN_] = {
 static const struct sock_filter kPledgeStart[] = {
     // make sure this isn't an i386 binary or something
     BPF_STMT(BPF_LD | BPF_W | BPF_ABS, OFF(arch)),
-    BPF_JUMP(BPF_JMP | BPF_JEQ | BPF_K, AUDIT_ARCH_X86_64, 1, 0),
+    BPF_JUMP(BPF_JMP | BPF_JEQ | BPF_K, ARCHITECTURE, 1, 0),
     BPF_STMT(BPF_RET | BPF_K, SECCOMP_RET_KILL_PROCESS),
     // each filter assumes ordinal is already loaded into accumulator
     BPF_STMT(BPF_LD | BPF_W | BPF_ABS, OFF(nr)),
+#ifdef __NR_linux_memfd_secret
     // forbid some system calls with ENOSYS (rather than EPERM)
-    BPF_JUMP(BPF_JMP | BPF_JGE | BPF_K, __NR_linux_memfd_secret, 5, 0),
-    BPF_JUMP(BPF_JMP | BPF_JEQ | BPF_K, __NR_linux_rseq, 4, 0),
-    BPF_JUMP(BPF_JMP | BPF_JEQ | BPF_K, __NR_linux_memfd_create, 3, 0),
-    BPF_JUMP(BPF_JMP | BPF_JEQ | BPF_K, __NR_linux_openat2, 2, 0),
-    BPF_JUMP(BPF_JMP | BPF_JEQ | BPF_K, __NR_linux_clone3, 1, 0),
-    BPF_JUMP(BPF_JMP | BPF_JEQ | BPF_K, __NR_linux_statx, 0, 1),
+    BPF_JUMP(BPF_JMP | BPF_JGE | BPF_K, __NR_linux_memfd_secret, 4, 0),
+#else
+    BPF_JUMP(BPF_JMP | BPF_JGE | BPF_K, __NR_linux_landlock_restrict_self + 1,
+             4, 0),
+#endif
+    BPF_JUMP(BPF_JMP | BPF_JEQ | BPF_K, __NR_linux_rseq, 3, 0),
+    BPF_JUMP(BPF_JMP | BPF_JEQ | BPF_K, __NR_linux_memfd_create, 2, 0),
+    BPF_JUMP(BPF_JMP | BPF_JEQ | BPF_K, __NR_linux_openat2, 1, 0),
+    BPF_JUMP(BPF_JMP | BPF_JEQ | BPF_K, __NR_linux_clone3, 0, 1),
     BPF_STMT(BPF_RET | BPF_K, SECCOMP_RET_ERRNO | (Enosys & SECCOMP_RET_DATA)),
 };
 
@@ -827,120 +1026,220 @@ static const struct sock_filter kFilterIgnoreExitGroup[] = {
 
 static privileged unsigned long StrLen(const char *s) {
   unsigned long n = 0;
-  while (*s++) ++n;
+  while (*s++)
+    ++n;
   return n;
 }
 
 static privileged void *MemCpy(void *d, const void *s, unsigned long n) {
   unsigned long i = 0;
-  for (; i < n; ++i) ((char *)d)[i] = ((char *)s)[i];
+  for (; i < n; ++i)
+    ((char *)d)[i] = ((char *)s)[i];
   return (char *)d + n;
 }
 
 static privileged char *FixCpy(char p[17], uint64_t x, int k) {
-  while (k > 0) *p++ = "0123456789abcdef"[(x >> (k -= 4)) & 15];
+  while (k > 0)
+    *p++ = "0123456789abcdef"[(x >> (k -= 4)) & 15];
   *p = '\0';
   return p;
 }
 
 static privileged char *HexCpy(char p[17], uint64_t x) {
-  return FixCpy(p, x, ROUNDUP(x ? _bsrl(x) + 1 : 1, 4));
+  return FixCpy(p, x, ROUNDUP(x ? bsrl(x) + 1 : 1, 4));
 }
 
 static privileged int GetPid(void) {
-  int ax;
+  int res;
+#ifdef __x86_64__
   asm volatile("syscall"
-               : "=a"(ax)
+               : "=a"(res)
                : "0"(__NR_linux_getpid)
                : "rcx", "r11", "memory");
-  return ax;
+#elif defined(__aarch64__)
+  register long res_x0 asm("x0");
+  asm volatile("mov\tx8,%1\n\t"
+               "svc\t0"
+               : "=r"(res_x0)
+               : "i"(__NR_linux_getpid)
+               : "x8", "memory");
+  res = res_x0;
+#endif
+  return res;
 }
 
 static privileged int GetTid(void) {
-  int ax;
+  int res;
+#ifdef __x86_64__
   asm volatile("syscall"
-               : "=a"(ax)
+               : "=a"(res)
                : "0"(__NR_linux_gettid)
                : "rcx", "r11", "memory");
-  return ax;
+#elif defined(__aarch64__)
+  register long res_x0 asm("x0");
+  asm volatile("mov\tx8,%1\n\t"
+               "svc\t0"
+               : "=r"(res_x0)
+               : "i"(__NR_linux_gettid)
+               : "x8", "memory");
+  res = res_x0;
+#endif
+  return res;
+}
+
+static privileged long Write(int fd, const void *p, unsigned long n) {
+#ifdef __x86_64__
+  long res;
+  asm volatile("syscall"
+               : "=a"(res)
+               : "0"(__NR_linux_write), "D"(2), "S"(p), "d"(n)
+               : "rcx", "r11", "memory");
+  return res;
+#elif defined(__aarch64__)
+  register long x0 asm("x0") = 2;
+  register long x1 asm("x1") = (long)p;
+  register long x2 asm("x2") = n;
+  register long x8 asm("x8") = __NR_linux_write;
+  asm volatile("svc\t0" : "+r"(x0) : "r"(x1), "r"(x2), "r"(x8) : "memory");
+  return x0;
+#endif
 }
 
 static privileged void Log(const char *s, ...) {
-  int ax;
   va_list va;
   va_start(va, s);
   do {
-    asm volatile("syscall"
-                 : "=a"(ax)
-                 : "0"(__NR_linux_write), "D"(2), "S"(s), "d"(StrLen(s))
-                 : "rcx", "r11", "memory");
+    Write(2, s, StrLen(s));
   } while ((s = va_arg(va, const char *)));
   va_end(va);
 }
 
-static privileged int Prctl(int op, long a, void *b, long c, long d) {
-  int rc;
-  asm volatile("mov\t%5,%%r10\n\t"
-               "mov\t%6,%%r8\n\t"
-               "syscall"
-               : "=a"(rc)
-               : "0"(__NR_linux_prctl), "D"(op), "S"(a), "d"(b), "g"(c), "g"(d)
-               : "rcx", "r8", "r10", "r11", "memory");
-  return rc;
-}
-
 static privileged int SigAction(int sig, struct sigaction *act,
                                 struct sigaction *old) {
-  int ax;
   act->sa_flags |= Sa_Restorer;
   act->sa_restorer = &__restore_rt;
+#ifdef __x86_64__
+  int res;
   asm volatile("mov\t%5,%%r10\n\t"
                "syscall"
-               : "=a"(ax)
+               : "=a"(res)
                : "0"(__NR_linux_sigaction), "D"(sig), "S"(act), "d"(old), "g"(8)
                : "rcx", "r10", "r11", "memory");
-  return ax;
+  return res;
+#elif defined(__aarch64__)
+  register int x0 asm("x0") = sig;
+  register void *x1 asm("x1") = act;
+  register void *x2 asm("x2") = old;
+  register int x3 asm("x3") = 8;
+  register int x8 asm("x8") = __NR_linux_sigaction;
+  asm volatile("svc\t0"
+               : "+r"(x0)
+               : "r"(x1), "r"(x2), "r"(x3), "r"(x8)
+               : "memory");
+  return x0;
+#endif
 }
 
 static privileged int SigProcMask(int how, int64_t set, int64_t *old) {
-  int ax;
+#ifdef __x86_64__
+  int res;
   asm volatile("mov\t%5,%%r10\n\t"
                "syscall"
-               : "=a"(ax)
+               : "=a"(res)
                : "0"(__NR_linux_sigprocmask), "D"(how), "S"(&set), "d"(old),
                  "g"(8)
                : "rcx", "r10", "r11", "memory");
-  return ax;
+  return res;
+#elif defined(__aarch64__)
+  register int x0 asm("x0") = how;
+  register void *x1 asm("x1") = &set;
+  register void *x2 asm("x2") = old;
+  register int x3 asm("x3") = 8;
+  register long x8 asm("x8") = __NR_linux_sigprocmask;
+  asm volatile("svc\t0"
+               : "+r"(x0)
+               : "r"(x1), "r"(x2), "r"(x3), "r"(x8)
+               : "memory");
+  return x0;
+#endif
 }
 
 static privileged void KillThisProcess(void) {
-  int ax;
   SigAction(Sigabrt, &(struct sigaction){0}, 0);
   SigProcMask(Sig_Setmask, -1, 0);
+#ifdef __x86_64__
+  int res;
   asm volatile("syscall"
-               : "=a"(ax)
+               : "=a"(res)
                : "0"(__NR_linux_kill), "D"(GetPid()), "S"(Sigabrt)
                : "rcx", "r11", "memory");
+#elif defined(__aarch64__)
+  {
+    register long r0 asm("x0") = (long)GetPid();
+    register long r1 asm("x1") = (long)Sigabrt;
+    register long res_x0 asm("x0");
+    asm volatile("mov\tx8,%1\n\t"
+                 "svc\t0"
+                 : "=r"(res_x0)
+                 : "i"(__NR_linux_kill), "r"(r0), "r"(r1)
+                 : "x8", "memory");
+  }
+#endif
   SigProcMask(Sig_Setmask, 0, 0);
+#ifdef __x86_64__
   asm volatile("syscall"
-               : "=a"(ax)
+               : "=a"(res)
                : "0"(__NR_linux_exit_group), "D"(128 + Sigabrt)
                : "rcx", "r11", "memory");
+#elif defined(__aarch64__)
+  {
+    register long r0 asm("x0") = (long)(128 + Sigabrt);
+    register long res_x0 asm("x0");
+    asm volatile("mov\tx8,%1\n\t"
+                 "svc\t0"
+                 : "=r"(res_x0)
+                 : "i"(__NR_linux_exit_group), "r"(r0)
+                 : "x8", "memory");
+  }
+#endif
 }
 
 static privileged void KillThisThread(void) {
-  int ax;
   SigAction(Sigabrt, &(struct sigaction){0}, 0);
   SigProcMask(Sig_Setmask, -1, 0);
+#ifdef __x86_64__
+  int res;
   asm volatile("syscall"
-               : "=a"(ax)
+               : "=a"(res)
                : "0"(__NR_linux_tkill), "D"(GetTid()), "S"(Sigabrt)
                : "rcx", "r11", "memory");
+#elif defined(__aarch64__)
+  {
+    register long r0 asm("x0") = (long)GetTid();
+    register long r1 asm("x1") = (long)Sigabrt;
+    register long res_x0 asm("x0");
+    asm volatile("mov\tx8,%1\n\t"
+                 "svc\t0"
+                 : "=r"(res_x0)
+                 : "i"(__NR_linux_tkill), "r"(r0), "r"(r1)
+                 : "x8", "memory");
+  }
+#endif
   SigProcMask(Sig_Setmask, 0, 0);
+#ifdef __x86_64__
   asm volatile("syscall"
                : /* no outputs */
                : "a"(__NR_linux_exit), "D"(128 + Sigabrt)
                : "rcx", "r11", "memory");
+#elif defined(__aarch64__)
+  register long r0 asm("x0") = (long)(128 + Sigabrt);
+  register long res_x0 asm("x0");
+  asm volatile("mov\tx8,%1\n\t"
+               "svc\t0"
+               : "=r"(res_x0)
+               : "i"(__NR_linux_exit), "r"(r0)
+               : "x8", "memory");
+#endif
 }
 
 static privileged const char *GetSyscallName(uint16_t n) {
@@ -953,7 +1252,7 @@ static privileged const char *GetSyscallName(uint16_t n) {
   return "unknown";
 }
 
-static privileged int HasSyscall(struct Pledges *p, uint16_t n) {
+static privileged int HasSyscall(const struct Pledges *p, uint16_t n) {
   int i;
   for (i = 0; i < p->len; ++i) {
     if (p->syscalls[i] == n) {
@@ -968,26 +1267,26 @@ static privileged int HasSyscall(struct Pledges *p, uint16_t n) {
 
 static privileged void OnSigSys(int sig, siginfo_t *si, void *vctx) {
   bool found;
-  char ord[17], rip[17];
-  int i, ok, mode = si->si_errno;
+  char ord[17];
+  int i, mode = si->si_errno;
   ucontext_t *ctx = vctx;
-  ctx->uc_mcontext.rax = -Eperm;
+  ctx->uc_mcontext.MCONTEXT_SYSCALL_RESULT_REGISTER = -Eperm;
   FixCpy(ord, si->si_syscall, 12);
-  HexCpy(rip, ctx->uc_mcontext.rip);
-  for (found = i = 0; i < ARRAYLEN(kPledge); ++i) {
+  for (found = false, i = 0; i < ARRAYLEN(kPledge); ++i) {
     if (HasSyscall(kPledge + i, si->si_syscall)) {
-      Log("error: pledge ", kPledge[i].name, " for ",
-          GetSyscallName(si->si_syscall), " (ord=", ord, " rip=", rip, ")\n",
+      Log("error: protected syscall ", GetSyscallName(si->si_syscall),
+          " (ord=", ord, "); pledge promise '", kPledge[i].name, "' to allow\n",
           NULL);
       found = true;
     }
   }
   if (!found) {
-    Log("error: bad syscall (", GetSyscallName(si->si_syscall), " ord=", ord,
-        " rip=", rip, ")\n", NULL);
+    Log("error: bad syscall ", GetSyscallName(si->si_syscall), " (ord=", ord,
+        ")\n", NULL);
   }
   switch (mode & PLEDGE_PENALTY_MASK) {
     case PLEDGE_PENALTY_KILL_PROCESS:
+      KillThisThread();
       KillThisProcess();
       // fallthrough
     case PLEDGE_PENALTY_KILL_THREAD:
@@ -999,7 +1298,6 @@ static privileged void OnSigSys(int sig, siginfo_t *si, void *vctx) {
 }
 
 static privileged void MonitorSigSys(void) {
-  int ax;
   struct sigaction sa = {
       .sa_sigaction = OnSigSys,
       .sa_flags = Sa_Siginfo | Sa_Restart,
@@ -1011,9 +1309,10 @@ static privileged void MonitorSigSys(void) {
   }
 }
 
-static privileged void AppendFilter(struct Filter *f, struct sock_filter *p,
-                                    size_t n) {
-  if (UNLIKELY(f->n + n > ARRAYLEN(f->p))) notpossible;
+static privileged void AppendFilter(struct Filter *f,
+                                    const struct sock_filter *p, size_t n) {
+  if (UNLIKELY(f->n + n > ARRAYLEN(f->p)))
+    notpossible;
   MemCpy(f->p + f->n, p, n * sizeof(*f->p));
   f->n += n;
 }
@@ -1086,24 +1385,6 @@ static privileged void AllowMonitor(struct Filter *f) {
       BPF_JUMP(BPF_JMP | BPF_JEQ | BPF_K, __NR_linux_sigreturn, 1, 0),
       BPF_JUMP(BPF_JMP | BPF_JEQ | BPF_K, __NR_linux_sigprocmask, 0, 1),
       BPF_STMT(BPF_RET | BPF_K, SECCOMP_RET_ALLOW),
-  };
-  AppendFilter(f, PLEDGE(fragment));
-}
-
-// SYSCALL is only allowed in the .privileged section
-// We assume program image is loaded in 32-bit spaces
-static privileged void AppendOriginVerification(struct Filter *f) {
-  long x = (long)__privileged_start;
-  long y = (long)__privileged_end;
-  struct sock_filter fragment[] = {
-      /*L0*/ BPF_STMT(BPF_LD | BPF_W | BPF_ABS, OFF(instruction_pointer) + 4),
-      /*L1*/ BPF_JUMP(BPF_JMP | BPF_JEQ | BPF_K, 0, 0, 5 - 2),
-      /*L2*/ BPF_STMT(BPF_LD | BPF_W | BPF_ABS, OFF(instruction_pointer)),
-      /*L3*/ BPF_JUMP(BPF_JMP | BPF_JGE | BPF_K, x, 0, 5 - 4),
-      /*L4*/ BPF_JUMP(BPF_JMP | BPF_JGE | BPF_K, y, 0, 6 - 5),
-      /*L5*/ BPF_STMT(BPF_RET | BPF_K, SECCOMP_RET_KILL),
-      /*L6*/ BPF_STMT(BPF_LD | BPF_W | BPF_ABS, OFF(nr)),
-      /*L7*/ /* next filter */
   };
   AppendFilter(f, PLEDGE(fragment));
 }
@@ -1339,7 +1620,6 @@ static privileged void AllowGetsockoptRestrict(struct Filter *f) {
 //   - MAP_HUGETLB  (0x40000)
 //
 static privileged void AllowMmapExec(struct Filter *f) {
-  long y = (long)__privileged_end;
   static const struct sock_filter fragment[] = {
       /*L0*/ BPF_JUMP(BPF_JMP | BPF_JEQ | BPF_K, __NR_linux_mmap, 0, 6 - 1),
       /*L1*/ BPF_STMT(BPF_LD | BPF_W | BPF_ABS, OFF(args[3])),  // flags
@@ -1362,7 +1642,6 @@ static privileged void AllowMmapExec(struct Filter *f) {
 //
 //   - MAP_LOCKED   (0x02000)
 //   - MAP_NONBLOCK (0x10000)
-//   - MAP_HUGETLB  (0x40000)
 //
 static privileged void AllowMmapNoexec(struct Filter *f) {
   static const struct sock_filter fragment[] = {
@@ -1371,7 +1650,7 @@ static privileged void AllowMmapNoexec(struct Filter *f) {
       /*L2*/ BPF_STMT(BPF_ALU | BPF_AND | BPF_K, ~(PROT_READ | PROT_WRITE)),
       /*L3*/ BPF_JUMP(BPF_JMP | BPF_JEQ | BPF_K, 0, 0, 8 - 4),
       /*L4*/ BPF_STMT(BPF_LD | BPF_W | BPF_ABS, OFF(args[3])),  // flags
-      /*L5*/ BPF_STMT(BPF_ALU | BPF_AND | BPF_K, 0x5a000),
+      /*L5*/ BPF_STMT(BPF_ALU | BPF_AND | BPF_K, 0x12000),
       /*L6*/ BPF_JUMP(BPF_JMP | BPF_JEQ | BPF_K, 0, 0, 1),
       /*L7*/ BPF_STMT(BPF_RET | BPF_K, SECCOMP_RET_ALLOW),
       /*L8*/ BPF_STMT(BPF_LD | BPF_W | BPF_ABS, OFF(nr)),
@@ -1565,6 +1844,7 @@ static privileged void AllowOpenatCreatonly(struct Filter *f) {
   AppendFilter(f, PLEDGE(fragment));
 }
 
+#ifdef __NR_linux_creat
 // Then the mode parameter must not have:
 //
 //   - S_ISVTX (01000 sticky)
@@ -1583,6 +1863,7 @@ static privileged void AllowCreatRestrict(struct Filter *f) {
   };
   AppendFilter(f, PLEDGE(fragment));
 }
+#endif
 
 // The second argument of fcntl() must be one of:
 //
@@ -1696,6 +1977,45 @@ static privileged void AllowSocketInet(struct Filter *f) {
 
 // The family parameter of socket() must be one of:
 //
+//   - AF_INET  (0x02)
+//   - AF_INET6 (0x0a)
+//
+// The type parameter of socket() will ignore:
+//
+//   - SOCK_CLOEXEC  (0x80000)
+//   - SOCK_NONBLOCK (0x00800)
+//
+// The type parameter of socket() must be one of:
+//
+//   - SOCK_STREAM (0x01)
+//
+// The protocol parameter of socket() must be one of:
+//
+//   - 0
+//   - IPPROTO_ICMP (0x01)
+//   - IPPROTO_TCP  (0x06)
+//
+static privileged void AllowSocketAnet(struct Filter *f) {
+  static const struct sock_filter fragment[] = {
+      BPF_JUMP(BPF_JMP | BPF_JEQ | BPF_K, __NR_linux_socket, 0, 12),
+      BPF_STMT(BPF_LD | BPF_W | BPF_ABS, OFF(args[0])),
+      BPF_JUMP(BPF_JMP | BPF_JEQ | BPF_K, 0x02, 1, 0),
+      BPF_JUMP(BPF_JMP | BPF_JEQ | BPF_K, 0x0a, 0, 8),
+      BPF_STMT(BPF_LD | BPF_W | BPF_ABS, OFF(args[1])),
+      BPF_STMT(BPF_ALU | BPF_AND | BPF_K, ~0x80800),
+      BPF_JUMP(BPF_JMP | BPF_JEQ | BPF_K, 0x01, 0, 5),
+      BPF_STMT(BPF_LD | BPF_W | BPF_ABS, OFF(args[2])),
+      BPF_JUMP(BPF_JMP | BPF_JEQ | BPF_K, 0x00, 2, 0),
+      BPF_JUMP(BPF_JMP | BPF_JEQ | BPF_K, 0x01, 1, 0),
+      BPF_JUMP(BPF_JMP | BPF_JEQ | BPF_K, 0x06, 0, 1),
+      BPF_STMT(BPF_RET | BPF_K, SECCOMP_RET_ALLOW),
+      BPF_STMT(BPF_LD | BPF_W | BPF_ABS, OFF(nr)),
+  };
+  AppendFilter(f, PLEDGE(fragment));
+}
+
+// The family parameter of socket() must be one of:
+//
 //   - AF_UNIX (1)
 //   - AF_LOCAL (1)
 //
@@ -1759,6 +2079,7 @@ static privileged void AllowPrctlStdio(struct Filter *f) {
   AppendFilter(f, PLEDGE(fragment));
 }
 
+#ifdef __NR_linux_chmod
 // The mode parameter of chmod() can't have the following:
 //
 //   - S_ISVTX (01000 sticky)
@@ -1777,6 +2098,7 @@ static privileged void AllowChmodNobits(struct Filter *f) {
   };
   AppendFilter(f, PLEDGE(fragment));
 }
+#endif
 
 // The mode parameter of fchmod() can't have the following:
 //
@@ -1854,7 +2176,8 @@ static privileged void AppendPledge(struct Filter *f,   //
   if ((count = CountUnspecial(p, len))) {
     if (count < 256) {
       for (j = i = 0; i < len; ++i) {
-        if (p[i] & SPECIAL) continue;
+        if (p[i] & SPECIAL)
+          continue;
         // jump to ALLOW rule below if accumulator equals ordinal
         struct sock_filter fragment[] = {
             BPF_JUMP(BPF_JMP | BPF_JEQ | BPF_K,  // instruction
@@ -1876,7 +2199,8 @@ static privileged void AppendPledge(struct Filter *f,   //
 
   // handle "special" ordinals which use hand-crafted bpf
   for (i = 0; i < len; ++i) {
-    if (!(p[i] & SPECIAL)) continue;
+    if (!(p[i] & SPECIAL))
+      continue;
     switch (p[i]) {
       case __NR_linux_mmap | EXEC:
         AllowMmapExec(f);
@@ -1887,9 +2211,11 @@ static privileged void AppendPledge(struct Filter *f,   //
       case __NR_linux_mprotect | NOEXEC:
         AllowMprotectNoexec(f);
         break;
+#ifdef __NR_linux_chmod
       case __NR_linux_chmod | NOBITS:
         AllowChmodNobits(f);
         break;
+#endif
       case __NR_linux_fchmod | NOBITS:
         AllowFchmodNobits(f);
         break;
@@ -1923,9 +2249,11 @@ static privileged void AppendPledge(struct Filter *f,   //
       case __NR_linux_getsockopt | RESTRICT:
         AllowGetsockoptRestrict(f);
         break;
+#ifdef __NR_linux_creat
       case __NR_linux_creat | RESTRICT:
         AllowCreatRestrict(f);
         break;
+#endif
       case __NR_linux_fcntl | STDIO:
         AllowFcntlStdio(f);
         break;
@@ -1943,6 +2271,9 @@ static privileged void AppendPledge(struct Filter *f,   //
         break;
       case __NR_linux_socket | INET:
         AllowSocketInet(f);
+        break;
+      case __NR_linux_socket | ANET:
+        AllowSocketAnet(f);
         break;
       case __NR_linux_socket | UNIX:
         AllowSocketUnix(f);
@@ -1977,14 +2308,16 @@ static privileged void AppendPledge(struct Filter *f,   //
  * @param ipromises is inverted integer bitmask of pledge() promises
  * @return 0 on success, or negative error number on error
  * @asyncsignalsafe
- * @threadsafe
  * @vforksafe
  */
 privileged int sys_pledge_linux(unsigned long ipromises, int mode) {
+#pragma GCC push_options
+#pragma GCC diagnostic ignored "-Wframe-larger-than="
   struct Filter f;
-  int i, e, rc = -1;
-  struct sock_filter sf[1] = {BPF_STMT(BPF_RET | BPF_K, 0)};
   CheckLargeStackAllocation(&f, sizeof(f));
+#pragma GCC pop_options
+  struct sock_filter sf[1] = {BPF_STMT(BPF_RET | BPF_K, 0)};
+  int i, rc = -1;
   f.n = 0;
 
   // set up the seccomp filter
@@ -2043,22 +2376,20 @@ privileged int sys_pledge_linux(unsigned long ipromises, int mode) {
   // PR_SET_SECCOMP (Linux 2.6.23+) will refuse to work if
   // PR_SET_NO_NEW_PRIVS (Linux 3.5+) wasn't called so we punt the error
   // detection to the seccomp system call below.
-  Prctl(PR_SET_NO_NEW_PRIVS, 1, 0, 0, 0);
+  sys_prctl(PR_SET_NO_NEW_PRIVS, 1, 0, 0, 0);
 
   // register our seccomp filter with the kernel
   struct sock_fprog sandbox = {.len = f.n, .filter = f.p};
-  rc = Prctl(PR_SET_SECCOMP, SECCOMP_MODE_FILTER, &sandbox, 0, 0);
+  rc = sys_prctl(PR_SET_SECCOMP, SECCOMP_MODE_FILTER, (long)&sandbox, 0, 0);
 
   // the EINVAL error could mean a lot of things. it could mean the bpf
   // code is broken. it could also mean we're running on RHEL5 which
   // doesn't have SECCOMP support. since we don't consider lack of
   // system support for security to be an error, we distinguish these
   // two cases by running a simpler SECCOMP operation.
-  if (rc == -Einval && Prctl(PR_GET_SECCOMP, 0, 0, 0, 0) == -Einval) {
+  if (rc == -Einval && sys_prctl(PR_GET_SECCOMP, 0, 0, 0, 0) == -Einval) {
     rc = 0;  // -Enosys
   }
 
   return rc;
 }
-
-#endif

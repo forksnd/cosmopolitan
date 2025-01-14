@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2021 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -21,8 +21,7 @@
 
 void (*ShiftRight)(uint64_t *, size_t, unsigned char);
 
+__attribute__((__constructor__(10)))
 static textstartup void ShiftRightInit(void) {
   ShiftRight = 0 && X86_HAVE(AVX) ? ShiftRightAvx : ShiftRightPure;
 }
-
-const void *const ShiftRightCtor[] initarray = {ShiftRightInit};

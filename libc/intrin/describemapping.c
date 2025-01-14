@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2021 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -16,25 +16,24 @@
 │ TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR             │
 │ PERFORMANCE OF THIS SOFTWARE.                                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
-#include "libc/intrin/describeflags.internal.h"
+#include "libc/intrin/describeflags.h"
+#include "libc/intrin/maps.h"
 #include "libc/runtime/memtrack.internal.h"
 #include "libc/sysv/consts/map.h"
 #include "libc/sysv/consts/prot.h"
 
-#ifdef DescribeMapping
-#undef DescribeMapping
-#endif
-
 static char DescribeMapType(int flags) {
   switch (flags & MAP_TYPE) {
     case MAP_FILE:
-      return 'f';
+      if (flags & MAP_NOFORK)
+        return 'i';  // executable image
+      return '-';
     case MAP_PRIVATE:
+      if (flags & MAP_NOFORK)
+        return 'w';  // windows memory
       return 'p';
     case MAP_SHARED:
       return 's';
-    case MAP_STACK:
-      return 'S';
     default:
       return '?';
   }
@@ -48,12 +47,11 @@ char *DescribeProt(char p[4], int prot) {
   return p;
 }
 
-const char *DescribeMapping(char p[8], int prot, int flags) {
+const char *_DescribeMapping(char p[8], int prot, int flags) {
   /* asan runtime depends on this function */
   DescribeProt(p, prot);
   p[3] = DescribeMapType(flags);
   p[4] = (flags & MAP_ANONYMOUS) ? 'a' : '-';
-  p[5] = (flags & MAP_FIXED) ? 'F' : '-';
-  p[6] = 0;
+  p[5] = 0;
   return p;
 }

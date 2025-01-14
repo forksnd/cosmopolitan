@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2021 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -18,8 +18,7 @@
 ╚─────────────────────────────────────────────────────────────────────────────*/
 #include "libc/runtime/symbols.internal.h"
 
-privileged noinstrument noasan noubsan char *__get_symbol_name(
-    struct SymbolTable *t, int s) {
+privileged char *__get_symbol_name(struct SymbolTable *t, int s) {
   /* asan runtime depends on this function */
   if (t && s != -1) {
     return t->name_base + t->names[s];

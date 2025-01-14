@@ -7,18 +7,19 @@
 │   • http://creativecommons.org/publicdomain/zero/1.0/            │
 ╚─────────────────────────────────────────────────────────────────*/
 #endif
-#include "libc/calls/struct/statfs.h"
-#include "libc/dce.h"
-#include "libc/fmt/conv.h"
-#include "libc/log/check.h"
 #include "libc/nt/enum/statfs.h"
-#include "libc/stdio/stdio.h"
-#include "libc/sysv/consts/st.h"
+#include <cosmo.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <sys/vfs.h>
 
-dontinline void ShowIt(const char *path) {
+void ShowIt(const char *path) {
   char ibuf[21];
   struct statfs sf = {0};
-  CHECK_NE(-1, statfs(path, &sf));
+  if (statfs(path, &sf)) {
+    perror(path);
+    exit(1);
+  }
 
   printf("filesystem %s\n", path);
   printf("f_type    = %#x (%s)\n", sf.f_type, sf.f_fstypename);
@@ -40,7 +41,9 @@ dontinline void ShowIt(const char *path) {
          "total file nodes in filesystem");
   printf("f_ffree   = %,zu (%s)\n", sf.f_ffree,
          "free file nodes in filesystem");
-  printf("f_fsid    = %#lx (%s)\n", sf.f_fsid, "filesystem id");
+  printf("f_fsid    = %#lx (%s)\n",
+         sf.f_fsid.__val[0] | (uint64_t)sf.f_fsid.__val[1] << 32,
+         "filesystem id");
   printf("f_owner   = %#lx (%s)\n", sf.f_owner, "user that created mount");
   printf("f_namelen = %,zu (%s)\n", sf.f_namelen,
          "maximum length of filenames");

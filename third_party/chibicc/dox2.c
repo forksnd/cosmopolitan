@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2020 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -16,7 +16,7 @@
 │ TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR             │
 │ PERFORMANCE OF THIS SOFTWARE.                                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
-#include "libc/intrin/bits.h"
+#include "libc/intrin/bsr.h"
 #include "libc/mem/alg.h"
 #include "libc/sysv/consts/map.h"
 #include "libc/sysv/consts/o.h"
@@ -152,7 +152,6 @@ static char *DeserializeStr(struct Dox *dox) {
 
 static struct Javadown *DeserializeJavadown(struct Dox *dox) {
   int i;
-  bool present;
   struct Javadown *jd;
   if (DeserializeInt(dox)) {
     jd = FreeLater(dox, calloc(1, sizeof(struct Javadown)));
@@ -272,7 +271,7 @@ static bool AddSet(struct Set *set, char *s) {
 static int CompareDoxIndexEntry(const void *p1, const void *p2, void *arg) {
   struct Dox *dox;
   const char *s1, *s2;
-  struct DoxIndexEntry *a, *b;
+  const struct DoxIndexEntry *a, *b;
   dox = arg, a = p1, b = p2;
   s1 = a->t == kObject ? dox->objects.p[a->i].name : dox->macros.p[a->i].name;
   s2 = b->t == kObject ? dox->objects.p[b->i].name : dox->macros.p[b->i].name;
@@ -281,9 +280,13 @@ static int CompareDoxIndexEntry(const void *p1, const void *p2, void *arg) {
   return strcasecmp(s1, s2);
 }
 
+static unsigned long roundup2pow(unsigned long x) {
+  return x > 1 ? 2ul << bsrl(x - 1) : x ? 1 : 0;
+}
+
 static void IndexDox(struct Dox *dox) {
   size_t i, j, n;
-  dox->names.n = _roundup2pow(dox->objects.n + dox->macros.n) << 1;
+  dox->names.n = roundup2pow(dox->objects.n + dox->macros.n) << 1;
   dox->names.p = calloc(dox->names.n, sizeof(*dox->names.p));
   n = 0;
   for (i = 0; i < dox->objects.n; ++i) {
@@ -772,7 +775,7 @@ document.addEventListener('DOMContentLoaded', function () {\n\
               prefix = xasprintf("%s ", o->params.p[j].name);
               for (k = 0; k < o->javadown->tags.n; ++k) {
                 if (!strcmp(o->javadown->tags.p[k].tag, "param") &&
-                    _startswith(o->javadown->tags.p[k].text, prefix)) {
+                    startswith(o->javadown->tags.p[k].text, prefix)) {
                   fprintf(f, "<dd>");
                   PrintText(f, o->javadown->tags.p[k].text + strlen(prefix));
                   fprintf(f, "\n");
@@ -906,7 +909,7 @@ document.addEventListener('DOMContentLoaded', function () {\n\
               prefix = xasprintf("%s ", m->params.p[j].name);
               for (k = 0; k < m->javadown->tags.n; ++k) {
                 if (!strcmp(m->javadown->tags.p[k].tag, "param") &&
-                    _startswith(m->javadown->tags.p[k].text, prefix)) {
+                    startswith(m->javadown->tags.p[k].text, prefix)) {
                   fprintf(f, "<dd>");
                   PrintText(f, m->javadown->tags.p[k].text + strlen(prefix));
                   fprintf(f, "\n");

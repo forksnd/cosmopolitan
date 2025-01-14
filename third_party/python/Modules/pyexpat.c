@@ -1,10 +1,10 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:4;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=4 sts=4 sw=4 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=4 sts=4 sw=4 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Python 3                                                                     │
 │ https://docs.python.org/3/license.html                                       │
 ╚─────────────────────────────────────────────────────────────────────────────*/
-#include "libc/fmt/fmt.h"
+#include "third_party/python/Include/pyexpat.h"
 #include "third_party/python/Include/abstract.h"
 #include "third_party/python/Include/boolobject.h"
 #include "third_party/python/Include/bytearrayobject.h"
@@ -16,14 +16,12 @@
 #include "third_party/python/Include/modsupport.h"
 #include "third_party/python/Include/objimpl.h"
 #include "third_party/python/Include/pycapsule.h"
-#include "third_party/python/Include/pyexpat.h"
 #include "third_party/python/Include/pyhash.h"
 #include "third_party/python/Include/pymacro.h"
 #include "third_party/python/Include/sysmodule.h"
 #include "third_party/python/Include/traceback.h"
 #include "third_party/python/Include/yoink.h"
 #include "third_party/python/Modules/expat/expat.h"
-/* clang-format off */
 
 PYTHON_PROVIDE("pyexpat");
 PYTHON_PROVIDE("pyexpat.EXPAT_VERSION");
@@ -2041,7 +2039,12 @@ dump buffer
 [clinic start generated code]*/
 /*[clinic end generated code: output=da39a3ee5e6b4b0d input=524ce2e021e4eba6]*/
 
-_Section(".rodata.pytab.1") const struct _inittab _PyImport_Inittab_pyexpat = {
+#ifdef __aarch64__
+_Section(".rodata.pytab.1 //")
+#else
+_Section(".rodata.pytab.1")
+#endif
+ const struct _inittab _PyImport_Inittab_pyexpat = {
     "pyexpat",
     PyInit_pyexpat,
 };

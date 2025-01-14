@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2020 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -22,12 +22,12 @@
 #include "libc/calls/struct/iovec.internal.h"
 #include "libc/calls/syscall-sysv.internal.h"
 #include "libc/dce.h"
-#include "libc/intrin/asan.internal.h"
-#include "libc/intrin/strace.internal.h"
+#include "libc/intrin/strace.h"
 #include "libc/intrin/weaken.h"
+#include "libc/runtime/zipos.internal.h"
 #include "libc/sock/sock.h"
+#include "libc/stdio/sysparam.h"
 #include "libc/sysv/errfuns.h"
-#include "libc/zipos/zipos.internal.h"
 
 /**
  * Writes data to file descriptor.
@@ -39,6 +39,7 @@
  *
  * @param fd is open file descriptor
  * @param buf is copied from, cf. copy_file_range(), sendfile(), etc.
+ * @param size is always saturated to 0x7ffff000 automatically
  * @return [1..size] bytes on success, or -1 w/ errno; noting zero is
  *     impossible unless size was passed as zero to do an error check
  * @raise EBADF if `fd` is negative or not an open file descriptor
@@ -59,34 +60,36 @@
  *     as a general possibility; whereas other system don't specify it
  * @raise ENXIO is specified only by POSIX and XNU when a request is
  *     made of a nonexistent device or outside device capabilities
- * @cancellationpoint
+ * @cancelationpoint
  * @asyncsignalsafe
  * @restartable
  * @vforksafe
  */
 ssize_t write(int fd, const void *buf, size_t size) {
   ssize_t rc;
-  BEGIN_CANCELLATION_POINT;
+  BEGIN_CANCELATION_POINT;
 
-  if (fd >= 0) {
-    if ((!buf && size) || (IsAsan() && !__asan_is_valid(buf, size))) {
-      rc = efault();
-    } else if (fd < g_fds.n && g_fds.p[fd].kind == kFdZip) {
-      rc = enotsup();
-    } else if (!IsWindows() && !IsMetal()) {
-      rc = sys_write(fd, buf, size);
-    } else if (fd >= g_fds.n) {
-      rc = ebadf();
-    } else if (IsMetal()) {
-      rc = sys_writev_metal(g_fds.p + fd, &(struct iovec){buf, size}, 1);
-    } else {
-      rc = sys_writev_nt(fd, &(struct iovec){buf, size}, 1);
-    }
-  } else {
+  // XNU and BSDs will EINVAL if requested bytes exceeds INT_MAX
+  // this is inconsistent with Linux which ignores huge requests
+  size = MIN(size, 0x7ffff000);
+
+  if (fd < 0) {
     rc = ebadf();
+  } else if (fd < g_fds.n && g_fds.p[fd].kind == kFdZip) {
+    rc = ebadf();  // posix specifies this when not open()'d for writing
+  } else if (IsLinux() || IsXnu() || IsFreebsd() || IsOpenbsd() || IsNetbsd()) {
+    rc = sys_write(fd, buf, size);
+  } else if (fd >= g_fds.n) {
+    rc = ebadf();
+  } else if (IsMetal()) {
+    rc = sys_writev_metal(g_fds.p + fd, &(struct iovec){(void *)buf, size}, 1);
+  } else if (IsWindows()) {
+    rc = sys_writev_nt(fd, &(struct iovec){(void *)buf, size}, 1);
+  } else {
+    rc = enosys();
   }
 
-  END_CANCELLATION_POINT;
+  END_CANCELATION_POINT;
   DATATRACE("write(%d, %#.*hhs%s, %'zu) → %'zd% m", fd, MAX(0, MIN(40, rc)),
             buf, rc > 40 ? "..." : "", size, rc);
   return rc;

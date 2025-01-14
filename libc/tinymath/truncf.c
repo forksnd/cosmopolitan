@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:t;c-basic-offset:8;tab-width:8;coding:utf-8   -*-│
-│vi: set et ft=c ts=8 tw=8 fenc=utf-8                                       :vi│
+│ vi: set noet ft=c ts=8 sw=8 fenc=utf-8                                   :vi │
 ╚──────────────────────────────────────────────────────────────────────────────╝
 │                                                                              │
 │  Musl Libc                                                                   │
@@ -27,13 +27,11 @@
 ╚─────────────────────────────────────────────────────────────────────────────*/
 #include "libc/math.h"
 #include "libc/tinymath/internal.h"
+#ifndef __llvm__
 #include "third_party/intel/smmintrin.internal.h"
+#endif
+__static_yoink("musl_libc_notice");
 
-asm(".ident\t\"\\n\\n\
-Musl libc (MIT License)\\n\
-Copyright 2005-2014 Rich Felker, et. al.\"");
-asm(".include \"libc/disclaimer.inc\"");
-// clang-format off
 
 /**
  * Rounds to integer, towards zero.
@@ -55,7 +53,7 @@ float truncf(float x)
 	asm("fiebra\t%0,5,%1,4" : "=f"(x) : "f"(x));
 	return x;
 
-#elif defined(__x86_64__) && defined(__SSE4_1__)
+#elif defined(__x86_64__) && defined(__SSE4_1__) && !defined(__llvm__) && !defined(__chibicc__)
 
 	asm("roundss\t%2,%1,%0"
 	    : "=x"(x)

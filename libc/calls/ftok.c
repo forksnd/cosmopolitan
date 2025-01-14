@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2021 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -26,6 +26,7 @@
  */
 int ftok(const char *path, int id) {
   struct stat st;
-  if (stat(path, &st) == -1) return -1;
+  if (stat(path, &st) == -1)
+    return -1;
   return (uint32_t)id << 24 | (st.st_dev & 0xff) << 16 | (st.st_ino & 0xffff);
 }

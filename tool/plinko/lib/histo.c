@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2022 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -16,8 +16,8 @@
 │ TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR             │
 │ PERFORMANCE OF THIS SOFTWARE.                                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
-#include "libc/assert.h"
 #include "tool/plinko/lib/histo.h"
+#include "libc/assert.h"
 #include "tool/plinko/lib/plinko.h"
 #include "tool/plinko/lib/printf.h"
 
@@ -27,10 +27,12 @@ void PrintHistogram(int fd, const char *s, const long *h, size_t n) {
   int j, p, m;
   char buf[101];
   size_t i, logos;
-  if (!(t = GetLongSum(h, n))) return;
+  if (!(t = GetLongSum(h, n)))
+    return;
   Fprintf(fd, "%s%n", s);
   for (i = 0; i < n; ++i) {
-    if (!h[i]) continue;
+    if (!h[i])
+      continue;
     p = h[i] * 1000000 / t;
     assert(0 <= p && p <= 1000000);
     for (j = 0, m = p / 10000; j < m; ++j) {

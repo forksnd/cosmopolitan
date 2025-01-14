@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2021 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -16,11 +16,9 @@
 │ TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR             │
 │ PERFORMANCE OF THIS SOFTWARE.                                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
-#include "libc/stdio/stdio.h"
+#include "libc/calls/calls.h"
 #include "libc/testlib/testlib.h"
 
 void __testlib_ezbenchwarn(const char *msg) {
-  fputs("warning: failed to accurately benchmark", stderr);
-  fputs(msg, stderr);
-  fputc('\n', stderr);
+  tinyprint(2, "warning: failed to accurately benchmark", msg, "\n", NULL);
 }

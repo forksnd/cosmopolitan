@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2022 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -17,6 +17,7 @@
 │ PERFORMANCE OF THIS SOFTWARE.                                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
 #include "libc/calls/calls.h"
+#include "libc/calls/struct/sigaction.h"
 #include "libc/calls/struct/timespec.h"
 #include "libc/dce.h"
 #include "libc/errno.h"
@@ -43,59 +44,62 @@ TEST(sem_init, einval) {
 }
 
 TEST(sem_post, afterDestroyed_isUndefinedBehavior) {
-  if (!IsModeDbg()) return;
-  int val;
+  if (!IsModeDbg())
+    return;
   sem_t sem;
   SPAWN(fork);
+  signal(SIGILL, SIG_DFL);
   ASSERT_SYS(0, 0, sem_init(&sem, 0, 0));
   ASSERT_SYS(0, 0, sem_destroy(&sem));
   IgnoreStderr();
   sem_post(&sem);
-  EXITS(77);
+  TERMS(SIGILL);
 }
 
 TEST(sem_trywait, afterDestroyed_isUndefinedBehavior) {
-  if (!IsModeDbg()) return;
-  int val;
+  if (!IsModeDbg())
+    return;
   sem_t sem;
   SPAWN(fork);
+  signal(SIGILL, SIG_DFL);
   ASSERT_SYS(0, 0, sem_init(&sem, 0, 0));
   ASSERT_SYS(0, 0, sem_destroy(&sem));
   IgnoreStderr();
   sem_trywait(&sem);
-  EXITS(77);
+  TERMS(SIGILL);
 }
 
 TEST(sem_wait, afterDestroyed_isUndefinedBehavior) {
-  if (!IsModeDbg()) return;
-  int val;
+  if (!IsModeDbg())
+    return;
   sem_t sem;
   SPAWN(fork);
+  signal(SIGILL, SIG_DFL);
   ASSERT_SYS(0, 0, sem_init(&sem, 0, 0));
   ASSERT_SYS(0, 0, sem_destroy(&sem));
   IgnoreStderr();
   sem_wait(&sem);
-  EXITS(77);
+  TERMS(SIGILL);
 }
 
 TEST(sem_timedwait, afterDestroyed_isUndefinedBehavior) {
-  if (!IsModeDbg()) return;
-  int val;
+  if (!IsModeDbg())
+    return;
   sem_t sem;
   SPAWN(fork);
+  signal(SIGILL, SIG_DFL);
   ASSERT_SYS(0, 0, sem_init(&sem, 0, 0));
   ASSERT_SYS(0, 0, sem_destroy(&sem));
   IgnoreStderr();
   sem_timedwait(&sem, 0);
-  EXITS(77);
+  TERMS(SIGILL);
 }
 
 void *Worker(void *arg) {
-  int rc;
   sem_t **s = arg;
   struct timespec ts;
   ASSERT_SYS(0, 0, clock_gettime(CLOCK_REALTIME, &ts));
-  ts.tv_sec += 1;
+  ts.tv_sec += 10;
   ASSERT_SYS(0, 0, sem_post(s[0]));
   ASSERT_SYS(0, 0, sem_timedwait(s[1], &ts));
   return 0;
@@ -104,15 +108,19 @@ void *Worker(void *arg) {
 TEST(sem_timedwait, threads) {
   int i, r, n = 4;
   sem_t sm[2], *s[2] = {sm, sm + 1};
-  pthread_t *t = _gc(malloc(sizeof(pthread_t) * n));
+  pthread_t *t = gc(malloc(sizeof(pthread_t) * n));
   ASSERT_SYS(0, 0, sem_init(s[0], 0, 0));
   ASSERT_SYS(0, 0, sem_init(s[1], 0, 0));
-  for (i = 0; i < n; ++i) ASSERT_EQ(0, pthread_create(t + i, 0, Worker, s));
-  for (i = 0; i < n; ++i) ASSERT_SYS(0, 0, sem_wait(s[0]));
+  for (i = 0; i < n; ++i)
+    ASSERT_EQ(0, pthread_create(t + i, 0, Worker, s));
+  for (i = 0; i < n; ++i)
+    ASSERT_SYS(0, 0, sem_wait(s[0]));
   ASSERT_SYS(0, 0, sem_getvalue(s[0], &r));
   ASSERT_EQ(0, r);
-  for (i = 0; i < n; ++i) ASSERT_SYS(0, 0, sem_post(s[1]));
-  for (i = 0; i < n; ++i) ASSERT_EQ(0, pthread_join(t[i], 0));
+  for (i = 0; i < n; ++i)
+    ASSERT_SYS(0, 0, sem_post(s[1]));
+  for (i = 0; i < n; ++i)
+    ASSERT_EQ(0, pthread_join(t[i], 0));
   ASSERT_SYS(0, 0, sem_getvalue(s[1], &r));
   ASSERT_EQ(0, r);
   ASSERT_SYS(0, 0, sem_destroy(s[1]));
@@ -121,17 +129,20 @@ TEST(sem_timedwait, threads) {
 
 TEST(sem_timedwait, processes) {
   int i, r, rc, n = 4, pshared = 1;
-  sem_t *sm = _mapshared(FRAMESIZE), *s[2] = {sm, sm + 1};
+  sem_t *sm = _mapshared(getpagesize()), *s[2] = {sm, sm + 1};
   ASSERT_SYS(0, 0, sem_init(s[0], pshared, 0));
   ASSERT_SYS(0, 0, sem_init(s[1], pshared, 0));
   for (i = 0; i < n; ++i) {
     ASSERT_NE(-1, (rc = fork()));
-    if (!rc) Worker(s), _Exit(0);
+    if (!rc)
+      Worker(s), _Exit(0);
   }
-  for (i = 0; i < n; ++i) ASSERT_SYS(0, 0, sem_wait(s[0]));
+  for (i = 0; i < n; ++i)
+    ASSERT_SYS(0, 0, sem_wait(s[0]));
   ASSERT_SYS(0, 0, sem_getvalue(s[0], &r));
   ASSERT_EQ(0, r);
-  for (i = 0; i < n; ++i) ASSERT_SYS(0, 0, sem_post(s[1]));
+  for (i = 0; i < n; ++i)
+    ASSERT_SYS(0, 0, sem_post(s[1]));
   for (;;) {
     int ws, pid, e = errno;
     if ((pid = waitpid(0, &ws, 0)) != -1) {
@@ -152,5 +163,5 @@ TEST(sem_timedwait, processes) {
   ASSERT_EQ(0, r);
   ASSERT_SYS(0, 0, sem_destroy(s[1]));
   ASSERT_SYS(0, 0, sem_destroy(s[0]));
-  ASSERT_SYS(0, 0, munmap(sm, FRAMESIZE));
+  ASSERT_SYS(0, 0, munmap(sm, getpagesize()));
 }

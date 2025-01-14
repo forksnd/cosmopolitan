@@ -10,7 +10,6 @@
 #include "libc/nt/thunk/msabi.h"
 #include "libc/nt/typedef/ioapcroutine.h"
 #include "libc/nt/typedef/pknormalroutine.h"
-#if !(__ASSEMBLER__ + __LINKER__ + 0)
 COSMOPOLITAN_C_START_
 /*                            ░░░░
                        ▒▒▒░░░▒▒▒▒▒▒▒▓▓▓░
@@ -225,9 +224,18 @@ NtStatus RtlUnlockHeap(int64_t heap);
 NtStatus RtlGetProcessHeaps(uint32_t count, void **out_Heaps);
 NtStatus RtlWalkHeap(int64_t heap, void *out_Info);
 
+/*───────────────────────────────────────────────────────────────────────────│─╗
+│ cosmopolitan § new technology » beyond the pale » i am the time lorde    ─╬─│┼
+╚────────────────────────────────────────────────────────────────────────────│*/
+
+NtStatus NtSetTimerResolution(uint32_t DesiredResolution, bool32 SetResolution,
+                              uint32_t *out_CurrentResolution);
+NtStatus NtQueryTimerResolution(uint32_t *out_MinimumResolution,
+                                uint32_t *out_MaximumResolution,
+                                uint32_t *out_CurrentResolution);
+
 #if ShouldUseMsabiAttribute()
 #include "libc/nt/thunk/ntdll.inc"
 #endif /* ShouldUseMsabiAttribute() */
 COSMOPOLITAN_C_END_
-#endif /* !(__ASSEMBLER__ + __LINKER__ + 0) */
 #endif /* COSMOPOLITAN_LIBC_NT_NTDLL_H_ */

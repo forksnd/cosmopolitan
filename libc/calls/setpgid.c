@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2022 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -18,42 +18,23 @@
 ╚─────────────────────────────────────────────────────────────────────────────*/
 #include "libc/calls/calls.h"
 #include "libc/calls/syscall-sysv.internal.h"
-#include "libc/calls/syscall_support-nt.internal.h"
 #include "libc/dce.h"
-#include "libc/intrin/strace.internal.h"
-#include "libc/nt/console.h"
-#include "libc/sysv/errfuns.h"
+#include "libc/intrin/strace.h"
 
 /**
  * Changes process group for process.
+ *
+ * @param pid is process id (may be zero for current process)
+ * @param pgid is process group id (may be zero for current process)
+ * @return 0 on success, or -1 w/ errno
  * @vforksafe
  */
 int setpgid(int pid, int pgid) {
-  int rc, me;
+  int rc;
   if (!IsWindows()) {
     rc = sys_setpgid(pid, pgid);
   } else {
-    me = getpid();
-    if ((!pid || pid == me) && (!pgid || pgid == me)) {
-      /*
-       * "When a process is created with CREATE_NEW_PROCESS_GROUP
-       *  specified, an implicit call to SetConsoleCtrlHandler(NULL,TRUE)
-       *  is made on behalf of the new process; this means that the new
-       *  process has CTRL+C disabled. This lets shells handle CTRL+C
-       *  themselves, and selectively pass that signal on to
-       *  sub-processes. CTRL+BREAK is not disabled, and may be used to
-       *  interrupt the process/process group."
-       *                           ──Quoth MSDN § CreateProcessW()
-       */
-      if (SetConsoleCtrlHandler(0, 1)) {
-        rc = 0;
-      } else {
-        rc = __winerr();
-      }
-    } else {
-      // irregular use cases not supported on windows
-      rc = einval();
-    }
+    rc = 0;  // not sure what to do on windows yet
   }
   STRACE("setpgid(%d, %d) → %d% m", pid, pgid, rc);
   return rc;

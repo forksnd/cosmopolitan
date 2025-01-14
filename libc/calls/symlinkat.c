@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2020 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -20,9 +20,8 @@
 #include "libc/calls/syscall-nt.internal.h"
 #include "libc/calls/syscall-sysv.internal.h"
 #include "libc/dce.h"
-#include "libc/intrin/asan.internal.h"
-#include "libc/intrin/describeflags.internal.h"
-#include "libc/intrin/strace.internal.h"
+#include "libc/intrin/describeflags.h"
+#include "libc/intrin/strace.h"
 #include "libc/sysv/consts/at.h"
 #include "libc/sysv/errfuns.h"
 
@@ -41,10 +40,6 @@
  */
 int symlinkat(const char *target, int newdirfd, const char *linkpath) {
   int rc;
-  if (IsAsan() &&
-      (!__asan_is_valid_str(target) || !__asan_is_valid_str(linkpath))) {
-    rc = efault();
-  }
   if (!IsWindows()) {
     rc = sys_symlinkat(target, newdirfd, linkpath);
   } else {

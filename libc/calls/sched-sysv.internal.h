@@ -11,18 +11,17 @@
 #define CPU_WHICH_TID   1
 #define CPU_WHICH_PID   2
 
-#if !(__ASSEMBLER__ + __LINKER__ + 0)
 COSMOPOLITAN_C_START_
 
 int sys_sched_get_priority_max(int);
 int sys_sched_get_priority_min(int);
 int sys_sched_getparam(int, struct sched_param *);
 int sys_sched_getscheduler(int);
-int sys_sched_setaffinity(int, uint64_t, const void *) _Hide;
+int sys_sched_setaffinity(int, uint64_t, const void *);
 int sys_sched_setparam(int, const struct sched_param *);
 int sys_sched_setscheduler(int, int, const struct sched_param *);
-int sys_sched_yield(void) _Hide;
-int64_t sys_sched_getaffinity(int, uint64_t, void *) _Hide;
+int sys_sched_yield(void);
+int64_t sys_sched_getaffinity(int, uint64_t, void *);
 
 int sys_sched_getscheduler_netbsd(int, struct sched_param *);
 int sys_sched_setparam_netbsd(int, int, int, const struct sched_param *)  //
@@ -41,5 +40,4 @@ int sys_sched_getaffinity_freebsd(int level, int which, int id, size_t setsize,
                                   void *mask) asm("sys_sched_getaffinity");
 
 COSMOPOLITAN_C_END_
-#endif /* !(__ASSEMBLER__ + __LINKER__ + 0) */
 #endif /* COSMOPOLITAN_LIBC_CALLS_SCHED_SYSV_INTERNAL_H_ */

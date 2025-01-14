@@ -1,5 +1,5 @@
 /*-*- mode:unix-assembly; indent-tabs-mode:t; tab-width:8; coding:utf-8     -*-│
-│vi: set et ft=asm ts=8 tw=8 fenc=utf-8                                     :vi│
+│ vi: set noet ft=asm ts=8 sw=8 fenc=utf-8                                 :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2020 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -16,8 +16,7 @@
 │ TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR             │
 │ PERFORMANCE OF THIS SOFTWARE.                                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
-#include "libc/macros.internal.h"
-#include "libc/runtime/internal.h"
+#include "libc/macros.h"
 #include "libc/sysv/consts/prot.h"
 #include "libc/dce.h"
 
@@ -43,7 +42,7 @@
 //	@param	r15 is envp (still callee saved)
 //	@note	rdi is __init_bss_start (callee monotonic lockstep)
 //	@note	rsi is __init_rodata_start (callee monotonic lockstep)
-//	@see	.init.start & .init.end (libc/macros.internal.h)
+//	@see	.init.start & .init.end (libc/macros.h)
 //	@see	ape/ape.lds
 	.section .initprologue,"ax",@progbits
 	.type	_init,@function
@@ -52,7 +51,6 @@ _init:
 #ifdef __x86_64__
 	push	%rbp
 	mov	%rsp,%rbp
-	.profilable
 	ezlea	__init_bss_start,di
 	ezlea	__init_rodata_start,si
 #elif defined(__aarch64__)
@@ -77,7 +75,7 @@ _init_check_rdi_rsi:
 	jne	1b
 3:	.endfn	_init_check_rdi_rsi
 #endif
-_woot:	leave
+	leave
 #elif defined(__aarch64__)
 	ldp	x29,x30,[sp],#16
 #endif
@@ -88,7 +86,7 @@ _woot:	leave
 
 //	Decentralized section for packed data structures & initializers.
 //
-//	@see	.initro (libc/macros.internal.h)
+//	@see	.initro (libc/macros.h)
 //	@see	ape/ape.lds
 	.section .initroprologue,"a",@progbits
 	.type	__init_rodata_start,@object
@@ -112,7 +110,7 @@ __init_rodata_end:
 //
 //	Data in this section becomes read-only after initialization.
 //
-//	@see	.piro.bss.init (libc/macros.internal.h)
+//	@see	.piro.bss.init (libc/macros.h)
 //	@see	libc/runtime/piro.c
 //	@see	ape/ape.lds
 	.section .piro.bss.init.1,"aw",@nobits

@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2021 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -16,10 +16,14 @@
 │ TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR             │
 │ PERFORMANCE OF THIS SOFTWARE.                                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
+#include "libc/dce.h"
 #include "libc/runtime/internal.h"
 #include "libc/runtime/runtime.h"
+#include "libc/runtime/symbols.internal.h"
 #include "libc/str/str.h"
 #include "libc/thread/tls.h"
+
+__static_yoink("zipos");
 
 /**
  * Enables plaintext function tracing if `--ftrace` flag is passed.
@@ -34,6 +38,9 @@
  * @see libc/runtime/_init.S for documentation
  */
 textstartup int ftrace_init(void) {
+  if (IsModeDbg() || strace_enabled(0) > 0) {
+    GetSymbolTable();
+  }
   if (__intercept_flag(&__argc, __argv, "--ftrace")) {
     ftrace_install();
     ftrace_enabled(+1);

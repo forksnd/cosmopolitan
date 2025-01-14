@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:4;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=4 sts=4 sw=4 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=4 sts=4 sw=4 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Python 3                                                                     │
 │ https://docs.python.org/3/license.html                                       │
@@ -25,7 +25,6 @@
 #include "third_party/python/Include/token.h"
 #include "third_party/python/Include/unicodeobject.h"
 #include "third_party/python/Include/yoink.h"
-/* clang-format off */
 
 PYTHON_PROVIDE("parser");
 PYTHON_PROVIDE("parser.ParserError");
@@ -41,12 +40,13 @@ PYTHON_PROVIDE("parser.st2tuple");
 PYTHON_PROVIDE("parser.suite");
 PYTHON_PROVIDE("parser.tuple2st");
 
-asm(".ident\t\"\\n\\n\
-parsermodule (Python license)\\n\
-Copyright 1995-1996 by Virginia Polytechnic Institute & State\\n\
-University, Blacksburg, Virginia, USA, and Fred L. Drake, Jr., Reston,\\n\
-Virginia, USA.  Portions copyright 1991-1995 by Stichting Mathematisch\\n\
-Centrum, Amsterdam, The Netherlands.\"");
+__notice(parsermodule_notice, "\
+parsermodule (Python license)\n\
+Copyright 1995-1996 by Virginia Polytechnic Institute & State\n\
+University, Blacksburg, Virginia, USA, and Fred L. Drake, Jr., Reston,\n\
+Virginia, USA.  Portions copyright 1991-1995 by Stichting Mathematisch\n\
+Centrum, Amsterdam, The Netherlands.");
+
 static const char parser_copyright_string[] =
 "Copyright 1995-1996 by Virginia Polytechnic Institute & State\n\
 University, Blacksburg, Virginia, USA, and Fred L. Drake, Jr., Reston,\n\
@@ -1240,7 +1240,12 @@ PyInit_parser(void)
     return module;
 }
 
-_Section(".rodata.pytab.1") const struct _inittab _PyImport_Inittab_parser = {
+#ifdef __aarch64__
+_Section(".rodata.pytab.1 //")
+#else
+_Section(".rodata.pytab.1")
+#endif
+ const struct _inittab _PyImport_Inittab_parser = {
     "parser",
     PyInit_parser,
 };

@@ -1,4 +1,3 @@
-// clang-format off
 /*
   Copyright (c) 1990-2010 Info-ZIP.  All rights reserved.
 
@@ -71,7 +70,7 @@
 #include "third_party/unzip/crypt.h"
 #include "libc/log/log.h"
 #include "libc/mem/mem.h"
-#include "libc/mem/gc.internal.h"
+#include "libc/mem/gc.h"
 #include "third_party/unzip/unzvers.h"
 #include "third_party/unzip/globals.h"
 
@@ -3626,7 +3625,7 @@ static ZCONST char Far long_op_ambig_err[] =
 static ZCONST char Far long_op_not_sup_err[] =
    "long option '%s' not supported\n";
 
-static ZCONST char Far no_arg_files_err[] = "argument files not enabled\n";
+/* static ZCONST char Far no_arg_files_err[] = "argument files not enabled\n"; */
 
 
 /* below removed as only used for processing argument files */

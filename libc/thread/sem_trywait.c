@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2022 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -18,9 +18,12 @@
 ╚─────────────────────────────────────────────────────────────────────────────*/
 #include "libc/assert.h"
 #include "libc/calls/calls.h"
+#include "libc/calls/syscall-sysv.internal.h"
+#include "libc/dce.h"
 #include "libc/errno.h"
 #include "libc/intrin/atomic.h"
 #include "libc/limits.h"
+#include "libc/runtime/syslib.internal.h"
 #include "libc/sysv/errfuns.h"
 #include "libc/thread/semaphore.h"
 
@@ -34,11 +37,20 @@
  */
 int sem_trywait(sem_t *sem) {
   int v;
+
+#if 0
+  if (IsXnuSilicon() && sem->sem_magic == SEM_MAGIC_KERNEL) {
+    return _sysret(__syslib->__sem_trywait(sem->sem_kernel));
+  }
+#endif
+
   v = atomic_load_explicit(&sem->sem_value, memory_order_relaxed);
   do {
-    _unassert(v > INT_MIN);
-    if (!v) return eagain();
-    if (v < 0) return einval();
+    unassert(v > INT_MIN);
+    if (!v)
+      return eagain();
+    if (v < 0)
+      return einval();
   } while (!atomic_compare_exchange_weak_explicit(
       &sem->sem_value, &v, v - 1, memory_order_acquire, memory_order_relaxed));
   return 0;

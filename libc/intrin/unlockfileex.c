@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2022 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -18,9 +18,9 @@
 ╚─────────────────────────────────────────────────────────────────────────────*/
 #include "libc/calls/syscall_support-nt.internal.h"
 #include "libc/errno.h"
-#include "libc/intrin/describeflags.internal.h"
-#include "libc/intrin/describentoverlapped.internal.h"
-#include "libc/intrin/strace.internal.h"
+#include "libc/intrin/describeflags.h"
+#include "libc/intrin/describentoverlapped.h"
+#include "libc/intrin/strace.h"
 #include "libc/nt/files.h"
 #include "libc/str/str.h"
 
@@ -39,7 +39,8 @@ bool32 UnlockFileEx(int64_t hFile, uint32_t dwReserved,
   bool32 ok;
   ok = __imp_UnlockFileEx(hFile, dwReserved, nNumberOfBytesToUnlockLow,
                           nNumberOfBytesToUnlockHigh, lpOverlapped);
-  if (!ok) __winerr();
+  if (!ok)
+    __winerr();
   NTTRACE(
       "UnlockFileEx(%ld, %#x, %'zu, [%s]) → %hhhd% m", hFile, dwReserved,
       (uint64_t)nNumberOfBytesToUnlockHigh << 32 | nNumberOfBytesToUnlockLow,

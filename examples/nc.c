@@ -7,25 +7,16 @@
 │   • http://creativecommons.org/publicdomain/zero/1.0/            │
 ╚─────────────────────────────────────────────────────────────────*/
 #endif
-#include "libc/calls/calls.h"
-#include "libc/dns/dns.h"
-#include "libc/fmt/conv.h"
-#include "libc/log/log.h"
-#include "libc/macros.internal.h"
-#include "libc/runtime/runtime.h"
-#include "libc/sock/sock.h"
-#include "libc/sock/struct/linger.h"
-#include "libc/sock/struct/pollfd.h"
-#include "libc/stdio/stdio.h"
-#include "libc/str/str.h"
-#include "libc/sysv/consts/af.h"
-#include "libc/sysv/consts/ipproto.h"
-#include "libc/sysv/consts/poll.h"
-#include "libc/sysv/consts/shut.h"
-#include "libc/sysv/consts/so.h"
-#include "libc/sysv/consts/sock.h"
-#include "libc/sysv/consts/sol.h"
-#include "third_party/getopt/getopt.h"
+#include <cosmo.h>
+#include <getopt.h>
+#include <netdb.h>
+#include <poll.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <sys/socket.h>
+#include <sys/types.h>
+#include <unistd.h>
+// clang-format off
 
 /**
  * @fileoverview netcat clone
@@ -36,19 +27,21 @@
  * Here's an example usage:
  *
  *     make -j8 o//examples/nc.com
- *     printf 'GET /\r\nHost: justine.lol\r\n\r\n' | o//examples/nc.com
- * justine.lol 80
+ *     printf 'GET /\r\nHost: justine.lol\r\n\r\n' | o//examples/nc.com justine.lol 80
  *
- * Once upon time we called this command "telnet"
+ * Once upon time we called this command basically "telnet"
  */
+
+#define ARRAYLEN(A) \
+  ((sizeof(A) / sizeof(*(A))) / ((unsigned)!(sizeof(A) % sizeof(*(A)))))
 
 int main(int argc, char *argv[]) {
   ssize_t rc;
   size_t i, got;
+  int opt, sock;
   char buf[1500];
   bool halfclose = true;
   const char *host, *port;
-  int opt, err, toto, sock;
   struct addrinfo *ai = NULL;
   struct linger linger = {true, 1};
   struct pollfd fds[2] = {{-1, POLLIN}, {-1, POLLIN}};
@@ -60,9 +53,7 @@ int main(int argc, char *argv[]) {
         halfclose = false;
         break;
       case 'h':
-        fputs("Usage: ", stdout);
-        fputs(argv[0], stdout);
-        fputs(" [-hH] IP PORT\n", stdout);
+        tinyprint(1, "Usage: ", argv[0], " [-hH] IP PORT\n", NULL);
         exit(0);
       default:
         fprintf(stderr, "bad option %d\n", opt);
@@ -76,17 +67,9 @@ int main(int argc, char *argv[]) {
   host = argv[optind + 0];
   port = argv[optind + 1];
 
-  switch ((rc = getaddrinfo(host, port, &hint, &ai))) {
-    case EAI_SUCCESS:
-      break;
-    case EAI_SYSTEM:
-      perror("getaddrinfo");
-      exit(1);
-    default:
-      fputs("EAI_", stderr);
-      fputs(gai_strerror(rc), stderr);
-      fputs("\n", stderr);
-      exit(1);
+  if ((rc = getaddrinfo(host, port, &hint, &ai))) {
+    tinyprint(2, host, ": ", gai_strerror(rc), "\n", NULL);
+    exit(1);
   }
 
   if ((sock = socket(ai->ai_family, ai->ai_socktype, ai->ai_protocol)) == -1) {
@@ -95,12 +78,12 @@ int main(int argc, char *argv[]) {
   }
 
   if (setsockopt(sock, SOL_SOCKET, SO_LINGER, &linger, sizeof(linger)) == -1) {
-    perror("setsockopt(SO_LINGER)");
+    perror("SO_LINGER");
     exit(1);
   }
 
   if (connect(sock, ai->ai_addr, ai->ai_addrlen) == -1) {
-    perror("connect");
+    perror(host);
     exit(1);
   }
 

@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2020 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -26,10 +26,10 @@
 /**
  * Removes file system caches from RAM.
  *
- * make o//tool/build/dropcache.com
- * sudo mv o//tool/build/dropcache.com /usr/local/bin/
- * sudo chown root /usr/local/bin/dropcache.com
- * sudo chmod u+s /usr/local/bin/dropcache.com
+ * make o//tool/build/dropcache
+ * sudo mv o//tool/build/dropcache /usr/local/bin/
+ * sudo chown root /usr/local/bin/dropcache
+ * sudo chmod u+s /usr/local/bin/dropcache
  */
 
 static void Write(int fd, const char *s) {

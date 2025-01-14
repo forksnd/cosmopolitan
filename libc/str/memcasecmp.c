@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2020 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -16,9 +16,9 @@
 │ TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR             │
 │ PERFORMANCE OF THIS SOFTWARE.                                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
-#include "libc/intrin/bits.h"
+#include "libc/serialize.h"
 #include "libc/str/str.h"
-#include "libc/str/tab.internal.h"
+#include "libc/str/tab.h"
 
 /**
  * Compares memory case-insensitively.
@@ -57,14 +57,7 @@ int memcasecmp(const void *p, const void *q, size_t n) {
   if ((a = p) != (b = q)) {
     for (i = 0; i < n; ++i) {
       while (i + 8 <= n) {
-        if ((w = (((uint64_t)a[0] << 000 | (uint64_t)a[1] << 010 |
-                   (uint64_t)a[2] << 020 | (uint64_t)a[3] << 030 |
-                   (uint64_t)a[4] << 040 | (uint64_t)a[5] << 050 |
-                   (uint64_t)a[6] << 060 | (uint64_t)a[7] << 070) ^
-                  ((uint64_t)b[0] << 000 | (uint64_t)b[1] << 010 |
-                   (uint64_t)b[2] << 020 | (uint64_t)b[3] << 030 |
-                   (uint64_t)b[4] << 040 | (uint64_t)b[5] << 050 |
-                   (uint64_t)b[6] << 060 | (uint64_t)b[7] << 070)))) {
+        if ((w = (READ64LE(a) ^ READ64LE(b)))) {
           u = __builtin_ctzll(w);
           i += u >> 3;
           break;

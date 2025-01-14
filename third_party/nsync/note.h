@@ -1,7 +1,6 @@
 #ifndef NSYNC_NOTE_H_
 #define NSYNC_NOTE_H_
 #include "third_party/nsync/time.h"
-#if !(__ASSEMBLER__ + __LINKER__ + 0)
 COSMOPOLITAN_C_START_
 
 /* An nsync_note represents a single bit that can transition from 0 to 1
@@ -20,7 +19,7 @@ typedef struct nsync_note_s_ *nsync_note;
    abs_deadline==nsync_zero_time.
 
    nsync_notes should be passed to nsync_note_free() when no longer needed. */
-nsync_note nsync_note_new(nsync_note parent, nsync_time abs_deadline);
+nsync_note nsync_note_new(nsync_note parent, int clock, nsync_time abs_deadline);
 
 /* Free resources associated with n. Requires that n was allocated by
    nsync_note_new(), and no concurrent or future operations are applied
@@ -47,5 +46,4 @@ int nsync_note_wait(nsync_note n, nsync_time abs_deadline);
 nsync_time nsync_note_expiry(nsync_note n);
 
 COSMOPOLITAN_C_END_
-#endif /* !(__ASSEMBLER__ + __LINKER__ + 0) */
 #endif /* NSYNC_NOTE_H_ */

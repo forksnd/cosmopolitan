@@ -1,12 +1,13 @@
 #include "libc/nt/codegen.h"
-.imp	kernel32,__imp_GetFileAttributesExW,GetFileAttributesExW,0
+.imp	kernel32,__imp_GetFileAttributesExW,GetFileAttributesExW
 
 	.text.windows
+	.ftrace1
 GetFileAttributesEx:
+	.ftrace2
 #ifdef __x86_64__
 	push	%rbp
 	mov	%rsp,%rbp
-	.profilable
 	mov	__imp_GetFileAttributesExW(%rip),%rax
 	jmp	__sysv2nt
 #elif defined(__aarch64__)

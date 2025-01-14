@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:t;c-basic-offset:8;tab-width:8;coding:utf-8   -*-│
-│vi: set et ft=c ts=8 tw=8 fenc=utf-8                                       :vi│
+│ vi: set noet ft=c ts=8 sw=8 fenc=utf-8                                   :vi │
 ╚──────────────────────────────────────────────────────────────────────────────╝
 │                                                                              │
 │  Musl Libc                                                                   │
@@ -26,12 +26,9 @@
 │                                                                              │
 ╚─────────────────────────────────────────────────────────────────────────────*/
 #include "libc/math.h"
+#include "libc/nexgen32e/x86feature.h"
+__static_yoink("musl_libc_notice");
 
-asm(".ident\t\"\\n\\n\
-Musl libc (MIT License)\\n\
-Copyright 2005-2014 Rich Felker, et. al.\"");
-asm(".include \"libc/disclaimer.inc\"");
-// clang-format off
 
 #define ASUINT64(x) ((union {double f; uint64_t i;}){x}).i
 #define ZEROINFNAN (0x7ff-0x3ff-52-1)
@@ -126,6 +123,17 @@ double fma(double x, double y, double z)
 	return z;
 
 #else
+/* #pragma STDC FENV_ACCESS ON */
+
+#ifdef __x86_64__
+	if (X86_HAVE(FMA)) {
+		asm("vfmadd132sd\t%1,%2,%0" : "+x"(x) : "x"(y), "x"(z));
+		return x;
+	} else if (X86_HAVE(FMA4)) {
+		asm("vfmaddsd\t%3,%2,%1,%0" : "=x"(x) : "x"(x), "x"(y), "x"(z));
+		return x;
+	}
+#endif
 
 	/* normalize so top 10bits and last bit are 0 */
 	struct num nx, ny, nz;
@@ -137,7 +145,7 @@ double fma(double x, double y, double z)
 		return x*y + z;
 	if (nz.e >= ZEROINFNAN) {
 		if (nz.e > ZEROINFNAN) /* z==0 */
-			return x*y + z;
+			return x*y;
 		return z;
 	}
 
@@ -153,7 +161,7 @@ double fma(double x, double y, double z)
 	if (d > 0) {
 		if (d < 64) {
 			zlo = nz.m<<d;
-			zhi = nz.m>>64-d;
+			zhi = nz.m>>(64-d);
 		} else {
 			zlo = 0;
 			zhi = nz.m;
@@ -161,7 +169,7 @@ double fma(double x, double y, double z)
 			d -= 64;
 			if (d == 0) {
 			} else if (d < 64) {
-				rlo = rhi<<64-d | rlo>>d | !!(rlo<<64-d);
+				rlo = rhi<<(64-d) | rlo>>d | !!(rlo<<(64-d));
 				rhi = rhi>>d;
 			} else {
 				rlo = 1;
@@ -174,7 +182,7 @@ double fma(double x, double y, double z)
 		if (d == 0) {
 			zlo = nz.m;
 		} else if (d < 64) {
-			zlo = nz.m>>d | !!(nz.m<<64-d);
+			zlo = nz.m>>d | !!(nz.m<<(64-d));
 		} else {
 			zlo = 1;
 		}
@@ -206,7 +214,7 @@ double fma(double x, double y, double z)
 		e += 64;
 		d = a_clz_64(rhi)-1;
 		/* note: d > 0 */
-		rhi = rhi<<d | rlo>>64-d | !!(rlo<<d);
+		rhi = rhi<<d | rlo>>(64-d) | !!(rlo<<d);
 	} else if (rlo) {
 		d = a_clz_64(rlo)-1;
 		if (d < 0)
@@ -257,7 +265,7 @@ double fma(double x, double y, double z)
 		} else {
 			/* only round once when scaled */
 			d = 10;
-			i = ( rhi>>d | !!(rhi<<64-d) ) << d;
+			i = ( rhi>>d | !!(rhi<<(64-d)) ) << d;
 			if (sign)
 				i = -i;
 			r = i;
@@ -267,3 +275,7 @@ double fma(double x, double y, double z)
 
 #endif /* __x86_64__ */
 }
+
+#if LDBL_MANT_DIG == 53 && LDBL_MAX_EXP == 1024
+__weak_reference(fma, fmal);
+#endif

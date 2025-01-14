@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2022 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -27,6 +27,10 @@
  *     pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
  *     pthread_create(0, &attr, func, 0);
  *     pthread_attr_destroy(&attr);
+ *
+ * If you use this, please be warned that your thread might run and exit
+ * before pthread_create() even returns. You really should assume it can
+ * not be used with any pthread APIs from the calling thread.
  *
  * @param detachstate can be one of
  *     - `PTHREAD_CREATE_JOINABLE` (default)

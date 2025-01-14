@@ -1,12 +1,13 @@
 #include "libc/nt/codegen.h"
-.imp	psapi,__imp_GetProcessImageFileNameW,GetProcessImageFileNameW,0
+.imp	psapi,__imp_GetProcessImageFileNameW,GetProcessImageFileNameW
 
 	.text.windows
+	.ftrace1
 GetProcessImageFileName:
+	.ftrace2
 #ifdef __x86_64__
 	push	%rbp
 	mov	%rsp,%rbp
-	.profilable
 	mov	__imp_GetProcessImageFileNameW(%rip),%rax
 	jmp	__sysv2nt
 #elif defined(__aarch64__)

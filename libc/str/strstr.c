@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2020 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -17,68 +17,113 @@
 │ PERFORMANCE OF THIS SOFTWARE.                                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
 #include "libc/str/str.h"
-#include "libc/dce.h"
-#include "libc/intrin/asan.internal.h"
-
-typedef char xmm_t __attribute__((__vector_size__(16), __aligned__(16)));
+#include "libc/str/kmp.h"
+#include "third_party/aarch64/arm_neon.internal.h"
+#include "third_party/intel/immintrin.internal.h"
 
 /**
  * Searches for substring.
  *
+ * This function offers assurances against pathological cases, using KMP
+ * if no progress is being made on the O(nm) vectorized fast path. It is
+ * important to note that, if `needle` is untrusted, that it not be long
+ * enough to overflow the stack. That's because KMP needs to allocate an
+ * array of longs the same length as `needle` and it needs to do it with
+ * stack memory since POSIX requires this function to be safe to call in
+ * signal handlers.
+ *
  * @param haystack is the search area, as a NUL-terminated string
  * @param needle is the desired substring, also NUL-terminated
  * @return pointer to first substring within haystack, or NULL
- * @note this implementation goes fast in practice but isn't hardened
- *     against pathological cases, and therefore shouldn't be used on
- *     untrustworthy data
  * @asyncsignalsafe
  * @see strcasestr()
  * @see memmem()
  */
-noasan char *strstr(const char *haystack, const char *needle) {
-#ifdef __x86_64__
-  xmm_t *p;
+__vex char *strstr(const char *haystack, const char *needle) {
+  if (haystack == needle || !*needle)
+    return (char *)haystack;
+#if defined(__x86_64__) && !defined(__chibicc__)
   size_t i;
   unsigned k, m;
-  xmm_t v, n, z = {0};
-  if (IsAsan()) __asan_verify(needle, 1);
-  if (IsAsan()) __asan_verify(haystack, 1);
-  if (haystack == needle || !*needle) return haystack;
-  n = (xmm_t){*needle, *needle, *needle, *needle, *needle, *needle,
-              *needle, *needle, *needle, *needle, *needle, *needle,
-              *needle, *needle, *needle, *needle};
+  const __m128i *p;
+  long progress = 0;
+  __m128i v, n, z = _mm_setzero_si128();
+  const char *hay = haystack;
+  n = _mm_set1_epi8(*needle);
   for (;;) {
-    k = (uintptr_t)haystack & 15;
-    p = (const xmm_t *)((uintptr_t)haystack & -16);
-    v = *p;
-    m = __builtin_ia32_pmovmskb128((v == z) | (v == n));
+    k = (uintptr_t)hay & 15;
+    p = (const __m128i *)((uintptr_t)hay & -16);
+    v = _mm_load_si128(p);
+    m = _mm_movemask_epi8(
+        _mm_or_si128(_mm_cmpeq_epi8(v, z), _mm_cmpeq_epi8(v, n)));
     m >>= k;
     m <<= k;
     while (!m) {
-      v = *++p;
-      m = __builtin_ia32_pmovmskb128((v == z) | (v == n));
+      progress += 16;
+      v = _mm_load_si128(++p);
+      m = _mm_movemask_epi8(
+          _mm_or_si128(_mm_cmpeq_epi8(v, z), _mm_cmpeq_epi8(v, n)));
     }
-    haystack = (const char *)p + __builtin_ctzl(m);
+    int offset = __builtin_ctzl(m);
+    progress += offset;
+    hay = (const char *)p + offset;
     for (i = 0;; ++i) {
-      if (!needle[i]) return (/*unconst*/ char *)haystack;
-      if (!haystack[i]) break;
-      if (needle[i] != haystack[i]) break;
+      if (--progress <= -512)
+        goto OfferPathologicalAssurances;
+      if (!needle[i])
+        return (/*unconst*/ char *)hay;
+      if (!hay[i])
+        break;
+      if (needle[i] != hay[i])
+        break;
     }
-    if (!*haystack++) break;
+    if (!*hay++)
+      break;
   }
   return 0;
-#else
+OfferPathologicalAssurances:
+#elif defined(__aarch64__) && defined(__ARM_NEON)
   size_t i;
-  unsigned k, m;
-  if (haystack == needle || !*needle) return haystack;
+  const char *hay = haystack;
+  uint8x16_t n = vdupq_n_u8(*needle);
+  uint8x16_t z = vdupq_n_u8(0);
+  long progress = 0;
   for (;;) {
-    for (i = 0;; ++i) {
-      if (!needle[i]) return (/*unconst*/ char *)haystack;
-      if (!haystack[i]) break;
-      if (needle[i] != haystack[i]) break;
+    int k = (uintptr_t)hay & 15;
+    hay = (const char *)((uintptr_t)hay & -16);
+    uint8x16_t v = vld1q_u8((const uint8_t *)hay);
+    uint8x16_t cmp = vorrq_u8(vceqq_u8(v, z), vceqq_u8(v, n));
+    uint8x8_t mask = vshrn_n_u16(vreinterpretq_u16_u8(cmp), 4);
+    uint64_t m;
+    vst1_u8((uint8_t *)&m, mask);
+    m >>= k * 4;
+    m <<= k * 4;
+    while (!m) {
+      hay += 16;
+      progress += 16;
+      v = vld1q_u8((const uint8_t *)hay);
+      cmp = vorrq_u8(vceqq_u8(v, z), vceqq_u8(v, n));
+      mask = vshrn_n_u16(vreinterpretq_u16_u8(cmp), 4);
+      vst1_u8((uint8_t *)&m, mask);
     }
-    if (!*haystack++) break;
+    int offset = __builtin_ctzll(m) >> 2;
+    progress += offset;
+    hay += offset;
+    for (i = 0;; ++i) {
+      if (--progress <= -512)
+        goto OfferPathologicalAssurances;
+      if (!needle[i])
+        return (/*unconst*/ char *)hay;
+      if (!hay[i])
+        break;
+      if (needle[i] != hay[i])
+        break;
+    }
+    if (!*hay++)
+      break;
   }
   return 0;
+OfferPathologicalAssurances:
 #endif
+  return __memmem_kmp(haystack, strlen(haystack), needle, strlen(needle));
 }

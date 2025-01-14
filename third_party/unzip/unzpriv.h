@@ -1,4 +1,3 @@
-// clang-format off
 /*
   Copyright (c) 1990-2010 Info-ZIP.  All rights reserved.
 
@@ -30,10 +29,10 @@
 #include "libc/errno.h"
 #include "third_party/unzip/unzpriv.h"
 #include "libc/calls/calls.h"
-#include "libc/fmt/fmt.h"
 #include "third_party/zip/crypt.h"
 #include "libc/mem/mem.h"
 #include "libc/runtime/runtime.h"
+#include "libc/ctype.h"
 #include "third_party/unzip/unxcfg.h"
 
 /* First thing: Signal all following code that we compile UnZip utilities! */

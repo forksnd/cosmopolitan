@@ -7,8 +7,7 @@
 │   • http://creativecommons.org/publicdomain/zero/1.0/            │
 ╚─────────────────────────────────────────────────────────────────*/
 #endif
-#include "libc/calls/calls.h"
-#include "libc/str/str.h"
+#include <unistd.h>
 
 int main() {
   write(1, "hello world\n", 12);

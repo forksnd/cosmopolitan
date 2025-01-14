@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2021 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -21,17 +21,18 @@
 /**
  * Returns uncompressed size in bytes from zip central directory header.
  */
-uint64_t GetZipCfileUncompressedSize(const uint8_t *z) {
-  uint64_t x;
-  const uint8_t *p, *pe;
-  if ((x = ZIP_CFILE_UNCOMPRESSEDSIZE(z)) == 0xFFFFFFFF) {
-    for (p = ZIP_CFILE_EXTRA(z), pe = p + ZIP_CFILE_EXTRASIZE(z); p < pe;
-         p += ZIP_EXTRA_SIZE(p)) {
-      if (ZIP_EXTRA_HEADERID(p) == kZipExtraZip64 &&
-          0 + 8 <= ZIP_EXTRA_CONTENTSIZE(p)) {
-        return READ64LE(ZIP_EXTRA_CONTENT(p) + 0);
+int64_t GetZipCfileUncompressedSize(const uint8_t *z) {
+  if (ZIP_CFILE_UNCOMPRESSEDSIZE(z) != 0xFFFFFFFFu) {
+    return ZIP_CFILE_UNCOMPRESSEDSIZE(z);
+  }
+  const uint8_t *p = ZIP_CFILE_EXTRA(z);
+  const uint8_t *pe = p + ZIP_CFILE_EXTRASIZE(z);
+  for (; p + ZIP_EXTRA_SIZE(p) <= pe; p += ZIP_EXTRA_SIZE(p)) {
+    if (ZIP_EXTRA_HEADERID(p) == kZipExtraZip64) {
+      if (8 <= ZIP_EXTRA_CONTENTSIZE(p)) {
+        return ZIP_READ64(ZIP_EXTRA_CONTENT(p));
       }
     }
   }
-  return x;
+  return -1;
 }

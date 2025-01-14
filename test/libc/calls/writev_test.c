@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2021 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -21,9 +21,8 @@
 #include "libc/dce.h"
 #include "libc/errno.h"
 #include "libc/limits.h"
-#include "libc/macros.internal.h"
+#include "libc/macros.h"
 #include "libc/mem/gc.h"
-#include "libc/mem/gc.internal.h"
 #include "libc/mem/mem.h"
 #include "libc/runtime/runtime.h"
 #include "libc/sock/sock.h"
@@ -32,9 +31,8 @@
 #include "libc/sysv/consts/o.h"
 #include "libc/testlib/testlib.h"
 
-char testlib_enable_tmp_setup_teardown;
-
 void SetUpOnce(void) {
+  testlib_enable_tmp_setup_teardown();
   ASSERT_SYS(0, 0, pledge("stdio rpath wpath cpath fattr", 0));
 }
 
@@ -54,9 +52,10 @@ TEST(writev, negative_einvalOrEfault) {
 }
 
 TEST(writev, exceedsIovMax_einval) {
-  if (IsWindows()) return;  // it's complicated
+  if (IsWindows())
+    return;  // it's complicated
   int i, n = IOV_MAX + 1;
-  struct iovec *v = _gc(malloc(sizeof(struct iovec) * n));
+  struct iovec *v = gc(malloc(sizeof(struct iovec) * n));
   for (i = 0; i < n; ++i) {
     v[i].iov_base = "x";
     v[i].iov_len = 1;
@@ -97,29 +96,6 @@ TEST(writev, big_fullCompletion) {
   EXPECT_NE(-1, close(fd));
 }
 
-TEST(writev, asanError_efaults) {
-  if (!IsAsan()) return;
-  void *malloc_(size_t) asm("malloc");
-  void free_(void *) asm("free");
-  void *p;
-  int fd;
-  p = malloc_(32);
-  EXPECT_NE(-1, (fd = open("asan", O_RDWR | O_CREAT | O_TRUNC, 0644)));
-  EXPECT_EQ(32, write(fd, p, 32));
-  EXPECT_NE(-1, lseek(fd, 0, SEEK_SET));
-  EXPECT_EQ(32, read(fd, p, 32));
-  EXPECT_EQ(-1, write(fd, p, 33));
-  EXPECT_EQ(EFAULT, errno);
-  EXPECT_EQ(-1, write(fd, p, -1));
-  EXPECT_EQ(EFAULT, errno);
-  free_(p);
-  EXPECT_EQ(-1, write(fd, p, 32));
-  EXPECT_EQ(EFAULT, errno);
-  EXPECT_EQ(-1, read(fd, p, 32));
-  EXPECT_EQ(EFAULT, errno);
-  close(fd);
-}
-
 TEST(writev, empty_stillPerformsIoOperation) {
   int fd;
   struct iovec iov[] = {{"", 0}, {NULL, 0}};
@@ -127,6 +103,8 @@ TEST(writev, empty_stillPerformsIoOperation) {
   ASSERT_NE(-1, (fd = open("file", O_RDONLY)));
   errno = 0;
   EXPECT_SYS(EBADF, -1, writev(fd, iov, ARRAYLEN(iov)));
-  EXPECT_EQ(-1, writev(fd, NULL, 0));
+  if (!(IsAarch64() && IsQemuUser())) {
+    EXPECT_EQ(-1, writev(fd, NULL, 0));
+  }
   EXPECT_NE(-1, close(fd));
 }

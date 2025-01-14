@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2022 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -16,34 +16,75 @@
 │ TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR             │
 │ PERFORMANCE OF THIS SOFTWARE.                                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
+#include "libc/assert.h"
+#include "libc/calls/struct/timespec.h"
 #include "libc/calls/struct/timespec.internal.h"
 #include "libc/calls/struct/timeval.h"
-#include "libc/calls/struct/timeval.internal.h"
-#include "libc/fmt/conv.h"
+#include "libc/calls/syscall-sysv.internal.h"
+#include "libc/errno.h"
+#include "libc/intrin/weaken.h"
+#include "libc/runtime/syslib.internal.h"
 #include "libc/sock/internal.h"
 #include "libc/sysv/consts/clock.h"
 #include "libc/sysv/consts/timer.h"
 #include "libc/sysv/errfuns.h"
+#include "libc/thread/posixthread.internal.h"
+#include "libc/thread/thread.h"
 
 int sys_clock_nanosleep_xnu(int clock, int flags, const struct timespec *req,
                             struct timespec *rem) {
-  int res;
-  struct timeval now, abs, rel;
-  if (clock == CLOCK_REALTIME) {
-    if (flags & TIMER_ABSTIME) {
-      abs = timespec_totimeval(*req);
-      sys_gettimeofday_xnu(&now, 0, 0);
-      if (timeval_cmp(abs, now) > 0) {
-        rel = timeval_sub(abs, now);
-        res = sys_select(0, 0, 0, 0, &rel);
-      } else {
-        res = 0;
-      }
+#ifdef __x86_64__
+  if (flags & TIMER_ABSTIME) {
+    int nerr;
+    struct timespec now;
+    if ((nerr = sys_clock_gettime_xnu(clock, &now)))
+      return _sysret(nerr);
+    if (timespec_cmp(*req, now) > 0) {
+      struct timeval rel = timespec_totimeval(timespec_sub(*req, now));
+      return sys_select(0, 0, 0, 0, &rel);
     } else {
-      res = sys_nanosleep_xnu(req, rem);
+      return 0;
     }
   } else {
-    res = enotsup();
+    int rc;
+    struct timespec beg;
+    if (rem)
+      if ((rc = sys_clock_gettime_xnu(clock, &beg)))
+        return _sysret(rc);
+    struct timeval rel = timespec_totimeval(*req);  // rounds up
+    rc = sys_select(0, 0, 0, 0, &rel);
+    if (rc == -1 && rem && errno == EINTR) {
+      struct timespec end;
+      sys_clock_gettime_xnu(clock, &end);
+      *rem = timespec_subz(*req, timespec_sub(end, beg));
+    }
+    return rc;
   }
-  return res;
+#else
+  long res;
+  struct timespec abs, now, rel;
+  if (_weaken(pthread_testcancel_np) &&  //
+      _weaken(pthread_testcancel_np)())
+    return ecanceled();
+  if (flags & TIMER_ABSTIME) {
+    abs = *req;
+    if (!(res = __syslib->__clock_gettime(clock, &now))) {
+      if (timespec_cmp(abs, now) > 0) {
+        rel = timespec_sub(abs, now);
+        res = __syslib->__nanosleep(&rel, 0);
+      }
+    }
+  } else {
+    struct timespec remainder;
+    res = __syslib->__nanosleep(req, &remainder);
+    if (res == -EINTR && rem)
+      *rem = remainder;
+  }
+  if (res == -EINTR &&                    //
+      (_weaken(pthread_testcancel_np) &&  //
+       _weaken(pthread_testcancel_np)())) {
+    return ecanceled();
+  }
+  return _sysret(res);
+#endif
 }

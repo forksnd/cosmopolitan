@@ -6,13 +6,16 @@
 
 #define STDC_HEADERS                    1
 #define HAVE_LONG_DOUBLE                1
-#define HAVE_GCC_ASM_FOR_X64            1
-#define HAVE_GCC_ASM_FOR_X87            1
 #define HAVE_GCC_UINT128_T              1
 #define HAVE_STDARG_PROTOTYPES          1
 #define HAVE_BUILTIN_ATOMIC             1
 #define HAVE_COMPUTED_GOTOS             1
 #define DOUBLE_IS_LITTLE_ENDIAN_IEEE754 1
+
+#ifdef __x86_64__
+#define HAVE_GCC_ASM_FOR_X64 1
+#define HAVE_GCC_ASM_FOR_X87 1
+#endif
 
 #define HAVE_ACOSH         1
 #define HAVE_ASINH         1
@@ -100,7 +103,7 @@
 #define HAVE_DECL_RTLD_NOW      1
 
 #define HAVE_GETSID        1
-#define HAVE_GETEUID        1
+#define HAVE_GETEUID       1
 #define HAVE_GETTIMEOFDAY  1
 #define HAVE_GETUID        1
 #define HAVE_GETNAMEINFO   1
@@ -119,8 +122,8 @@
 #define HAVE_DIRENT_D_TYPE 1
 #define HAVE_DUP2          1
 #define HAVE_DUP3          1
-#define HAVE_EPOLL         1
-#define HAVE_EPOLL_CREATE1 1
+// #define HAVE_EPOLL         1
+// #define HAVE_EPOLL_CREATE1 1
 #define HAVE_ERF           1
 #define HAVE_ERFC          1
 #define HAVE_EXECV         1
@@ -315,8 +318,9 @@
 #define HAVE_WAIT4            1
 #define HAVE_WAITPID          1
 #define HAVE_STATVFS          1
+#define HAVE_STD_ATOMIC       1
+#define HAVE_MREMAP           1
 
-/* #define HAVE_MREMAP 1 */
 /* #undef HAVE_PLOCK */
 /* #undef HAVE_POSIX_FALLOCATE */
 /* #undef HAVE_PRLIMIT */
@@ -332,16 +336,15 @@
 /* #undef HAVE_SIGWAITINFO */
 /* #undef HAVE_SOCKADDR_ALG */
 /* #undef HAVE_SOCKADDR_SA_LEN */
-/* #undef HAVE_STD_ATOMIC */
 
 #define HAVE_SNPRINTF 1
 #define HAVE_STRDUP   1
 #define HAVE_STRFTIME 1
 #define HAVE_STRLCPY  1
 #define HAVE_WMEMCMP  1
-/* #undef HAVE_WCSCOLL */
-/* #undef HAVE_WCSFTIME */
-/* #undef HAVE_WCSXFRM */
+#define HAVE_WCSCOLL  1
+#define HAVE_WCSXFRM  1
+#define HAVE_WCSFTIME 1
 
 #define HAVE_USABLE_WCHAR_T                 1
 #define HAVE_SOCKETPAIR                     1
@@ -529,7 +532,7 @@
 /* define to 1 if your sem_getvalue is broken. */
 /* #define HAVE_BROKEN_SEM_GETVALUE 1 */
 /* Define if --enable-ipv6 is specified */
-/* #undef ENABLE_IPV6 */
+// #define ENABLE_IPV6 1
 /* Define if flock needs to be linked with bsd library. */
 /* #undef FLOCK_NEEDS_LIBBSD */
 /* Define if getpgrp() must be called as getpgrp(0). */

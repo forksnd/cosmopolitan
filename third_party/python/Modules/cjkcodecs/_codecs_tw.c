@@ -1,4 +1,3 @@
-/* clang-format off */
 /*
  * _codecs_tw.c: Codecs collection for Taiwan's encodings
  *
@@ -149,7 +148,12 @@ END_CODECS_LIST
 
 I_AM_A_MODULE_FOR(tw)
 
-_Section(".rodata.pytab.1") const struct _inittab _PyImport_Inittab__codecs_tw = {
+#ifdef __aarch64__
+_Section(".rodata.pytab.1 //")
+#else
+_Section(".rodata.pytab.1")
+#endif
+ const struct _inittab _PyImport_Inittab__codecs_tw = {
     "_codecs_tw",
     PyInit__codecs_tw,
 };

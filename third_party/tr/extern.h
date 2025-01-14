@@ -1,8 +1,9 @@
 #ifndef COSMOPOLITAN_THIRD_PARTY_TR_EXTERN_H_
 #define COSMOPOLITAN_THIRD_PARTY_TR_EXTERN_H_
 #include "libc/limits.h"
-#if !(__ASSEMBLER__ + __LINKER__ + 0)
 COSMOPOLITAN_C_START_
+
+#define next _tr_next
 
 typedef struct {
   enum { STRING1, STRING2 } which;
@@ -20,5 +21,4 @@ typedef struct {
 int next(STR *);
 
 COSMOPOLITAN_C_END_
-#endif /* !(__ASSEMBLER__ + __LINKER__ + 0) */
 #endif /* COSMOPOLITAN_THIRD_PARTY_TR_EXTERN_H_ */

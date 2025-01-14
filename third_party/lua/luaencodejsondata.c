@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2022 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -18,21 +18,24 @@
 ╚─────────────────────────────────────────────────────────────────────────────*/
 #include "libc/assert.h"
 #include "libc/fmt/itoa.h"
-#include "libc/intrin/bits.h"
+#include "libc/serialize.h"
 #include "libc/intrin/likely.h"
 #include "libc/log/log.h"
-#include "libc/log/rop.h"
-#include "libc/mem/gc.internal.h"
+#include "libc/log/rop.internal.h"
+#include "libc/mem/gc.h"
 #include "libc/mem/mem.h"
+#include "libc/runtime/runtime.h"
 #include "libc/runtime/stack.h"
 #include "libc/stdio/append.h"
 #include "libc/stdio/strlist.internal.h"
 #include "libc/str/str.h"
+#include "libc/sysv/consts/auxv.h"
 #include "net/http/escape.h"
 #include "third_party/double-conversion/wrapper.h"
 #include "third_party/lua/cosmo.h"
 #include "third_party/lua/lauxlib.h"
 #include "third_party/lua/lua.h"
+#include "third_party/lua/cosmo.h"
 #include "third_party/lua/visitor.h"
 
 static int Serialize(lua_State *, char **, int, struct Serializer *, int);
@@ -67,8 +70,8 @@ OnError:
 
 static int SerializeString(lua_State *L, char **buf, int idx,
                            struct Serializer *z) {
-  char *s;
   size_t m;
+  const char *s;
   s = lua_tolstring(L, idx, &m);
   if (!(s = EscapeJsStringLiteral(&z->strbuf, &z->strbuflen, s, m, &m))) {
     goto OnError;
@@ -169,7 +172,7 @@ static int SerializeTable(lua_State *L, char **buf, int idx,
   bool multi;
   bool isarray;
   lua_Unsigned n;
-  if (UNLIKELY(!HaveStackMemory(GUARDSIZE))) {
+  if (UNLIKELY(GetStackPointer() < z->bsp)) {
     z->reason = "out of stack";
     return -1;
   }
@@ -262,7 +265,11 @@ static int Serialize(lua_State *L, char **buf, int idx, struct Serializer *z,
 int LuaEncodeJsonData(lua_State *L, char **buf, int idx,
                       struct EncoderConfig conf) {
   int rc;
-  struct Serializer z = {.reason = "out of memory", .conf = conf};
+  struct Serializer z = {
+    .reason = "out of memory", 
+    .bsp = GetStackBottom() + 4096,
+    .conf = conf,
+  };
   if (lua_checkstack(L, conf.maxdepth * 3 + LUA_MINSTACK)) {
     rc = Serialize(L, buf, idx, &z, 0);
     free(z.visited.p);
@@ -274,6 +281,6 @@ int LuaEncodeJsonData(lua_State *L, char **buf, int idx,
     return rc;
   } else {
     luaL_error(L, "can't set stack depth");
-    unreachable;
+    __builtin_unreachable();
   }
 }

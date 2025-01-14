@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2022 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -16,18 +16,31 @@
 │ TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR             │
 │ PERFORMANCE OF THIS SOFTWARE.                                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
+#include "libc/runtime/runtime.h"
 #include "libc/runtime/stack.h"
+#include "libc/sysv/consts/auxv.h"
 #include "libc/thread/thread.h"
 
 /**
  * Initializes pthread attributes.
  *
  * @return 0 on success, or errno on error
+ * @see pthread_attr_setdetachstate()
+ * @see pthread_attr_setsigmask_np()
+ * @see pthread_attr_setstack()
+ * @see pthread_attr_setstacksize()
+ * @see pthread_attr_setguardsize()
+ * @see pthread_attr_setschedparam()
+ * @see pthread_attr_setschedpolicy()
+ * @see pthread_attr_setinheritsched()
+ * @see pthread_attr_setscope()
+ * @see pthread_attr_setsigaltstack_np()
+ * @see pthread_attr_setsigaltstacksize_np()
  */
 errno_t pthread_attr_init(pthread_attr_t *attr) {
   *attr = (pthread_attr_t){
       .__stacksize = GetStackSize(),
-      .__guardsize = GUARDSIZE,
+      .__guardsize = GetGuardSize(),
   };
   return 0;
 }

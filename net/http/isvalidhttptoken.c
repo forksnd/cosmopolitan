@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2021 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -26,8 +26,10 @@
  */
 bool IsValidHttpToken(const char *s, size_t n) {
   size_t i;
-  if (!n) return false;
-  if (n == -1) n = s ? strlen(s) : 0;
+  if (!n)
+    return false;
+  if (n == -1)
+    n = s ? strlen(s) : 0;
   for (i = 0; i < n; ++i) {
     if (!kHttpToken[s[i] & 0xff]) {
       return false;

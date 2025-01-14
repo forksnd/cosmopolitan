@@ -57,6 +57,7 @@
            "gottpoff"
            "function"
            "object"
+           "notype"
            "got"
            "size"
            "gotoff"
@@ -64,9 +65,11 @@
            "pltoff"
            "gotpcrel"
            "progbits"
+           "note"
            "nobits"
            "init_array"
-           "fini_array")])
+           "fini_array"
+           "gnu_indirect_function")])
     "\\>"])
   "GNU Assembler section, relocation, macro param qualifiers.")
 
@@ -333,9 +336,10 @@
   (set (make-local-variable 'indent-tabs-mode) t)
   (set (make-local-variable 'tab-width) 8))
 
-(progn
-  (add-hook 'asm-mode-hook 'cosmo-asm-supplemental-hook)
-  (setq asm-font-lock-keywords cosmo-asm-font-lock-keywords))
+(eval-after-load 'asm-mode
+  '(progn
+     (add-hook 'asm-mode-hook 'cosmo-asm-supplemental-hook)
+     (setq asm-font-lock-keywords cosmo-asm-font-lock-keywords)))
 
 ;; Make -*-unix-assembly-*- mode line work correctly like GitHub.
 (define-derived-mode unix-assembly-mode asm-mode "UNIX Assembly")

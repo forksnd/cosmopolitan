@@ -6,7 +6,7 @@ error("Tried to evaluate definition file.")
 
 SYNOPSIS
 
-  redbean.com [-?BVabdfghjkmsuvz] [-p PORT] [-D DIR] [-- SCRIPTARGS...]
+  redbean [-?BVabdfghjkmsuvz] [-p PORT] [-D DIR] [-- SCRIPTARGS...]
 
 DESCRIPTION
 
@@ -16,9 +16,7 @@ OVERVIEW
 
   redbean makes it possible to share web applications that run offline
   as a single-file Actually Portable Executable PKZIP archive which
-  contains your assets. All you need to do is download the redbean.com
-  program below, change the filename to .zip, add your content in a zip
-  editing tool, and then change the extension back to .com.
+  contains your assets.
 
   redbean can serve 1 million+ gzip encoded responses per second on a
   cheap personal computer. That performance is thanks to zip and gzip
@@ -52,8 +50,6 @@ FLAGS
   -b        log message bodies
   -a        log resource usage
   -g        log handler latency
-  -e        eval Lua code in arg
-  -F        eval Lua code in file
   -E        show crash reports to public ips
   -j        enable ssl client verify
   -k        disable ssl fetch verify
@@ -68,6 +64,8 @@ FLAGS
   -v        increase verbosity                [repeatable]
   -V        increase ssl verbosity            [repeatable]
   -S        increase pledge sandboxing        [repeatable]
+  -e CODE   eval Lua code in arg              [repeatable]
+  -F PATH   eval Lua code in file             [repeatable]
   -H K:V    sets http header globally         [repeatable]
   -D DIR    overlay assets in local directory [repeatable]
   -r /X=/Y  redirect X to Y                   [repeatable]
@@ -145,15 +143,15 @@ USAGE
   This executable is also a ZIP file that contains static assets.
   You can run redbean interactively in your terminal as follows:
 
-    ./redbean.com -vvvmbag        # starts server verbosely
+    ./redbean -vvvmbag        # starts server verbosely
     open http://127.0.0.1:8080/   # shows zip listing page
     CTRL-C                        # 1x: graceful shutdown
     CTRL-C                        # 2x: forceful shutdown
 
   You can override the default listing page by adding:
 
-    zip redbean.com index.lua     # lua server pages take priority
-    zip redbean.com index.html    # default page for directory
+    zip redbean index.lua     # lua server pages take priority
+    zip redbean index.html    # default page for directory
 
   The listing page only applies to the root directory. However the
   default index page applies to subdirectories too. In order for it
@@ -168,7 +166,7 @@ USAGE
       --no-parent            \
       --no-if-modified-since \
       http://a.example/index.html
-    zip -r redbean.com a.example/  # default page for directory
+    zip -r redbean a.example/  # default page for directory
 
   redbean normalizes the trailing slash for you automatically:
 
@@ -206,18 +204,18 @@ USAGE
   by default, embedded as a bas64 data uri. You can override the
   custom page for various errors by adding files to the zip root.
 
-    zip redbean.com 404.html      # custom not found page
+    zip redbean 404.html      # custom not found page
 
   Audio video content should not be compressed in your ZIP files.
   Uncompressed assets enable browsers to send Range HTTP request.
   On the other hand compressed assets are best for gzip encoding.
 
-    zip redbean.com index.html    # adds file
-    zip -0 redbean.com video.mp4  # adds without compression
+    zip redbean index.html    # adds file
+    zip -0 redbean video.mp4  # adds without compression
 
   You can have redbean run as a daemon by doing the following:
 
-    sudo ./redbean.com -vvdp80 -p443 -L redbean.log -P redbean.pid
+    sudo ./redbean -vvdp80 -p443 -L redbean.log -P redbean.pid
     kill -TERM $(cat redbean.pid) # 1x: graceful shutdown
     kill -TERM $(cat redbean.pid) # 2x: forceful shutdown
 
@@ -241,11 +239,11 @@ USAGE
   is on the system path beforehand. You can also "assimilate" any
   redbean into the platform-local executable format by running:
 
-      $ file redbean.com
-      redbean.com: DOS/MBR boot sector
-      $ ./redbean.com --assimilate
-      $ file redbean.com
-      redbean.com: ELF 64-bit LSB executable
+      $ file redbean
+      redbean: DOS/MBR boot sector
+      $ ./redbean --assimilate
+      $ file redbean
+      redbean: ELF 64-bit LSB executable
 
 ────────────────────────────────────────────────────────────────────────────────
 SECURITY
@@ -352,7 +350,7 @@ REPL
   interpreter then you can pass the `-i` flag to put redbean into
   interpreter mode.
 
-      redbean.com -i binarytrees.lua 15
+      redbean -i binarytrees.lua 15
 
   When the `-i` flag is passed (for interpreter mode), redbean won't
   start a web server and instead functions like the `lua` command. The
@@ -369,12 +367,12 @@ REPL
   encoded in its preferred executable format. You can assimilate your
   redbean into the local format using the following commands:
 
-      $ file redbean.com
-      redbean.com: DOS/MBR boot sector
-      $ ./redbean.com --assimilate
-      $ file redbean.com
-      redbean.com: ELF 64-bit LSB executable
-      $ sudo cp redbean.com /usr/bin/redbean
+      $ file redbean
+      redbean: DOS/MBR boot sector
+      $ ./redbean --assimilate
+      $ file redbean
+      redbean: ELF 64-bit LSB executable
+      $ sudo cp redbean /usr/bin/redbean
 
   By following the above steps, redbean can be installed systemwide for
   multiple user accounts. It's also possible to chmod the binary to have
@@ -392,22 +390,22 @@ LUA ENHANCEMENTS
     - redbean supports a printf modulus operator, like Python. For
       example, you can say `"hello %s" % {"world"}` instead of
       `string.format("hello %s", "world")`.
-      
+
       --
       - redbean supports a string multiply operator, like Python. For
       example, you can say `"hi" * 2` instead of `string.rep("hi", 2)`.
-      
+
       - redbean supports octal (base 8) integer literals. For example
       `0644 == 420` is the case in redbean, whereas in upstream Lua
       `0644 == 644` would be the case.
-      
+
       - redbean supports binary (base 2) integer literals. For example
       `0b1010 == 10` is the case in redbean, whereas in upstream Lua
       `0b1010` would result in an error.
-      
+
       - redbean supports the GNU syntax for the ASCII ESC character in
       string literals. For example, `"\e"` is the same as `"\x1b"`.
-      
+
 ]]
 
 ---@class string
@@ -423,11 +421,11 @@ LUA ENHANCEMENTS
 ---
 --- For example, if you launch your redbean as follows:
 ---
----     redbean.com -v arg1 arg2
+---     redbean -v arg1 arg2
 ---
 --- Then your `/.init.lua` file will have the `arg` array like:
 ---
----     arg[-1] = '/usr/bin/redbean.com'
+---     arg[-1] = '/usr/bin/redbean'
 ---     arg[ 0] = '/zip/.init.lua'
 ---     arg[ 1] = 'arg1'
 ---     arg[ 2] = 'arg2'
@@ -435,11 +433,11 @@ LUA ENHANCEMENTS
 --- If you launch redbean in interpreter mode (rather than web
 --- server) mode, then an invocation like this:
 ---
----     ./redbean.com -i script.lua arg1 arg2
+---     ./redbean -i script.lua arg1 arg2
 ---
 --- Would have an `arg` array like this:
 ---
----     arg[-1] = './redbean.com'
+---     arg[-1] = './redbean'
 ---     arg[ 0] = 'script.lua'
 ---     arg[ 1] = 'arg1'
 ---     arg[ 2] = 'arg2'
@@ -470,7 +468,7 @@ SPECIAL PATHS
         this path is a hidden file so that it can't be unintentionally run
         by the network client.
 
-/.reload.lua
+/.reload.lua (deprecated; use OnServerReload instead)
         This script is run from the main process when SIGHUP is received.
         This only applies to redbean when running in daemon mode. Any
         changes that are made to the Lua interpreter state will be
@@ -511,7 +509,7 @@ SPECIAL PATHS
         If the special argument `...` *is* encountered, then it'll be
         replaced with whatever CLI args were specified by the user.
 
-        For example, you might want to use redbean.com in interpreter
+        For example, you might want to use redbean in interpreter
         mode, where your script file is inside the zip. Then, if your
         redbean is run, what you want is to have the default behavior
         be running your script. In that case, you might:
@@ -525,13 +523,13 @@ SPECIAL PATHS
             print("hello world")
             EOF
 
-            $ zip redbean.com .args hello.lua
-            $ ./redbean.com
+            $ zip redbean .args hello.lua
+            $ ./redbean
             hello world
 
         Please note that if you ran:
 
-            $ ./redbean.com -vv
+            $ ./redbean -vv
 
         Then the default mode of redbean will kick back in. To prevent
         that from happening, simply add the magic arg `...` to the end
@@ -549,6 +547,17 @@ SPECIAL PATHS
 --- thing from the handler.
 ---
 function OnHttpRequest() end
+
+--- Hooks catch errors
+---
+--- If this functiopn is defined in the global scope by your `/.init.lua`
+--- then any errors occuring in the OnHttpRequest() hook will be catched.
+--- You'll be able then to do whatever you need with the error status and
+--- error message.
+---
+---@param status uint16
+---@param message string
+function OnError(status, message) end
 
 --- Hooks client connection creation.
 ---
@@ -611,6 +620,13 @@ function OnServerHeartbeat() end
 function OnServerListen(socketdescriptor, serverip, serverport) end
 
 --- If this function is defined it'll be called from the main process
+--- on each server reload triggered by SIGHUP (for daemonized) and
+--- SIGUSR1 (for all) redbean instances. `reindex` indicates if redbean
+--- assets have been re-indexed following the signal.
+---@param reindex boolean
+function OnServerReload(reindex) end
+
+--- If this function is defined it'll be called from the main process
 --- right before the main event loop starts.
 function OnServerStart() end
 
@@ -644,6 +660,8 @@ function OnWorkerStop() end
 
 ---@alias uint32 integer Unsigned 32-bit integer
 ---@alias uint16 integer Unsigned 16-bit integer
+---@alias uint8 integer Unsigned 8-bit integer
+---@alias int8 integer Signed 8-bit integer
 
 ---@class EncoderOptions
 ---@field useoutput boolean? defaults to `false`. Encodes the result directly to the output buffer and returns `nil` value. This option is ignored if used outside of request handling code.
@@ -733,6 +751,23 @@ function LaunchBrowser(path) end
 ---@nodiscard
 function CategorizeIp(ip) end
 
+--- Turns ISO-8859-1 string into UTF-8.
+---@param iso_8859_1 string
+---@return string UTF8
+---@nodiscard
+function DecodeLatin1(iso_8859_1) end
+
+--- Turns binary into ASCII base-16 hexadecimal lowercase string.
+---@param binary string
+---@return string ascii
+function EncodeHex(binary) end
+
+--- Turns ASCII base-16 hexadecimal byte string into binary string,
+--- case-insensitively. Non-hex characters may not appear in string.
+---@param ascii string
+---@return string binary
+function DecodeHex(ascii) end
+
 --- Decodes binary data encoded as base64.
 ---
 --- This turns ASCII into binary, in a permissive way that ignores
@@ -743,13 +778,6 @@ function CategorizeIp(ip) end
 ---@return string binary
 ---@nodiscard
 function DecodeBase64(ascii) end
-
---- Turns ISO-8859-1 string into UTF-8.
----
----@param iso_8859_1 string
----@return string UTF8
----@nodiscard
-function DecodeLatin1(iso_8859_1) end
 
 --- Turns binary into ASCII. This can be used to create HTML data:
 --- URIs that do things like embed a PNG file in a web page. See
@@ -992,13 +1020,13 @@ function EncodeLatin1(utf8, flags) end
 --- and everything else gets `%XX` encoded. Please note that `'&` can still break
 --- HTML and that `'()` can still break CSS URLs. This function is charset agnostic
 --- and will not canonicalize overlong encodings. It is assumed that a UTF-8 string
---- will be supplied. See `kescapefragment.c`.
+--- will be supplied. See `kescapefragment.S`.
 ---@param str string
 ---@return string
 ---@nodiscard
 function EscapeFragment(str) end
 
---- Escapes URL host. See `kescapeauthority.c`.
+--- Escapes URL host. See `kescapeauthority.S`.
 ---@param str string
 ---@return string
 ---@nodiscard
@@ -1022,13 +1050,13 @@ function EscapeLiteral(str) end
 --- Escapes URL parameter name or value. The allowed characters are `-.*_0-9A-Za-z`
 --- and everything else gets `%XX` encoded. This function is charset agnostic and
 --- will not canonicalize overlong encodings. It is assumed that a UTF-8 string
---- will be supplied. See `kescapeparam.c`.
+--- will be supplied. See `kescapeparam.S`.
 ---@param str string
 ---@return string
 ---@nodiscard
 function EscapeParam(str) end
 
---- Escapes URL password. See `kescapeauthority.c`.
+--- Escapes URL password. See `kescapeauthority.S`.
 ---@param str string
 ---@return string
 ---@nodiscard
@@ -1039,7 +1067,7 @@ function EscapePass(str) end
 --- gets `%XX` encoded. Please note that `'&` can still break HTML, so the output
 --- may need EscapeHtml too. Also note that `'()` can still break CSS URLs. This
 --- function is charset agnostic and will not canonicalize overlong encodings.
---- It is assumed that a UTF-8 string will be supplied. See `kescapepath.c`.
+--- It is assumed that a UTF-8 string will be supplied. See `kescapepath.S`.
 ---@param str string
 ---@return string
 ---@nodiscard
@@ -1050,13 +1078,13 @@ function EscapePath(str) end
 --- else gets `%XX` encoded. Please note that `'&` can still break HTML, so the
 --- output may need EscapeHtml too. Also note that `'()` can still break CSS URLs.
 --- This function is charset agnostic and will not canonicalize overlong encodings.
---- It is assumed that a UTF-8 string will be supplied. See `kescapesegment.c`.
+--- It is assumed that a UTF-8 string will be supplied. See `kescapesegment.S`.
 ---@param str string
 ---@return string
 ---@nodiscard
 function EscapeSegment(str) end
 
---- Escapes URL username. See `kescapeauthority.c`.
+--- Escapes URL username. See `kescapeauthority.S`.
 ---@param str string
 ---@return string
 ---@nodiscard
@@ -1082,6 +1110,16 @@ function EvadeDragnetSurveillance(bool) end
 --- - `maxredirects` (default: `5`): sets the number of allowed redirects to
 ---   minimize looping due to misconfigured servers. When the number is exceeded,
 ---   the result of the last redirect is returned.
+--- - `keepalive` (default = `false`): configures each request to keep the
+---   connection open (unless closed by the server) and reuse for the
+---   next request to the same host. This option is disabled when SSL
+---   connection is used.
+---   The mapping of hosts and their sockets is stored in a table
+---   assigned to the `keepalive` field itself, so it can be passed to
+---   the next call.
+---   If the table includes the `close` field set to a true value,
+---   then the connection is closed after the request is made and the
+---   host is removed from the mapping table.
 ---
 --- When the redirect is being followed, the same method and body values are being
 --- sent in all cases except when 303 status is returned. In that case the method
@@ -1089,10 +1127,10 @@ function EvadeDragnetSurveillance(bool) end
 --- that if these (method/body) values are provided as table fields, they will be
 --- modified in place.
 ---@param url string
----@param body? string|{ headers: table<string,string>, value: string, method: string, body: string, maxredirects: integer? }
+---@param body? string|{ headers: table<string,string>, value: string, method: string, body: string, maxredirects: integer?, keepalive: boolean? }
 ---@return integer status, table<string,string> headers, string body/
 ---@nodiscard
----@overload fun(url:string, body?: string|{ headers: table<string,string>, value: string, method: string, body: string, maxredirects?: integer }): nil, error: string
+---@overload fun(url:string, body?: string|{ headers: table<string,string>, value: string, method: string, body: string, maxredirects?: integer, keepalive: boolean? }): nil, error: string
 function Fetch(url, body) end
 
 --- Converts UNIX timestamp to an RFC1123 string that looks like this:
@@ -1195,6 +1233,17 @@ function GetHost() end
 ---@return "LINUX"|"METAL"|"WINDOWS"|"XNU"|"NETBSD"|"FREEBSD"|"OPENBSD" osname string that describes the host OS.
 ---@nodiscard
 function GetHostOs() end
+
+--- Returns string describing host instruction set architecture.
+---
+--- This can return:
+---
+--- - `"X86_64"` for Intel and AMD systems
+--- - `"AARCH64"` for ARM64, M1, and Raspberry Pi systems
+--- - `"POWERPC64"` for OpenPOWER Raptor Computing Systems
+---@return "X86_64"|"AARCH64"|"POWERPC64"
+---@nodiscard
+function GetHostIsa() end
 
 ---@param str string|integer monospace display width of string.
 --- This is useful for fixed-width formatting. For example, CJK characters
@@ -1396,9 +1445,9 @@ function Log(level, message) end
 function ParseHttpDateTime(rfc1123) end
 
 --- Parses URL.
---- 
+---
 ---@return Url url An object containing the following fields is returned:
---- 
+---
 --- - `scheme` is a string, e.g. `"http"`
 --- - `user` is the username string, or nil if absent
 --- - `pass` is the password string, or nil if absent
@@ -1408,28 +1457,28 @@ function ParseHttpDateTime(rfc1123) end
 --- - `params` is the URL paramaters, e.g. `/?a=b&c` would be
 ---   represented as the data structure `{{"a", "b"}, {"c"}, ...}`
 --- - `fragment` is the stuff after the `#` character
---- 
+---
 ---@param url string
 ---@param flags integer? may have:
---- 
+---
 --- - `kUrlPlus` to turn `+` into space
 --- - `kUrlLatin1` to transcode ISO-8859-1 input into UTF-8
---- 
+---
 --- This parser is charset agnostic. Percent encoded bytes are
 --- decoded for all fields. Returned values might contain things
 --- like NUL characters, spaces, control codes, and non-canonical
 --- encodings. Absent can be discerned from empty by checking if
 --- the pointer is set.
---- 
+---
 --- There's no failure condition for this routine. This is a
 --- permissive parser. This doesn't normalize path segments like
---- `.` or `..` so use IsAcceptablePath() to check for those. No 
+--- `.` or `..` so use IsAcceptablePath() to check for those. No
 --- restrictions are imposed beyond that which is strictly
 --- necessary for parsing. All the data that is provided will be
 --- consumed to the one of the fields. Strict conformance is
 --- enforced on some fields more than others, like scheme, since
 --- it's the most non-deterministically defined field of them all.
---- 
+---
 --- Please note this is a URL parser, not a URI parser. Which
 --- means we support everything the URI spec says we should do
 --- except for the things we won't do, like tokenizing path
@@ -1581,9 +1630,13 @@ function ProgramBrand(str) end
 --- Configures Cache-Control and Expires header generation for static asset serving.
 --- A negative value will disable the headers. Zero means don't cache. Greater than
 --- zero asks public proxies and browsers to cache for a given number of seconds.
+--- The directive value is added to the Cache-Control header when specified (with
+--- "must-revalidate" provided by default) and can be set to an empty  string to
+--- remove the default value.
 --- This should only be called from `/.init.lua`.
 ---@param seconds integer
-function ProgramCache(seconds) end
+---@param directive string?
+function ProgramCache(seconds, directive) end
 
 --- This function is the same as the -C flag if called from `.init.lua`, e.g.
 --- `ProgramCertificate(LoadAsset("/.sign.crt"))` for zip loading or
@@ -1787,8 +1840,8 @@ function ProgramLogBodies(bool) end
 --- before de-escalating the user / group id. The file is opened in append only
 --- mode. If the disk runs out of space then redbean will truncate the log file if
 --- has access to change the log file after daemonizing.
----@param bool boolean
-function ProgramLogPath(bool) end
+---@param str string
+function ProgramLogPath(str) end
 
 --- Same as the `-P` flag if called from `.init.lua` for setting the pid file path
 --- on the local file system. It's useful for reloading daemonized redbean using
@@ -1821,11 +1874,11 @@ function ProgramUniprocess(bool) end
 --- if you need to react to it.
 ---
 ---@param filename string
----@param i integer
----@param j integer
+---@param i integer?
+---@param j integer?
 ---@return string data
 ---@nodiscard
----@overload fun(filename: string, i: integer, j: integer): nil, unix.Errno
+---@overload fun(filename: string, i?: integer, j?: integer): nil, unix.Errno
 function Slurp(filename, i, j) end
 
 --- Writes all data to file the easy way.
@@ -1923,6 +1976,14 @@ function VisualizeControlCodes(str) end
 ---@return string
 ---@nodiscard
 function Underlong(str) end
+
+--- Generate a uuid_v4
+--- @return string
+function UuidV4() end
+
+--- Generate a uuid_v7
+--- @return string
+function UuidV7() end
 
 ---@param x integer
 ---@return integer # position of first bit set.
@@ -2113,6 +2174,186 @@ function bin(int) end
 ---@overload fun(hostname: string): nil, error: string
 function ResolveIp(hostname) end
 
+--- Returns `true` if IP address is trustworthy.
+--- If the `ProgramTrustedIp()` function has NOT been called then redbean
+--- will consider the networks 127.0.0.0/8, 10.0.0.0/8, 172.16.0.0/12,
+--- and 192.168.0.0/16 to be trustworthy too. If `ProgramTrustedIp()` HAS
+--- been called at some point earlier in your redbean's lifecycle, then
+--- it'll trust the IPs and network subnets you specify instead.
+--- The network interface addresses used by the host machine are always
+--- considered trustworthy, e.g. 127.0.0.1. This may change soon, if we
+--- decide to export a `GetHostIps()` API which queries your NIC devices.
+---@param ip integer
+---@return boolean
+function IsTrustedIp(ip) end
+
+--- Trusts an IP address or network
+--- This function may be used to configure the `IsTrustedIp()` function
+--- which is how redbean determines if a client is allowed to send us
+--- headers like X-Forwarded-For (cf `GetRemoteAddr` vs. `GetClientAddr`)
+--- without them being ignored. Trusted IPs is also how redbean turns
+--- off token bucket rate limiting selectively, so be careful. Here's
+--- an example of how you could trust all of Cloudflare's IPs:
+---
+---     ProgramTrustedIp(ParseIp("103.21.244.0"), 22);
+---     ProgramTrustedIp(ParseIp("103.22.200.0"), 22);
+---     ProgramTrustedIp(ParseIp("103.31.4.0"), 22);
+---     ProgramTrustedIp(ParseIp("104.16.0.0"), 13);
+---     ProgramTrustedIp(ParseIp("104.24.0.0"), 14);
+---     ProgramTrustedIp(ParseIp("108.162.192.0"), 18);
+---     ProgramTrustedIp(ParseIp("131.0.72.0"), 22);
+---     ProgramTrustedIp(ParseIp("141.101.64.0"), 18);
+---     ProgramTrustedIp(ParseIp("162.158.0.0"), 15);
+---     ProgramTrustedIp(ParseIp("172.64.0.0"), 13);
+---     ProgramTrustedIp(ParseIp("173.245.48.0"), 20);
+---     ProgramTrustedIp(ParseIp("188.114.96.0"), 20);
+---     ProgramTrustedIp(ParseIp("190.93.240.0"), 20);
+---     ProgramTrustedIp(ParseIp("197.234.240.0"), 22);
+---     ProgramTrustedIp(ParseIp("198.41.128.0"), 17);
+---
+--- Although you might want consider trusting redbean's open source
+--- freedom embracing solution to DDOS protection instead!
+---@param ip integer
+---@param cidr integer?
+function ProgramTrustedIp(ip, cidr) end
+
+--- Enables DDOS protection.
+---
+--- Imagine you have 2**32 buckets, one for each IP address. Each bucket
+--- can hold about 127 tokens. Every second a background worker puts one
+--- token in each bucket. When a TCP client socket is opened, it takes a
+--- token from its bucket, and then proceeds. If the bucket holds only a
+--- third of its original tokens, then redbean sends them a 429 warning.
+--- If the client ignores this warning and keeps sending requests, until
+--- there's no tokens left, then the banhammer finally comes down.
+---
+---    function OnServerStart()
+---        ProgramTokenBucket()
+---        ProgramTrustedIp(ParseIp('x.x.x.x'), 32)
+---        assert(unix.setrlimit(unix.RLIMIT_NPROC, 1000, 1000))
+---    end
+---
+--- This model of network rate limiting generously lets people "burst" a
+--- tiny bit. For example someone might get a strong craving for content
+--- and smash the reload button in Chrome 64 times in a fow seconds. But
+--- since the client only get 1 new token per second, they'd better cool
+--- their heels for a few minutes after doing that. This amount of burst
+--- can be altered by choosing the `reject` / `ignore` / `ban` threshold
+--- arguments. For example, if the `reject` parameter is set to 126 then
+--- no bursting is allowed, which probably isn't a good idea.
+---
+--- redbean is programmed to acquire a token immediately after accept()
+--- is called from the main server process, which is well before fork()
+--- or read() or any Lua code happens. redbean then takes action, based
+--- on the token count, which can be accept / reject / ignore / ban. If
+--- redbean determines a ban is warrented, then 4-byte datagram is sent
+--- to the unix domain socket `/var/run/blackhole.sock` which should be
+--- operated using the blackholed program we distribute separately.
+---
+--- The trick redbean uses on Linux for example is insert rules in your
+--- raw prerouting table. redbean is very fast at the application layer
+--- so the biggest issue we've encountered in production is are kernels
+--- themselves, and programming the raw prerouting table dynamically is
+--- how we solved that.
+---
+--- `replenish` is the number of times per second a token should be
+--- added to each bucket. The default value is 1 which means one token
+--- is granted per second to all buckets. The minimum value is 1/3600
+--- which means once per hour. The maximum value for this setting is
+--- 1e6, which means once every microsecond.
+---
+--- `cidr` is the specificity of judgement.  Since creating 2^32 buckets
+--- would need 4GB of RAM, redbean defaults this value to 24 which means
+--- filtering applies to class c network blocks (i.e. x.x.x.*), and your
+--- token buckets only take up 2^24 bytes of RAM (16MB). This can be set
+--- to any number on the inclusive interval [8,32], where having a lower
+--- number means you use less ram/cpu, but splash damage applies more to
+--- your clients; whereas higher numbers means more ram/cpu usage, while
+--- ensuring rate limiting only applies to specific compromised actors.
+---
+--- `reject` is the token count or treshold at which redbean should send
+--- 429 Too Many Request warnings to the client. Permitted values can be
+--- anywhere between -1 and 126 inclusively. The default value is 30 and
+--- -1 means disable to disable (assuming AcquireToken() will be used).
+---
+--- `ignore` is the token count or treshold, at which redbean should try
+--- simply ignoring clients and close the connection without logging any
+--- kind of warning, and without sending any response. The default value
+--- for this setting is `MIN(reject / 2, 15)`. This must be less than or
+--- equal to the `reject` setting. Allowed values are [-1,126] where you
+--- can use -1 as a means of disabling `ignore`.
+---
+--- `ban` is the token count at which redbean should report IP addresses
+--- to the blackhole daemon via a unix-domain socket datagram so they'll
+--- get banned in the kernel routing tables. redbean's default value for
+--- this setting is `MIN(ignore / 10, 1)`. Permitted values are [-1,126]
+--- where -1 may be used as a means of disabling the `ban` feature.
+---
+--- This function throws an exception if the constraints described above
+--- are not the case. Warnings are logged should redbean fail to connect
+--- to the blackhole daemon, assuming it hasn't been disabled. It's safe
+--- to use load balancing tools when banning is enabled, since you can't
+--- accidentally ban your own network interface addresses, loopback ips,
+--- or ProgramTrustedIp() addresses where these rate limits don't apply.
+---
+--- It's assumed will be called from the .init.lua global scope although
+--- it could be used in interpreter mode, or from a forked child process
+--- in which case the only processes that'll have ability to use it will
+--- be that same process, and any descendent processes. This function is
+--- only able to be called once.
+---
+--- This feature is not available in unsecure mode.
+---@param replenish number?
+---@param cidr integer?
+---@param reject integer?
+---@param ignore integer?
+---@param ban integer?
+function ProgramTokenBucket(replenish, cidr, reject, ignore, ban) end
+
+--- Atomically acquires token.
+---
+--- This routine atomically acquires a single token for an `ip` address.
+--- The return value is the token count before the subtraction happened.
+--- No action is taken based on the count, since the caller will decide.
+---
+--- `ip` should be an IPv4 address and this defaults to `GetClientAddr()`,
+--- although other interpretations of its meaning are possible.
+---
+--- Your token buckets are stored in shared memory so this can be called
+--- from multiple forked processes. which operate on the same values.
+---@param ip uint32?
+---@return int8
+function AcquireToken(ip) end
+
+--- Counts number of tokens in bucket.
+---
+--- This function is the same as AcquireToken() except no subtraction is
+--- performed, i.e. no token is taken.
+---
+--- `ip` should be an IPv4 address and this defaults to GetClientAddr(),
+--- although other interpretations of its meaning are possible.
+---@param ip uint32?
+---@return int8
+function CountTokens(ip) end
+
+--- Sends IP address to blackholed service.
+---
+--- `ProgramTokenBucket()` needs to be called beforehand. The default
+--- settings will blackhole automatically, during the `accept()` loop
+--- based on the banned threshold. However if your Lua code calls
+--- `AcquireToken()` manually, then you'll need this function to take
+--- action on the returned values.
+---
+--- This function returns true if a datagram could be sent sucessfully.
+--- Otherwise false is returned, which can happen if blackholed isn't
+--- running, or if a lot of processes are sending messages to it and the
+--- operation would have blocked.
+---
+--- It's assumed that the blackholed service is running locally in the
+--- background.
+---@param ip uint32
+function Blackhole(ip) end
+
 -- MODULES
 
 ---Please refer to the LuaSQLite3 Documentation.
@@ -2192,7 +2433,7 @@ lsqlite3 = {
     --- An `lsqlite3.BUSY` error can occur at any point in a transaction: when
     --- the transaction is first started, during any write or update operations,
     --- or when the transaction commits. To avoid encountering `lsqlite3.BUSY`
-    --- errors in the middle of a transaction, the application can use 
+    --- errors in the middle of a transaction, the application can use
     --- `BEGIN IMMEDIATE` instead of just `BEGIN` to start a transaction. The
     --- `BEGIN IMMEDIATE` command might itself return `lsqlite3.BUSY`, but if it
     --- succeeds, then SQLite guarantees that no subsequent operations on the same database through the next COMMIT will return `lsqlite3.BUSY`.
@@ -2248,7 +2489,7 @@ lsqlite3 = {
     CORRUPT = 11,
     --- The `lsqlite3.NOTFOUND` result code is exposed in three ways:
     ---
-    --- `lsqlite3.NOTFOUND` can be returned by the `sqlite3_file_control()` 
+    --- `lsqlite3.NOTFOUND` can be returned by the `sqlite3_file_control()`
     --- interface to indicate that the file control opcode passed as the third
     --- argument was not recognized by the underlying VFS.
     ---
@@ -2267,7 +2508,7 @@ lsqlite3 = {
     --- complete because the disk is full. Note that this error can occur when
     --- trying to write information into the main database file, or it can also
     --- occur when writing into temporary disk files.
-    --- 
+    ---
     --- Sometimes applications encounter this error even though there is an
     --- abundance of primary disk space because the error occurs when writing
     --- into temporary disk files on a system where temporary files are stored
@@ -2297,19 +2538,19 @@ lsqlite3 = {
     --- the database schema was changed by some other process in between the
     --- time that the statement was prepared and the time the statement was run,
     --- this error can result.
-    --- 
+    ---
     --- The statement is automatically re-prepared if the schema changes, up to
     --- `SQLITE_MAX_SCHEMA_RETRY` times (default: 50). The `step()` interface
     --- will only return `lsqlite3.SCHEMA` back to the application if the
     --- failure persists after these many retries.
     SCHEMA = 17,
     --- The `lsqlite3.TOOBIG` error code indicates that a string or BLOB was too
-    --- large. The default maximum length of a string or BLOB in SQLite is 
+    --- large. The default maximum length of a string or BLOB in SQLite is
     --- 1,000,000,000 bytes. This maximum length can be changed at compile-time
     --- using the `SQLITE_MAX_LENGTH` compile-time option. The `lsqlite3.TOOBIG`
     --- error results when SQLite encounters a string or BLOB that exceeds the
     --- compile-time limit.
-    --- 
+    ---
     --- The `lsqlite3.TOOBIG` error code can also result when an oversized SQL
     --- statement is passed into one of the `db:prepare()` interface. The
     --- maximum length of an SQL statement defaults to a much smaller value of
@@ -2320,7 +2561,7 @@ lsqlite3 = {
     --- information about the failed constraint can be found by consulting the
     --- accompanying error message (returned via `errmsg()`) or by looking at
     --- the extended error code.
-    --- 
+    ---
     --- The `lsqlite3.CONSTRAINT` code can also be used as the return value from
     --- the `xBestIndex()` method of a virtual table implementation. When
     --- `xBestIndex()` returns `lsqlite3.CONSTRAINT`, that indicates that the
@@ -2334,7 +2575,7 @@ lsqlite3 = {
     --- BLOB in a column with a declared type of BOOLEAN. But in a few cases,
     --- SQLite is strict about types. The `lsqlite3.MISMATCH` error is returned
     --- in those few cases when the types do not match.
-    --- 
+    ---
     --- The rowid of a table must be an integer. Attempt to set the rowid to
     --- anything other than an integer (or a NULL which will be automatically
     --- converted into the next available integer rowid) results in an
@@ -2619,7 +2860,7 @@ function Database:close_vm(temponly) end
 ---@param func fun(udata: Udata) a Lua function that is invoked by SQLite3 whenever a transaction is committed. This callback receives one argument:
 ---@param udata Udata argument used when the callback was installed.
 ---
---- If `func` returns `false` or `nil` the COMMIT is allowed to proceed, 
+--- If `func` returns `false` or `nil` the COMMIT is allowed to proceed,
 --- otherwise the COMMIT is converted to a ROLLBACK.
 ---
 --- See: `db:rollback_hook` and `db:update_hook`
@@ -2674,7 +2915,7 @@ function Database:create_aggregate(name, nargs, step, final, userdata) end
 --- This creates a collation callback. A collation callback is used to establish
 --- a collation order, mostly for string comparisons and sorting purposes.
 ---@param name string the name of the collation to be created
----@param func fun(s1: string, s2: string): -1|0|1 a function that accepts two string arguments, compares them and returns `0` if both strings are identical, `-1` if the first argument is lower in the collation order than the second and `1` if the first argument is higher in the collation order than the second. 
+---@param func fun(s1: string, s2: string): -1|0|1 a function that accepts two string arguments, compares them and returns `0` if both strings are identical, `-1` if the first argument is lower in the collation order than the second and `1` if the first argument is higher in the collation order than the second.
 --- A simple example:
 ---
 ---    local function collate(s1,s2)
@@ -3620,7 +3861,7 @@ function path.islink(path) end
 --- The database file is distributed by MaxMind. You need to sign up on their
 --- website to get a free copy. The database has a generalized structure. For a
 --- concrete example of how this module may be used, please see `maxmind.lua`
---- in `redbean-demo.com`.
+--- in `redbean-demo`.
 maxmind = {}
 
 ---@param filepath string the location of the MaxMind database
@@ -3888,36 +4129,21 @@ unix = {
     CLK_TCK = nil,
 
     --- @type integer
-    CLOCK_BOOTTIME = nil,
-    --- @type integer
-    CLOCK_BOOTTIME_ALARM = nil,
+    CLOCK_REALTIME = nil,
     --- @type integer
     CLOCK_MONOTONIC = nil,
     --- @type integer
-    CLOCK_MONOTONIC_COARSE = nil,
-    --- @type integer
-    CLOCK_MONOTONIC_PRECISE = nil,
-    --- @type integer
-    CLOCK_MONOTONIC_FAST = nil,
+    CLOCK_BOOTTIME = nil,
     --- @type integer
     CLOCK_MONOTONIC_RAW = nil,
     --- @type integer
-    CLOCK_PROCESS_CPUTIME_ID = nil,
-    --- @type integer
-    CLOCK_PROF = nil,
-    --- @type integer
-    CLOCK_REALTIME = nil,
-    --- @type integer
-    CLOCK_REALTIME_PRECISE = nil,
-    --- @type integer
-    CLOCK_REALTIME_ALARM = nil,
-    --- @type integer
     CLOCK_REALTIME_COARSE = nil,
     --- @type integer
-    CLOCK_REALTIME_FAST = nil,
+    CLOCK_MONOTONIC_COARSE = nil,
+    ---@type integer
+    CLOCK_THREAD_CPUTIME_ID = nil,
     --- @type integer
-    CLOCK_TAI = nil,
-
+    CLOCK_PROCESS_CPUTIME_ID = nil,
     --- @type integer
     DT_BLK = nil,
     --- @type integer
@@ -4441,6 +4667,38 @@ unix = {
     --- when exceeding the libc limit.
     PATH_MAX = nil,
 
+    ---@type integer Causes the violating thread to be killed. This is
+    --- the default on Linux. It's effectively the same as killing the
+    --- process, since redbean has no threads. The termination signal
+    --- can't be caught and will be either `SIGSYS` or `SIGABRT`.
+    --- Consider enabling stderr logging below so you'll know why your
+    --- program failed. Otherwise check the system log.
+    PLEDGE_PENALTY_KILL_THREAD = nil,
+
+    ---@type integer Causes the process and all its threads to be killed.
+    --- This is always the case on OpenBSD.
+    PLEDGE_PENALTY_KILL_PROCESS = nil,
+
+    ---@type integer Causes system calls to just return an `EPERM` error
+    --- instead of killing. This is a gentler solution that allows code to
+    --- display a friendly warning. Please note this may lead to weird
+    --- behaviors if the software being sandboxed is lazy about checking
+    --- error results.
+    PLEDGE_PENALTY_RETURN_EPERM = nil,
+
+    ---@type integer Enables friendly error message logging letting you
+    --- know which promises are needed whenever violations occur. Without
+    --- this, violations will be logged to `dmesg` on Linux if the penalty
+    --- is to kill the process. You would then need to manually look up
+    --- the system call number and then cross reference it with the
+    --- cosmopolitan libc `pledge()` documentation. You can also use
+    --- `strace -ff` which is easier. This is ignored OpenBSD, which
+    --- already has a good system log. Turning on stderr logging (which
+    --- uses SECCOMP trapping) also means that the `unix.WTERMSIG()` on
+    --- your killed processes will always be `unix.SIGABRT` on both Linux
+    --- and OpenBSD. Otherwise, Linux prefers to raise `unix.SIGSYS`.
+    PLEDGE_STDERR_LOGGING = nil,
+
     --- @type integer Returns maximum size at which pipe i/o is guaranteed atomic.
     ---
     --- POSIX requires this be at least 512. Linux is more generous and
@@ -4930,11 +5188,14 @@ function unix.fork() end
 ---     unix.execve(prog, {prog, '-hal', '.'}, {'PATH=/bin'})
 ---     unix.exit(127)
 ---
---- We automatically suffix `.com` and `.exe` for all platforms when
---- path searching. By default, the current directory is not on the
---- path. If `prog` is an absolute path, then it's returned as-is. If
---- `prog` contains slashes then it's not path searched either and will
---- be returned if it exists.
+--- If `prog` is an absolute path, then it's returned as-is. If `prog`
+--- contains slashes then it's not path searched either and will be
+--- returned if it exists. On Windows, it's recommended that you install
+--- programs from cosmos to c:/bin/ without any .exe or .com suffix, so
+--- they can be discovered like they would on UNIX. If you want to find
+--- a program like notepad on the $PATH using this function, then you
+--- need to specify "notepad.exe" so it includes the extension.
+---
 ---@param prog string
 ---@return string path
 ---@overload fun(prog: string): nil, error: unix.Errno
@@ -5823,23 +6084,73 @@ function unix.syslog(priority, msg) end
 ---
 --- `clock` can be any one of of:
 ---
---- - `CLOCK_REALTIME`: universally supported
---- - `CLOCK_REALTIME_FAST`: ditto but faster on freebsd
---- - `CLOCK_REALTIME_PRECISE`: ditto but better on freebsd
---- - `CLOCK_REALTIME_COARSE`: : like `CLOCK_REALTIME_FAST` but needs Linux 2.6.32+
---- - `CLOCK_MONOTONIC`: universally supported
---- - `CLOCK_MONOTONIC_FAST`: ditto but faster on freebsd
---- - `CLOCK_MONOTONIC_PRECISE`: ditto but better on freebsd
---- - `CLOCK_MONOTONIC_COARSE`: : like `CLOCK_MONOTONIC_FAST` but needs Linux 2.6.32+
---- - `CLOCK_MONOTONIC_RAW`: is actually monotonic but needs Linux 2.6.28+
---- - `CLOCK_PROCESS_CPUTIME_ID`: linux and bsd
---- - `CLOCK_THREAD_CPUTIME_ID`: linux and bsd
---- - `CLOCK_MONOTONIC_COARSE`: linux, freebsd
---- - `CLOCK_PROF`: linux and netbsd
---- - `CLOCK_BOOTTIME`: linux and openbsd
---- - `CLOCK_REALTIME_ALARM`: linux-only
---- - `CLOCK_BOOTTIME_ALARM`: linux-only
---- - `CLOCK_TAI`: linux-only
+--- - `CLOCK_REALTIME` returns a wall clock timestamp represented in
+---   nanoseconds since the UNIX epoch (~1970). It'll count time in the
+---   suspend state. This clock is subject to being smeared by various
+---   adjustments made by NTP. These timestamps can have unpredictable
+---   discontinuous jumps when clock_settime() is used. Therefore this
+---   clock is the default clock for everything, even pthread condition
+---   variables. Cosmopoiltan guarantees this clock will never raise
+---   `EINVAL` and also guarantees `CLOCK_REALTIME == 0` will always be
+---   the case. On Windows this maps to GetSystemTimePreciseAsFileTime().
+---   On platforms with vDSOs like Linux, Windows, and MacOS ARM64 this
+---   should take about 20 nanoseconds.
+---
+--- - `CLOCK_MONOTONIC` returns a timestamp with an unspecified epoch,
+---   that should be when the system was powered on. These timestamps
+---   shouldn't go backwards. Timestamps shouldn't count time spent in
+---   the sleep, suspend, and hibernation states. These timestamps won't
+---   be impacted by clock_settime(). These timestamps may be impacted by
+---   frequency adjustments made by NTP. Cosmopoiltan guarantees this
+---   clock will never raise `EINVAL`. MacOS and BSDs use the word
+---   "uptime" to describe this clock. On Windows this maps to
+---   QueryUnbiasedInterruptTimePrecise().
+---
+--- - `CLOCK_BOOTTIME` is a monotonic clock returning a timestamp with an
+---   unspecified epoch, that should be relative to when the host system
+---   was powered on. These timestamps shouldn't go backwards. Timestamps
+---   should also include time spent in a sleep, suspend, or hibernation
+---   state. These timestamps aren't impacted by clock_settime(), but
+---   they may be impacted by frequency adjustments made by NTP. This
+---   clock will raise an `EINVAL` error on extremely old Linux distros
+---   like RHEL5. MacOS and BSDs use the word "monotonic" to describe
+---   this clock. On Windows this maps to QueryInterruptTimePrecise().
+---
+--- - `CLOCK_MONOTONIC_RAW` returns a timestamp from an unspecified
+---   epoch. These timestamps don't count time spent in the sleep,
+---   suspend, and hibernation states. Unlike `CLOCK_MONOTONIC` this
+---   clock is guaranteed to not be impacted by frequency adjustments or
+---   discontinuous jumps caused by clock_settime(). Providing this level
+---   of assurances may make this clock slower than the normal monotonic
+---   clock. Furthermore this clock may cause `EINVAL` to be raised if
+---   running on a host system that doesn't provide those guarantees,
+---   e.g. OpenBSD and MacOS on AMD64.
+---
+--- - `CLOCK_REALTIME_COARSE` is the same as `CLOCK_REALTIME` except
+---   it'll go faster if the host OS provides a cheaper way to read the
+---   wall time. Please be warned that coarse can be really coarse.
+---   Rather than nano precision, you're looking at `CLK_TCK` precision,
+---   which can lag as far as 30 milliseconds behind or possibly more.
+---   Cosmopolitan may fallback to `CLOCK_REALTIME` if a faster less
+---   accurate clock isn't provided by the system. This clock will raise
+---   an `EINVAL` error on extremely old Linux distros like RHEL5.
+---
+--- - `CLOCK_MONOTONIC_COARSE` is the same as `CLOCK_MONOTONIC` except
+---   it'll go faster if the host OS provides a cheaper way to read the
+---   unbiased time. Please be warned that coarse can be really coarse.
+---   Rather than nano precision, you're looking at `CLK_TCK` precision,
+---   which can lag as far as 30 milliseconds behind or possibly more.
+---   Cosmopolitan may fallback to `CLOCK_REALTIME` if a faster less
+---   accurate clock isn't provided by the system. This clock will raise
+---   an `EINVAL` error on extremely old Linux distros like RHEL5.
+---
+--- - `CLOCK_PROCESS_CPUTIME_ID` returns the amount of time this process
+---   was actively scheduled. This is similar to getrusage() and clock().
+---   Cosmopoiltan guarantees this clock will never raise `EINVAL`.
+---
+--- - `CLOCK_THREAD_CPUTIME_ID` returns the amount of time this thread
+---   was actively scheduled. This is similar to getrusage() and clock().
+---   Cosmopoiltan guarantees this clock will never raise `EINVAL`.
 ---
 --- Returns `EINVAL` if clock isn't supported on platform.
 ---
@@ -6736,7 +7047,7 @@ function unix.getrusage(who) end
 --- If the executable in question needs a loader, then you will need
 --- "rpath prot_exec" too. With APE, security is strongest when you
 --- assimilate your binaries beforehand, using the --assimilate flag,
---- or the o//tool/build/assimilate.com program. On OpenBSD this is
+--- or the o//tool/build/assimilate program. On OpenBSD this is
 --- mandatory.
 ---
 --- ### prot_exec
@@ -6759,9 +7070,41 @@ function unix.getrusage(who) end
 --- Since Linux has to do this before calling `sys_execve()`, the executed
 --- process will be weakened to have execute permissions too.
 ---
+---@param mode integer? if specified should specify one penalty:
+---
+--- - `unix.PLEDGE_PENALTY_KILL_THREAD` causes the violating thread to
+---   be killed. This is the default on Linux. It's effectively the
+---   same as killing the process, since redbean has no threads. The
+---   termination signal can't be caught and will be either `SIGSYS`
+---   or `SIGABRT`. Consider enabling stderr logging below so you'll
+---   know why your program failed. Otherwise check the system log.
+---
+--- - `unix.PLEDGE_PENALTY_KILL_PROCESS` causes the process and all
+---   its threads to be killed. This is always the case on OpenBSD.
+---
+--- - `unix.PLEDGE_PENALTY_RETURN_EPERM` causes system calls to just
+---   return an `EPERM` error instead of killing. This is a gentler
+---   solution that allows code to display a friendly warning. Please
+---   note this may lead to weird behaviors if the software being
+---   sandboxed is lazy about checking error results.
+---
+--- `mode` may optionally bitwise or the following flags:
+---
+--- - `unix.PLEDGE_STDERR_LOGGING` enables friendly error message
+---   logging letting you know which promises are needed whenever
+---   violations occur. Without this, violations will be logged to
+---   `dmesg` on Linux if the penalty is to kill the process. You
+---   would then need to manually look up the system call number and
+---   then cross reference it with the cosmopolitan libc pledge()
+---   documentation. You can also use `strace -ff` which is easier.
+---   This is ignored OpenBSD, which already has a good system log.
+---   Turning on stderr logging (which uses SECCOMP trapping) also
+---   means that the `unix.WTERMSIG()` on your killed processes will
+---   always be `unix.SIGABRT` on both Linux and OpenBSD. Otherwise,
+---   Linux prefers to raise `unix.SIGSYS`.
 ---@return true
----@overload fun(promises?: string, execpromises?: string): nil, error: unix.Errno
-function unix.pledge(promises, execpromises) end
+---@overload fun(promises?: string, execpromises?: string, mode?: integer): nil, error: unix.Errno
+function unix.pledge(promises, execpromises, mode) end
 
 --- Restricts filesystem operations, e.g.
 ---
@@ -6825,6 +7168,7 @@ function unix.pledge(promises, execpromises) end
 ---
 ---@return true
 ---@overload fun(path: string, permissions: string): nil, error: unix.Errno
+---@overload fun(path: nil, permissions: nil): true
 function unix.unveil(path, permissions) end
 
 --- Breaks down UNIX timestamp into Zulu Time numbers.
@@ -6973,16 +7317,15 @@ function unix.isatty(fd) end
 function unix.tiocgwinsz(fd) end
 
 --- Returns file descriptor of open anonymous file.
---- 
+---
 --- This creates a secure temporary file inside `$TMPDIR`. If it isn't
 --- defined, then `/tmp` is used on UNIX and GetTempPath() is used on
---- the New Technology. This resolution of `$TMPDIR` happens once in a
---- ctor, which is copied to the `kTmpDir` global.
---- 
+--- the New Technology. This resolution of `$TMPDIR` happens once.
+---
 --- Once close() is called, the returned file is guaranteed to be
 --- deleted automatically. On UNIX the file is unlink()'d before this
 --- function returns. On the New Technology it happens upon close().
---- 
+---
 --- On the New Technology, temporary files created by this function
 --- should have better performance, because `kNtFileAttributeTemporary`
 --- asks the kernel to more aggressively cache and reduce i/o ops.
@@ -6995,7 +7338,7 @@ function unix.tmpfd() end
 function unix.sched_yield() end
 
 --- Creates interprocess shared memory mapping.
---- 
+---
 --- This function allocates special memory that'll be inherited across
 --- fork in a shared way. By default all memory in Redbean is "private"
 --- memory that's only viewable and editable to the process that owns
@@ -7005,15 +7348,15 @@ function unix.sched_yield() end
 --- don't want that to happen, and you want the memory to be shared
 --- similar to how it would be shared if you were using threads, then
 --- you can use this function to achieve just that.
---- 
+---
 --- The memory object this function returns may be accessed using its
 --- methods, which support atomics and futexes. It's very low-level.
 --- For example, you can use it to implement scalable mutexes:
---- 
+---
 ---     mem = unix.mapshared(8000 * 8)
---- 
+---
 ---     LOCK = 0 -- pick an arbitrary word index for lock
---- 
+---
 ---     -- From Futexes Are Tricky Version 1.1 § Mutex, Take 3;
 ---     -- Ulrich Drepper, Red Hat Incorporated, June 27, 2004.
 ---     function Lock()
@@ -7035,7 +7378,7 @@ function unix.sched_yield() end
 ---             mem:wake(LOCK, 1)
 ---         end
 ---     end
---- 
+---
 --- It's possible to accomplish the same thing as unix.mapshared()
 --- using files and unix.fcntl() advisory locks. However this goes
 --- significantly faster. For example, that's what SQLite does and
@@ -7044,7 +7387,7 @@ function unix.sched_yield() end
 --- might need something lower level than file locks, to implement
 --- things like throttling. Shared memory is a good way to do that
 --- since there's nothing that's faster.
---- 
+---
 ---@param size integer
 --- The `size` parameter needs to be a multiple of 8. The returned
 --- memory is zero initialized. When allocating shared memory, you
@@ -7052,7 +7395,7 @@ function unix.sched_yield() end
 --- overhead of allocating a single shared mapping is 500 words of
 --- resident memory and 8000 words of virtual memory. It's because
 --- the Cosmopolitan Libc mmap() granularity is 2**16.
---- 
+---
 --- This system call does not fail. An exception is instead thrown
 --- if sufficient memory isn't available.
 ---
@@ -7062,16 +7405,16 @@ function unix.mapshared(size) end
 ---@class unix.Memory: userdata
 --- unix.Memory encapsulates memory that's shared across fork() and
 --- this module provides the fundamental synchronization primitives
---- 
+---
 --- Redbean memory maps may be used in two ways:
---- 
+---
 --- 1. as an array of bytes a.k.a. a string
 --- 2. as an array of words a.k.a. integers
---- 
+---
 --- They're aliased, union, or overlapped views of the same memory.
 --- For example if you write a string to your memory region, you'll
 --- be able to read it back as an integer.
---- 
+---
 --- Reads, writes, and word operations will throw an exception if a
 --- memory boundary error or overflow occurs.
 unix.Memory = {}
@@ -7083,7 +7426,7 @@ unix.Memory = {}
 --- If `bytes` is none or nil, then the nul-terminated string at
 --- `offset` is returned. You may specify `bytes` to safely read
 --- binary data.
---- 
+---
 --- This operation happens atomically. Each shared mapping has a
 --- single lock which is used to synchronize reads and writes to
 --- that specific map. To make it scale, create additional maps.
@@ -7092,7 +7435,7 @@ unix.Memory = {}
 function unix.Memory:read(offset, bytes) end
 
 --- Writes bytes to memory region.
---- 
+---
 ---@param data string
 ---@param offset integer?
 --- `offset` is the starting byte index to which memory is copied,
@@ -7102,7 +7445,7 @@ function unix.Memory:read(offset, bytes) end
 --- If `bytes` is none or nil, then an implicit nil-terminator
 --- will be included after your `data` so things like json can
 --- be easily serialized to shared memory.
---- 
+---
 --- This operation happens atomically. Each shared mapping has a
 --- single lock which is used to synchronize reads and writes to
 --- that specific map. To make it scale, create additional maps.
@@ -7110,7 +7453,7 @@ function unix.Memory:write(data, offset, bytes) end
 
 
 --- Loads word from memory region.
---- 
+---
 --- This operation is atomic and has relaxed barrier semantics.
 ---@param word_index integer
 ---@return integer
@@ -7118,7 +7461,7 @@ function unix.Memory:write(data, offset, bytes) end
 function unix.Memory:load(word_index) end
 
 --- Stores word from memory region.
---- 
+---
 --- This operation is atomic and has relaxed barrier semantics.
 ---@param word_index integer
 ---@param value integer
@@ -7126,10 +7469,10 @@ function unix.Memory:store(word_index, value) end
 
 
 --- Exchanges value.
---- 
+---
 --- This sets word at `word_index` to `value` and returns the value
 --- previously held in by the word.
---- 
+---
 --- This operation is atomic and provides the same memory barrier
 --- semantics as the aligned x86 LOCK XCHG instruction.
 ---@param word_index integer
@@ -7138,12 +7481,12 @@ function unix.Memory:store(word_index, value) end
 function unix.Memory:xchg(word_index, value) end
 
 --- Compares and exchanges value.
---- 
+---
 --- This inspects the word at `word_index` and if its value is the same
 --- as `old` then it'll be replaced by the value `new`, in which case
 --- `true, old` shall be returned. If a different value was held at
 --- word, then `false` shall be returned along with the word.
---- 
+---
 --- This operation happens atomically and provides the same memory
 --- barrier semantics as the aligned x86 LOCK CMPXCHG instruction.
 ---@param word_index integer
@@ -7153,11 +7496,11 @@ function unix.Memory:xchg(word_index, value) end
 function unix.Memory:cmpxchg(word_index, old, new) end
 
 --- Fetches then adds value.
---- 
+---
 --- This method modifies the word at `word_index` to contain the sum of
 --- value and the `value` paremeter. This method then returns the value
 --- as it existed before the addition was performed.
---- 
+---
 --- This operation is atomic and provides the same memory barrier
 --- semantics as the aligned x86 LOCK XADD instruction.
 ---@param word_index integer
@@ -7166,7 +7509,7 @@ function unix.Memory:cmpxchg(word_index, old, new) end
 function unix.Memory:fetch_add(word_index, value) end
 
 --- Fetches and bitwise ands value.
---- 
+---
 --- This operation happens atomically and provides the same memory
 --- barrier ordering semantics as its x86 implementation.
 ---@param word_index integer
@@ -7175,7 +7518,7 @@ function unix.Memory:fetch_add(word_index, value) end
 function unix.Memory:fetch_and(word_index, value) end
 
 --- Fetches and bitwise ors value.
---- 
+---
 --- This operation happens atomically and provides the same memory
 --- barrier ordering semantics as its x86 implementation.
 ---@param word_index integer
@@ -7184,7 +7527,7 @@ function unix.Memory:fetch_and(word_index, value) end
 function unix.Memory:fetch_or(word_index, value) end
 
 --- Fetches and bitwise xors value.
---- 
+---
 --- This operation happens atomically and provides the same memory
 --- barrier ordering semantics as its x86 implementation.
 ---@param word_index integer
@@ -7193,24 +7536,24 @@ function unix.Memory:fetch_or(word_index, value) end
 function unix.Memory:fetch_xor(word_index, value) end
 
 --- Waits for word to have a different value.
---- 
+---
 --- This method asks the kernel to suspend the process until either the
 --- absolute deadline expires or we're woken up by another process that
 --- calls `unix.Memory:wake()`.
---- 
+---
 --- The `expect` parameter is used only upon entry to synchronize the
 --- transition to kernelspace. The kernel doesn't actually poll the
 --- memory location. It uses `expect` to make sure the process doesn't
 --- get added to the wait list unless it's sure that it needs to wait,
 --- since the kernel can only control the ordering of wait / wake calls
 --- across processes.
---- 
+---
 --- The default behavior is to wait until the heat death of the universe
 --- if necessary. You may alternatively specify an absolute deadline. If
 --- it's less than or equal to the value returned by clock_gettime, then
 --- this routine is non-blocking. Otherwise we'll block at most until
 --- the current time reaches the absolute deadline.
---- 
+---
 --- Futexes are currently supported on Linux, FreeBSD, OpenBSD. On other
 --- platforms this method calls sched_yield() and will either (1) return
 --- unix.EINTR if a deadline is specified, otherwise (2) 0 is returned.
@@ -7223,7 +7566,7 @@ function unix.Memory:fetch_xor(word_index, value) end
 --- well-supported on all supported platforms but requires using files.
 --- Please test your use case though, because it's kind of an edge case
 --- to have the scenario above, and chances are this op will work fine.
---- 
+---
 ---@return 0
 ---@overload fun(self, word_index: integer, expect: integer, abs_deadline?: integer, nanos?: integer): nil, error: unix.Errno
 ---
@@ -7231,10 +7574,10 @@ function unix.Memory:fetch_xor(word_index, value) end
 --- should use futexes inside a loop that is able to cope with spurious
 --- wakeups. We don't actually guarantee the value at word has in fact
 --- changed when this returns.
---- 
+---
 --- `EAGAIN` is raised if, upon entry, the word at `word_index` had a
 --- different value than what's specified at `expect`.
---- 
+---
 --- `ETIMEDOUT` is raised when the absolute deadline expires.
 ---
 ---@param word_index integer
@@ -7244,11 +7587,11 @@ function unix.Memory:fetch_xor(word_index, value) end
 function unix.Memory:wait(word_index, expect, abs_deadline, nanos) end
 
 --- Wakes other processes waiting on word.
---- 
+---
 --- This method may be used to signal or broadcast to waiters. The
 --- `count` specifies the number of processes that should be woken,
 --- which defaults to `INT_MAX`.
---- 
+---
 --- The return value is the number of processes that were actually woken
 --- as a result of the system call. No failure conditions are defined.
 ---@param index integer
@@ -7590,7 +7933,7 @@ function unix.Stat:flags() end
 --- The unix.Sigset class defines a mutable bitset that may currently
 --- contain 128 entries. See `unix.NSIG` to find out how many signals
 --- your operating system actually supports.
-
+---
 --- Constructs new signal bitset object.
 ---@param sig integer
 ---@param ... integer

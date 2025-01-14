@@ -1,4 +1,3 @@
-// clang-format off
 /*
  * Copyright (c) 2009-2011, Salvatore Sanfilippo <antirez at gmail dot com>
  * Copyright (c) 2010-2011, Pieter Noordhuis <pcnoordhuis at gmail dot com>
@@ -33,7 +32,7 @@
 #include "libc/mem/alg.h"
 #include "libc/str/str.h"
 #include "libc/calls/calls.h"
-#include "libc/calls/dprintf.h"
+#include "libc/stdio/dprintf.h"
 #include "libc/calls/termios.h"
 #include "libc/fmt/conv.h"
 #include "libc/limits.h"
@@ -41,11 +40,10 @@
 #include "libc/mem/mem.h"
 #include "libc/runtime/runtime.h"
 #include "libc/stdio/rand.h"
-#include "libc/stdio/temp.h"
+#include "libc/temp.h"
 #include "libc/str/str.h"
 #include "libc/sysv/consts/exit.h"
 #include "third_party/gdtoa/gdtoa.h"
-#include "third_party/getopt/getopt.h"
 #include "third_party/musl/crypt.h"
 #include "third_party/musl/rand48.h"
 #ifndef _MSC_VER
@@ -58,8 +56,8 @@
 #include "libc/sysv/consts/fileno.h"
 #include "libc/sysv/consts/o.h"
 #include "libc/sysv/consts/ok.h"
-#include "libc/time/time.h"
-#include "third_party/getopt/getopt.h"
+#include "libc/time.h"
+#include "third_party/getopt/getopt.internal.h"
 #include "third_party/musl/crypt.h"
 #include "third_party/musl/lockf.h"
 #include "libc/str/locale.h"
@@ -75,6 +73,7 @@
 #include "libc/sysv/consts/limits.h"
 #include "libc/sysv/consts/xopen.h"
 #include "libc/thread/thread.h"
+#include "libc/ctype.h"
 #include "libc/math.h"
 
 #include "third_party/hiredis/alloc.h"

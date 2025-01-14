@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2022 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -16,6 +16,7 @@
 │ TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR             │
 │ PERFORMANCE OF THIS SOFTWARE.                                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
+#include "net/http/tokenbucket.h"
 #include "libc/assert.h"
 #include "libc/atomic.h"
 #include "libc/calls/struct/timespec.h"
@@ -28,7 +29,6 @@
 #include "libc/testlib/ezbench.h"
 #include "libc/testlib/testlib.h"
 #include "net/http/http.h"
-#include "net/http/tokenbucket.h"
 
 #define TB_CIDR  22
 #define TB_BYTES (1u << TB_CIDR)
@@ -63,14 +63,16 @@ TEST(tokenbucket, test) {
   ASSERT_EQ(1, AcquireToken(tok.b, 0x7f000001, TB_CIDR));
   ASSERT_EQ(0, AcquireToken(tok.b, 0x7f000002, TB_CIDR));
   ASSERT_EQ(3, AcquireToken(tok.b, 0x08080808, TB_CIDR));
-  for (int i = 0; i < 130; ++i) ReplenishTokens(tok.w, TB_WORDS);
+  for (int i = 0; i < 130; ++i)
+    ReplenishTokens(tok.w, TB_WORDS);
   ASSERT_EQ(127, AcquireToken(tok.b, 0x08080808, TB_CIDR));
 }
 
 void NaiveReplenishTokens(atomic_schar *b, size_t n) {
   for (size_t i = 0; i < n; ++i) {
     int x = atomic_load_explicit(b + i, memory_order_relaxed);
-    if (x == 127) continue;
+    if (x == 127)
+      continue;
     atomic_fetch_add_explicit(b + i, 1, memory_order_acq_rel);
   }
 }

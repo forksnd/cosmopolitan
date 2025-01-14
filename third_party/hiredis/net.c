@@ -1,4 +1,3 @@
-// clang-format off
 /* Extracted from anet.c to work properly with Hiredis error reporting.
  *
  * Copyright (c) 2009-2011, Salvatore Sanfilippo <antirez at gmail dot com>
@@ -41,7 +40,6 @@
 #include "libc/intrin/newbie.h"
 #include "libc/sock/sock.h"
 #include "libc/sock/select.h"
-#include "libc/dns/dns.h"
 #include "libc/sysv/consts/endian.h"
 #include "libc/calls/calls.h"
 #include "libc/calls/struct/flock.h"
@@ -63,15 +61,15 @@
 #include "libc/sysv/consts/tcp.h"
 #include "libc/mem/alg.h"
 #include "libc/str/str.h"
+#include "libc/sock/struct/sockaddr.h"
+#include "third_party/musl/netdb.h"
 #include "libc/errno.h"
 
 #include "libc/calls/calls.h"
-#include "libc/calls/dprintf.h"
+#include "libc/stdio/dprintf.h"
 #include "libc/calls/weirdtypes.h"
-#include "libc/fmt/fmt.h"
-#include "libc/mem/fmt.h"
 #include "libc/stdio/stdio.h"
-#include "libc/stdio/temp.h"
+#include "libc/temp.h"
 #include "third_party/musl/tempnam.h"
 #include "libc/limits.h"
 #include "libc/sysv/consts/_posix.h"
@@ -80,7 +78,7 @@
 #include "libc/sysv/consts/xopen.h"
 #include "libc/thread/thread.h"
 #include "libc/calls/calls.h"
-#include "libc/calls/dprintf.h"
+#include "libc/stdio/dprintf.h"
 #include "libc/calls/termios.h"
 #include "libc/fmt/conv.h"
 #include "libc/limits.h"
@@ -88,11 +86,10 @@
 #include "libc/mem/mem.h"
 #include "libc/runtime/runtime.h"
 #include "libc/stdio/rand.h"
-#include "libc/stdio/temp.h"
+#include "libc/temp.h"
 #include "libc/str/str.h"
 #include "libc/sysv/consts/exit.h"
 #include "third_party/gdtoa/gdtoa.h"
-#include "third_party/getopt/getopt.h"
 #include "third_party/musl/crypt.h"
 #include "third_party/musl/rand48.h"
 

@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2022 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -21,12 +21,11 @@
 #include "libc/calls/calls.h"
 #include "libc/calls/struct/timespec.h"
 #include "libc/intrin/atomic.h"
-#include "libc/mem/gc.internal.h"
+#include "libc/mem/gc.h"
 #include "libc/mem/mem.h"
 #include "libc/testlib/ezbench.h"
 #include "libc/testlib/testlib.h"
 #include "libc/thread/posixthread.internal.h"
-#include "libc/thread/spawn.h"
 #include "libc/thread/thread.h"
 #include "third_party/nsync/mu.h"
 
@@ -41,7 +40,7 @@ pthread_mutexattr_t attr;
 
 FIXTURE(pthread_mutex_lock, normal) {
   ASSERT_EQ(0, pthread_mutexattr_init(&attr));
-  ASSERT_EQ(0, pthread_mutexattr_settype(&attr, PTHREAD_MUTEX_NORMAL));
+  ASSERT_EQ(0, pthread_mutexattr_settype(&attr, PTHREAD_MUTEX_DEFAULT));
   ASSERT_EQ(0, pthread_mutex_init(&lock, &attr));
   ASSERT_EQ(0, pthread_mutexattr_destroy(&attr));
 }
@@ -63,7 +62,7 @@ FIXTURE(pthread_mutex_lock, errorcheck) {
 ////////////////////////////////////////////////////////////////////////////////
 // TESTS
 
-int MutexWorker(void *p, int tid) {
+void *MutexWorker(void *p) {
   int i;
   ++started;
   for (i = 0; i < ITERATIONS; ++i) {
@@ -78,19 +77,19 @@ int MutexWorker(void *p, int tid) {
 
 TEST(pthread_mutex_lock, contention) {
   int i;
-  struct spawn *th = gc(malloc(sizeof(struct spawn) * THREADS));
+  pthread_t *th = gc(malloc(sizeof(pthread_t) * THREADS));
   pthread_mutexattr_init(&attr);
-  pthread_mutexattr_settype(&attr, PTHREAD_MUTEX_NORMAL);
+  pthread_mutexattr_settype(&attr, PTHREAD_MUTEX_DEFAULT);
   pthread_mutex_init(&lock, &attr);
   pthread_mutexattr_destroy(&attr);
   count = 0;
   started = 0;
   finished = 0;
   for (i = 0; i < THREADS; ++i) {
-    ASSERT_SYS(0, 0, _spawn(MutexWorker, (void *)(intptr_t)i, th + i));
+    ASSERT_EQ(0, pthread_create(th + i, 0, MutexWorker, (void *)(intptr_t)i));
   }
   for (i = 0; i < THREADS; ++i) {
-    ASSERT_SYS(0, 0, _join(th + i));
+    ASSERT_EQ(0, pthread_join(th[i], 0));
   }
   EXPECT_EQ(THREADS, started);
   EXPECT_EQ(THREADS, finished);
@@ -129,7 +128,7 @@ BENCH(pthread_mutex_lock, bench_uncontended) {
     pthread_mutex_t m;
     pthread_mutexattr_t attr;
     pthread_mutexattr_init(&attr);
-    pthread_mutexattr_settype(&attr, PTHREAD_MUTEX_NORMAL);
+    pthread_mutexattr_settype(&attr, PTHREAD_MUTEX_DEFAULT);
     pthread_mutex_init(&m, &attr);
     EZBENCH2("normal 1x", donothing, BenchLockUnlock(&m));
   }
@@ -157,7 +156,7 @@ struct SpinContentionArgs {
   atomic_char ready;
 };
 
-int SpinContentionWorker(void *arg, int tid) {
+void *SpinContentionWorker(void *arg) {
   struct SpinContentionArgs *a = arg;
   while (!atomic_load_explicit(&a->done, memory_order_relaxed)) {
     pthread_spin_lock(a->spin);
@@ -173,12 +172,14 @@ struct MutexContentionArgs {
   atomic_char ready;
 };
 
-int MutexContentionWorker(void *arg, int tid) {
+void *MutexContentionWorker(void *arg) {
   struct MutexContentionArgs *a = arg;
   while (!atomic_load_explicit(&a->done, memory_order_relaxed)) {
-    if (pthread_mutex_lock(a->mutex)) notpossible;
+    if (pthread_mutex_lock(a->mutex))
+      notpossible;
     atomic_store_explicit(&a->ready, 1, memory_order_relaxed);
-    if (pthread_mutex_unlock(a->mutex)) notpossible;
+    if (pthread_mutex_unlock(a->mutex))
+      notpossible;
   }
   return 0;
 }
@@ -189,7 +190,7 @@ struct NsyncContentionArgs {
   atomic_char ready;
 };
 
-int NsyncContentionWorker(void *arg, int tid) {
+void *NsyncContentionWorker(void *arg) {
   struct NsyncContentionArgs *a = arg;
   while (!atomic_load_explicit(&a->done, memory_order_relaxed)) {
     nsync_mu_lock(a->nsync);
@@ -200,37 +201,40 @@ int NsyncContentionWorker(void *arg, int tid) {
 }
 
 BENCH(pthread_mutex_lock, bench_contended) {
-  struct spawn t;
+  pthread_t t;
   {
     pthread_spinlock_t s = {0};
     struct SpinContentionArgs a = {&s};
-    _spawn(SpinContentionWorker, &a, &t);
-    while (!a.ready) sched_yield();
+    pthread_create(&t, 0, SpinContentionWorker, &a);
+    while (!a.ready)
+      sched_yield();
     EZBENCH2("spin 2x", donothing, BenchSpinUnspin(&s));
     a.done = true;
-    _join(&t);
+    pthread_join(t, 0);
   }
   {
     nsync_mu m = {0};
     struct NsyncContentionArgs a = {&m};
-    _spawn(NsyncContentionWorker, &a, &t);
-    while (!a.ready) sched_yield();
+    pthread_create(&t, 0, NsyncContentionWorker, &a);
+    while (!a.ready)
+      sched_yield();
     EZBENCH2("nsync 2x", donothing, BenchLockUnlockNsync(&m));
     a.done = true;
-    _join(&t);
+    pthread_join(t, 0);
   }
   {
     pthread_mutex_t m;
     pthread_mutexattr_t attr;
     pthread_mutexattr_init(&attr);
-    pthread_mutexattr_settype(&attr, PTHREAD_MUTEX_NORMAL);
+    pthread_mutexattr_settype(&attr, PTHREAD_MUTEX_DEFAULT);
     pthread_mutex_init(&m, &attr);
     struct MutexContentionArgs a = {&m};
-    _spawn(MutexContentionWorker, &a, &t);
-    while (!a.ready) sched_yield();
+    pthread_create(&t, 0, MutexContentionWorker, &a);
+    while (!a.ready)
+      sched_yield();
     EZBENCH2("normal 2x", donothing, BenchLockUnlock(&m));
     a.done = true;
-    _join(&t);
+    pthread_join(t, 0);
   }
   {
     pthread_mutex_t m;
@@ -239,11 +243,12 @@ BENCH(pthread_mutex_lock, bench_contended) {
     pthread_mutexattr_settype(&attr, PTHREAD_MUTEX_RECURSIVE);
     pthread_mutex_init(&m, &attr);
     struct MutexContentionArgs a = {&m};
-    _spawn(MutexContentionWorker, &a, &t);
-    while (!a.ready) sched_yield();
+    pthread_create(&t, 0, MutexContentionWorker, &a);
+    while (!a.ready)
+      sched_yield();
     EZBENCH2("recursive 2x", donothing, BenchLockUnlock(&m));
     a.done = true;
-    _join(&t);
+    pthread_join(t, 0);
   }
   {
     pthread_mutex_t m;
@@ -252,10 +257,11 @@ BENCH(pthread_mutex_lock, bench_contended) {
     pthread_mutexattr_settype(&attr, PTHREAD_MUTEX_ERRORCHECK);
     pthread_mutex_init(&m, &attr);
     struct MutexContentionArgs a = {&m};
-    _spawn(MutexContentionWorker, &a, &t);
-    while (!a.ready) sched_yield();
+    pthread_create(&t, 0, MutexContentionWorker, &a);
+    while (!a.ready)
+      sched_yield();
     EZBENCH2("errorcheck 2x", donothing, BenchLockUnlock(&m));
     a.done = true;
-    _join(&t);
+    pthread_join(t, 0);
   }
 }

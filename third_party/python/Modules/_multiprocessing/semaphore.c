@@ -1,13 +1,12 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:4;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=4 sts=4 sw=4 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=4 sts=4 sw=4 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Python 3                                                                     │
 │ https://docs.python.org/3/license.html                                       │
 ╚─────────────────────────────────────────────────────────────────────────────*/
-#include "libc/sysv/consts/o.h"
 #include "libc/thread/semaphore.h"
+#include "libc/sysv/consts/o.h"
 #include "third_party/python/Modules/_multiprocessing/multiprocessing.h"
-/* clang-format off */
 
 /*
  * A type which wraps a semaphore
@@ -206,12 +205,8 @@ semlock_release(SemLockObject *self, PyObject *args)
 #  define SEM_FAILED ((sem_t *)-1)
 #endif
 
-#ifndef HAVE_SEM_UNLINK
-#  define sem_unlink(name) 0
-#endif
-
 #ifndef HAVE_SEM_TIMEDWAIT
-#  define sem_timedwait(sem,deadline) sem_timedwait_save(sem,deadline,_save)
+#  define sem_timedwait_(sem,deadline) sem_timedwait_save(sem,deadline,_save)
 
 static int
 sem_timedwait_save(sem_t *sem, struct timespec *deadline, PyThreadState *_save)

@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2022 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -18,47 +18,51 @@
 ╚─────────────────────────────────────────────────────────────────────────────*/
 #include "libc/assert.h"
 #include "libc/calls/calls.h"
+#include "libc/calls/syscall-sysv.internal.h"
 #include "libc/dce.h"
-#include "libc/errno.h"
 #include "libc/nexgen32e/msr.internal.h"
 #include "libc/nt/thread.h"
+#include "libc/sysv/consts/arch.h"
 #include "libc/thread/tls.h"
 
-int sys_set_tls();
+#define AMD64_SET_FSBASE 129
+#define AMD64_SET_GSBASE 131
 
-textstartup void __set_tls(struct CosmoTib *tib) {
+int sys_set_tls(uintptr_t, void *);
+
+// we can't allow --ftrace here because cosmo_dlopen() calls this
+// function to fix the tls register, and ftrace needs it unbroken
+dontinstrument textstartup void __set_tls(struct CosmoTib *tib) {
   tib = __adj_tls(tib);
 #ifdef __x86_64__
   // ask the operating system to change the x86 segment register
-  int ax, dx;
   if (IsWindows()) {
-    __tls_index = TlsAlloc();
-    _npassert(0 <= __tls_index && __tls_index < 64);
-    asm("mov\t%1,%%gs:%0" : "=m"(*((long *)0x1480 + __tls_index)) : "r"(tib));
-  } else if (IsFreebsd()) {
-    sys_set_tls(129 /*AMD64_SET_FSBASE*/, tib);
+    __set_tls_win32(tib);
   } else if (IsLinux()) {
-    sys_set_tls(ARCH_SET_FS, tib);
+    sys_set_tls(ARCH_SET_GS, tib);
+  } else if (IsFreebsd()) {
+    sys_set_tls(AMD64_SET_GSBASE, tib);
   } else if (IsNetbsd()) {
     // netbsd has sysarch(X86_SET_FSBASE) but we can't use that because
     // signal handlers will cause it to be reset due to not setting the
     // _mc_tlsbase field in struct mcontext_netbsd.
-    sys_set_tls(tib);
+    sys_set_tls((uintptr_t)tib, 0);
   } else if (IsOpenbsd()) {
-    sys_set_tls(tib);
+    sys_set_tls((uintptr_t)tib, 0);
   } else if (IsXnu()) {
     // thread_fast_set_cthread_self has a weird ABI
-    int e = errno;
-    sys_set_tls((intptr_t)tib - 0x30);
-    errno = e;
+    sys_set_tls((intptr_t)tib - 0x30, 0);
   } else {
     uint64_t val = (uint64_t)tib;
     asm volatile("wrmsr"
                  : /* no outputs */
-                 : "c"(MSR_IA32_FS_BASE), "a"((uint32_t)val),
+                 : "c"(MSR_IA32_GS_BASE), "a"((uint32_t)val),
                    "d"((uint32_t)(val >> 32)));
   }
+#elif defined(__aarch64__)
+  register long x28 asm("x28") = (long)tib;
+  asm volatile("" : "+r"(x28));
 #else
-  asm volatile("msr\ttpidr_el0,%0" : /* no outputs */ : "r"(tib));
+#error "unsupported architecture"
 #endif
 }

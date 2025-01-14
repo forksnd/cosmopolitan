@@ -4,12 +4,7 @@
 #include "libc/str/str.h"
 #include "third_party/gdtoa/gdtoa.h"
 
-asm(".ident\t\"\\n\\n\
-gdtoa (MIT License)\\n\
-The author of this software is David M. Gay\\n\
-Kudos go to Guy L. Steele, Jr. and Jon L. White\\n\
-Copyright (C) 1997, 1998, 2000 by Lucent Technologies\"");
-asm(".include \"libc/disclaimer.inc\"");
+__static_yoink("gdtoa_notice");
 
 #define IEEE_Arith          1
 #define IEEE_8087           1
@@ -205,7 +200,7 @@ typedef unsigned short UShort;
 
 #ifdef Bad_float_h
 
-#else /* ifndef Bad_float_h */
+#else  /* ifndef Bad_float_h */
 #endif /* Bad_float_h */
 
 #ifdef IEEE_Arith
@@ -348,12 +343,13 @@ typedef struct ThInfo {
 #define Bcopy(x, y) \
   memcpy(&x->sign, &y->sign, y->wds * sizeof(ULong) + 2 * sizeof(int))
 
-_Hide extern const double __gdtoa_tens[];
-_Hide extern const double __gdtoa_bigtens[];
-_Hide extern const double __gdtoa_tinytens[];
-_Hide extern const unsigned char __gdtoa_hexdig[];
-_Hide extern const char *const __gdtoa_InfName[6];
-_Hide extern const char *const __gdtoa_NanName[3];
+extern const double __gdtoa_tens[];
+extern const double __gdtoa_bigtens[];
+extern const double __gdtoa_tinytens[];
+extern const unsigned char __gdtoa_hexdig[];
+extern const char *const __gdtoa_InfName[6];
+extern const char *const __gdtoa_NanName[3];
+extern const ULong __gdtoa_NanDflt_Q[4];
 
 Bigint *__gdtoa_Balloc(int, ThInfo **);
 void __gdtoa_Bfree(Bigint *, ThInfo **);

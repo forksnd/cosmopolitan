@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2020 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -16,8 +16,8 @@
 │ TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR             │
 │ PERFORMANCE OF THIS SOFTWARE.                                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
-#include "libc/fmt/fmt.h"
-#include "libc/macros.internal.h"
+#include "libc/ctype.h"
+#include "libc/macros.h"
 #include "libc/sock/internal.h"
 #include "libc/sock/sock.h"
 #include "libc/sysv/consts/af.h"
@@ -46,7 +46,7 @@ static int inet_pton_inet6_impl(const char *src, uint8_t *dst) {
   unsigned digitsLeft = 32;
   bool zeroFound = false;
   uint16_t currentSet = 0;
-  while (c = *src++) {
+  while ((c = *src++)) {
     if (digitsLeft == 0) {
       return 0;
     }
@@ -57,7 +57,11 @@ static int inet_pton_inet6_impl(const char *src, uint8_t *dst) {
           if (zeroFound) {
             return 0;
           }
-          res = resTemp << (4 * digitsLeft);
+          if (digitsLeft == 32) {
+            res = 0;
+          } else {
+            res = resTemp << (4 * digitsLeft);
+          }
           resTemp = 0;
           digitsLeft -= 4;
           zeroFound = true;
@@ -156,8 +160,10 @@ static int inet_pton_inet6_impl(const char *src, uint8_t *dst) {
 int inet_pton(int af, const char *src, void *dst) {
   uint8_t *p;
   int b, c, j;
-  if (af == AF_INET6) return inet_pton_inet6_impl(src, dst);
-  if (af != AF_INET) return eafnosupport();
+  if (af == AF_INET6)
+    return inet_pton_inet6_impl(src, dst);
+  if (af != AF_INET)
+    return eafnosupport();
   j = 0;
   p = dst;
   p[0] = 0;
@@ -165,9 +171,11 @@ int inet_pton(int af, const char *src, void *dst) {
     if (isdigit(c)) {
       b = c - '0' + p[j] * 10;
       p[j] = MIN(255, b);
-      if (b > 255) return 0;
+      if (b > 255)
+        return 0;
     } else if (c == '.') {
-      if (++j == 4) return 0;
+      if (++j == 4)
+        return 0;
       p[j] = 0;
     } else {
       return 0;

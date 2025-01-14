@@ -34,15 +34,15 @@
  * SUCH DAMAGE.
  */
 #include "libc/calls/calls.h"
-#include "libc/dns/ent.h"
 #include "libc/errno.h"
 #include "libc/sock/sock.h"
 #include "libc/stdio/stdio.h"
 #include "libc/str/str.h"
 #include "libc/sysv/consts/af.h"
 #include "libc/sysv/consts/sock.h"
+#include "libc/sock/struct/sockaddr.h"
+#include "third_party/musl/netdb.h"
 #include "third_party/finger/finger.h"
-// clang-format off
 
 #ifndef lint
 /*static char sccsid[] = "from: @(#)net.c	5.5 (Berkeley) 6/1/90";*/

@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2021 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -17,7 +17,7 @@
 │ PERFORMANCE OF THIS SOFTWARE.                                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
 #include "libc/math.h"
-#include "libc/mem/gc.internal.h"
+#include "libc/mem/gc.h"
 #include "libc/testlib/ezbench.h"
 #include "libc/testlib/testlib.h"
 #include "libc/x/x.h"
@@ -31,7 +31,7 @@ TEST(sqrtl, test) {
   EXPECT_STREQ("NAN", gc(xdtoal(_sqrtl(NAN))));
   EXPECT_STREQ("0", gc(xdtoal(_sqrtl(0))));
   EXPECT_STREQ("INFINITY", gc(xdtoal(_sqrtl(INFINITY))));
-  EXPECT_STREQ("-NAN", gc(xdtoal(_sqrtl(-1))));
+  EXPECT_TRUE(isnan(_sqrtl(-1)));
 }
 
 TEST(sqrt, test) {
@@ -39,7 +39,7 @@ TEST(sqrt, test) {
   EXPECT_STREQ("NAN", gc(xdtoa(_sqrt(NAN))));
   EXPECT_STREQ("0", gc(xdtoa(_sqrt(0))));
   EXPECT_STREQ("INFINITY", gc(xdtoa(_sqrt(INFINITY))));
-  EXPECT_STREQ("-NAN", gc(xdtoa(_sqrt(-1))));
+  EXPECT_TRUE(isnan(_sqrt(-1)));
 }
 
 TEST(sqrtf, test) {
@@ -47,7 +47,7 @@ TEST(sqrtf, test) {
   EXPECT_STREQ("NAN", gc(xdtoaf(_sqrtf(NAN))));
   EXPECT_STREQ("0", gc(xdtoaf(_sqrtf(0))));
   EXPECT_STREQ("INFINITY", gc(xdtoaf(_sqrtf(INFINITY))));
-  EXPECT_STREQ("-NAN", gc(xdtoaf(_sqrtf(-1))));
+  EXPECT_TRUE(isnan(_sqrtf(-1)));
 }
 
 BENCH(_sqrt, bench) {

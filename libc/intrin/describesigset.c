@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2021 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -16,10 +16,11 @@
 │ TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR             │
 │ PERFORMANCE OF THIS SOFTWARE.                                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
+#include "libc/calls/calls.h"
 #include "libc/calls/struct/sigset.h"
 #include "libc/calls/struct/sigset.internal.h"
 #include "libc/dce.h"
-#include "libc/intrin/asan.internal.h"
+#include "libc/errno.h"
 #include "libc/intrin/kprintf.h"
 #include "libc/intrin/popcnt.h"
 #include "libc/str/str.h"
@@ -30,26 +31,29 @@
 
 #define append(...) o += ksnprintf(buf + o, N - o, __VA_ARGS__)
 
-const char *(DescribeSigset)(char buf[N], int rc, const sigset_t *ss) {
+const char *_DescribeSigset(char buf[N], int rc, const sigset_t *ss) {
+  int olderr;
   bool gotsome;
   const char *s;
   int sig, o = 0;
   sigset_t sigset;
 
-  if (rc == -1) return "n/a";
-  if (!ss) return "NULL";
-  if ((!IsAsan() && kisdangerous(ss)) ||
-      (IsAsan() && !__asan_is_valid(ss, sizeof(*ss)))) {
+  if (rc == -1)
+    return "n/a";
+  if (!ss)
+    return "NULL";
+  if (kisdangerous(ss)) {
     ksnprintf(buf, N, "%p", ss);
     return buf;
   }
+  olderr = errno;
 
   if (sigcountset(ss) > 16) {
     append("~");
     sigemptyset(&sigset);
     for (sig = 1; sig <= _NSIG; ++sig) {
       if (!sigismember(ss, sig)) {
-        sigset.__bits[(sig - 1) >> 6] |= 1ull << ((sig - 1) & 63);
+        sigaddset(&sigset, sig);
       }
     }
   } else {
@@ -74,5 +78,6 @@ const char *(DescribeSigset)(char buf[N], int rc, const sigset_t *ss) {
   }
   append("}");
 
+  errno = olderr;
   return buf;
 }

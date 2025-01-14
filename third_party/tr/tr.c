@@ -1,45 +1,49 @@
-/*	$OpenBSD: tr.c,v 1.21 2022/02/11 16:09:21 cheloha Exp $	*/
-/*	$NetBSD: tr.c,v 1.5 1995/08/31 22:13:48 jtc Exp $	*/
-/*
- * Copyright (c) 1988, 1993
- *	The Regents of the University of California.  All rights reserved.
- *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions
- * are met:
- * 1. Redistributions of source code must retain the above copyright
- *    notice, this list of conditions and the following disclaimer.
- * 2. Redistributions in binary form must reproduce the above copyright
- *    notice, this list of conditions and the following disclaimer in the
- *    documentation and/or other materials provided with the distribution.
- * 3. Neither the name of the University nor the names of its contributors
- *    may be used to endorse or promote products derived from this software
- *    without specific prior written permission.
- *
- * THIS SOFTWARE IS PROVIDED BY THE REGENTS AND CONTRIBUTORS ``AS IS'' AND
- * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
- * ARE DISCLAIMED.  IN NO EVENT SHALL THE REGENTS OR CONTRIBUTORS BE LIABLE
- * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
- * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
- * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
- * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
- * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
- * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
- * SUCH DAMAGE.
- */
+/*-*- mode:c;indent-tabs-mode:t;c-basic-offset:8;tab-width:8;coding:utf-8   -*-│
+│ vi: set noet ft=c ts=8 sw=8 fenc=utf-8                                   :vi │
+╚──────────────────────────────────────────────────────────────────────────────╝
+│                                                                              │
+│	$OpenBSD: tr.c,v 1.21 2022/02/11 16:09:21 cheloha Exp $	               │
+│	$NetBSD: tr.c,v 1.5 1995/08/31 22:13:48 jtc Exp $	               │
+│                                                                              │
+│ Copyright (c) 1988, 1993                                                     │
+│	The Regents of the University of California.  All rights reserved.     │
+│                                                                              │
+│ Redistribution and use in source and binary forms, with or without           │
+│ modification, are permitted provided that the following conditions           │
+│ are met:                                                                     │
+│ 1. Redistributions of source code must retain the above copyright            │
+│    notice, this list of conditions and the following disclaimer.             │
+│ 2. Redistributions in binary form must reproduce the above copyright         │
+│    notice, this list of conditions and the following disclaimer in the       │
+│    documentation and/or other materials provided with the distribution.      │
+│ 3. Neither the name of the University nor the names of its contributors      │
+│    may be used to endorse or promote products derived from this software     │
+│    without specific prior written permission.                                │
+│                                                                              │
+│ THIS SOFTWARE IS PROVIDED BY THE REGENTS AND CONTRIBUTORS ``AS IS'' AND      │
+│ ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE        │
+│ IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE   │
+│ ARE DISCLAIMED.  IN NO EVENT SHALL THE REGENTS OR CONTRIBUTORS BE LIABLE     │
+│ FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL   │
+│ DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS      │
+│ OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)        │
+│ HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT   │
+│ LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY    │
+│ OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF       │
+│ SUCH DAMAGE.                                                                 │
+│                                                                              │
+╚─────────────────────────────────────────────────────────────────────────────*/
 #include "libc/calls/calls.h"
 #include "libc/log/bsd.h"
 #include "libc/runtime/runtime.h"
 #include "libc/stdio/stdio.h"
 #include "libc/str/str.h"
-#include "third_party/getopt/getopt.h"
+#include "third_party/getopt/getopt.internal.h"
 #include "third_party/tr/cmd.h"
 #include "third_party/tr/extern.h"
-// clang-format off
 
-int delete[NCHARS], squeeze[NCHARS];
-int translate[NCHARS] = {
+static int delete[NCHARS], squeeze[NCHARS];
+static int translate[NCHARS] = {
 	0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,		/* ASCII */
 	0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f,
 	0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17,
@@ -74,8 +78,8 @@ int translate[NCHARS] = {
 	0xf8, 0xf9, 0xfa, 0xfb, 0xfc, 0xfd, 0xfe, 0xff,
 };
 
-STR s1 = { STRING1, NORMAL, 0, OOBCH, { 0, OOBCH }, NULL, NULL };
-STR s2 = { STRING2, NORMAL, 0, OOBCH, { 0, OOBCH }, NULL, NULL };
+static STR s1 = { STRING1, NORMAL, 0, OOBCH, { 0, OOBCH }, NULL, NULL };
+static STR s2 = { STRING2, NORMAL, 0, OOBCH, { 0, OOBCH }, NULL, NULL };
 
 static void setup(int *, char *, STR *, int);
 static void usage(void);
@@ -85,9 +89,6 @@ _tr(int argc, char *argv[])
 {
 	int ch, cnt, lastch, *p;
 	int cflag, dflag, sflag;
-
-	if (pledge("stdio", NULL) == -1)
-		err(1, "pledge");
 
 	cflag = dflag = sflag = 0;
 	while ((ch = getopt(argc, argv, "Ccds")) != -1)

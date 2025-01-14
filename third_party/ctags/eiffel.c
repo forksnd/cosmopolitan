@@ -1,4 +1,3 @@
-// clang-format off
 /*
 *   $Id: eiffel.c 748 2009-11-06 02:44:42Z dhiebert $
 *
@@ -15,16 +14,15 @@
 *   INCLUDE FILES
 */
 #include "libc/fmt/conv.h"
+#include "libc/ctype.h"
 #include "third_party/ctags/general.h"  /* must always come first */
 
 #ifdef TYPE_REFERENCE_TOOL
 #include "libc/calls/calls.h"
-#include "libc/calls/dprintf.h"
+#include "libc/stdio/dprintf.h"
 #include "libc/calls/weirdtypes.h"
-#include "libc/fmt/fmt.h"
-#include "libc/mem/fmt.h"
 #include "libc/stdio/stdio.h"
-#include "libc/stdio/temp.h"
+#include "libc/temp.h"
 #include "third_party/musl/tempnam.h"
 #endif
 #include "libc/mem/alg.h"

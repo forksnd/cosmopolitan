@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2020 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -22,13 +22,12 @@
 #include "libc/calls/syscall-sysv.internal.h"
 #include "libc/dce.h"
 #include "libc/errno.h"
-#include "libc/intrin/asan.internal.h"
-#include "libc/intrin/describeflags.internal.h"
-#include "libc/intrin/strace.internal.h"
+#include "libc/intrin/describeflags.h"
+#include "libc/intrin/strace.h"
 #include "libc/intrin/weaken.h"
+#include "libc/runtime/zipos.internal.h"
 #include "libc/sysv/consts/s.h"
 #include "libc/sysv/errfuns.h"
-#include "libc/zipos/zipos.internal.h"
 
 /**
  * Deletes inode and maybe the file too.
@@ -40,15 +39,13 @@
  * @param path is the thing to delete
  * @param flags can have AT_REMOVEDIR
  * @return 0 on success, or -1 w/ errno
+ * @raise EROFS if either path is under /zip/...
  */
 int unlinkat(int dirfd, const char *path, int flags) {
   int rc;
 
-  if (IsAsan() && !__asan_is_valid_str(path)) {
-    rc = efault();
-  } else if (_weaken(__zipos_notat) &&
-             (rc = __zipos_notat(dirfd, path)) == -1) {
-    STRACE("zipos unlinkat not supported yet");
+  if (_weaken(__zipos_notat) && (rc = __zipos_notat(dirfd, path)) == -1) {
+    rc = erofs();
   } else if (!IsWindows()) {
     rc = sys_unlinkat(dirfd, path, flags);
   } else {
@@ -57,12 +54,13 @@ int unlinkat(int dirfd, const char *path, int flags) {
 
   // POSIX.1 says unlink(directory) raises EPERM but on Linux
   // it always raises EISDIR, which is so much less ambiguous
-  if (!IsLinux() && rc == -1 && !flags && errno == EPERM) {
+  int e = errno;
+  if (!IsLinux() && rc == -1 && !flags && (e == EPERM || e == EACCES)) {
     struct stat st;
     if (!fstatat(dirfd, path, &st, 0) && S_ISDIR(st.st_mode)) {
       errno = EISDIR;
     } else {
-      errno = EPERM;
+      errno = e;
     }
   }
 

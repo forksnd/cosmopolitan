@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:t;c-basic-offset:8;tab-width:8;coding:utf-8   -*-│
-│vi: set et ft=c ts=8 tw=8 fenc=utf-8                                       :vi│
+│ vi: set noet ft=c ts=8 sw=8 fenc=utf-8                                   :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2016 Google Inc.                                                   │
 │                                                                              │
@@ -18,7 +18,6 @@
 #include "libc/mem/mem.h"
 #include "libc/str/str.h"
 #include "third_party/nsync/array.internal.h"
-// clang-format off
 
 void a_ensure_ (void *v, int delta, int sz) {
 	typedef A_TYPE (void *) a_void_ptr;
@@ -39,7 +38,7 @@ void a_ensure_ (void *v, int delta, int sz) {
 		} else {
 			na = realloc (a->a_, nmax*sz);
 		}
-		memset (omax *sz + (char *)na, 0, (nmax - omax) * sz);
+		bzero (omax *sz + (char *)na, (nmax - omax) * sz);
 		a->a_ = (void **) na;
 		a->h_.max_ = nmax;
 	}

@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2020 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -16,15 +16,15 @@
 │ TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR             │
 │ PERFORMANCE OF THIS SOFTWARE.                                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
-#include "libc/assert.h"
-#include "libc/calls/calls.h"
-#include "libc/limits.h"
-#include "libc/str/str.h"
+#include "libc/ctype.h"
 
 /**
  * Returns true if c is hexadecimal digit.
  */
 int isxdigit(int c) {
-  return ('0' <= c && c <= '9') || ('A' <= c && c <= 'F') ||
+  return ('0' <= c && c <= '9') ||  //
+         ('A' <= c && c <= 'F') ||  //
          ('a' <= c && c <= 'f');
 }
+
+__weak_reference(isxdigit, isxdigit_l);

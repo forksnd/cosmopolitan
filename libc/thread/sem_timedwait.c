@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2022 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -17,26 +17,33 @@
 │ PERFORMANCE OF THIS SOFTWARE.                                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
 #include "libc/assert.h"
+#include "libc/calls/calls.h"
 #include "libc/calls/cp.internal.h"
 #include "libc/calls/struct/timespec.h"
 #include "libc/calls/struct/timespec.internal.h"
+#include "libc/calls/syscall-sysv.internal.h"
+#include "libc/cosmo.h"
+#include "libc/dce.h"
 #include "libc/errno.h"
 #include "libc/intrin/atomic.h"
+#include "libc/intrin/weaken.h"
 #include "libc/limits.h"
+#include "libc/runtime/syslib.internal.h"
+#include "libc/sysv/consts/clock.h"
 #include "libc/sysv/errfuns.h"
 #include "libc/thread/semaphore.h"
 #include "libc/thread/thread.h"
-#include "third_party/nsync/futex.internal.h"
 
 static void sem_delay(int n) {
   volatile int i;
-  for (i = 0; i != 1 << n; i++) donothing;
+  for (i = 0; i != 1 << n; i++)
+    donothing;
 }
 
 static void sem_timedwait_cleanup(void *arg) {
   sem_t *sem = arg;
-  _unassert(atomic_fetch_add_explicit(&sem->sem_waiters, -1,
-                                      memory_order_acq_rel) > 0);
+  unassert(atomic_fetch_add_explicit(&sem->sem_waiters, -1,
+                                     memory_order_acq_rel) > 0);
 }
 
 /**
@@ -49,53 +56,91 @@ static void sem_timedwait_cleanup(void *arg) {
  * @raise EDEADLK if deadlock was detected
  * @raise ETIMEDOUT if deadline expired
  * @raise EINVAL if `sem` is invalid
- * @cancellationpoint
+ * @cancelationpoint
  */
 int sem_timedwait(sem_t *sem, const struct timespec *abstime) {
-  int e, i, v, rc;
-  struct timespec ts;
+  int v, rc, e = errno;
 
-  e = errno;
-  for (i = 0; i < 7; ++i) {
-    rc = sem_trywait(sem);
-    if (!rc) {
-      return rc;
-    } else if (errno == EAGAIN) {
-      errno = e;
-      sem_delay(i);
-    } else {
+#if 0
+  if (IsXnuSilicon() && sem->sem_magic == SEM_MAGIC_KERNEL) {
+    if (!abstime) {
+      if (_weaken(pthread_testcancel_np) &&  //
+          _weaken(pthread_testcancel_np)()) {
+        return ecanceled();
+      }
+      rc = _sysret(__syslib->__sem_wait(sem->sem_kernel));
+      if (rc == -1 && errno == EINTR &&      //
+          _weaken(pthread_testcancel_np) &&  //
+          _weaken(pthread_testcancel_np)()) {
+        return ecanceled();
+      }
       return rc;
     }
+    for (;;) {
+      if (_weaken(pthread_testcancel_np) &&  //
+          _weaken(pthread_testcancel_np)()) {
+        return ecanceled();
+      }
+      rc = _sysret(__syslib->__sem_trywait(sem->sem_kernel));
+      if (!rc)
+        return 0;
+      if (errno == EINTR &&                  //
+          _weaken(pthread_testcancel_np) &&  //
+          _weaken(pthread_testcancel_np)()) {
+        return ecanceled();
+      }
+      if (errno != EAGAIN)
+        return -1;
+      errno = e;
+      struct timespec now = timespec_real();
+      if (timespec_cmp(*abstime, now) >= 0) {
+        return etimedout();
+      }
+      if (usleep(10 * 1000) == -1) {
+        return -1;
+      }
+    }
+  }
+#endif
+
+  rc = sem_trywait(sem);
+  if (!rc) {
+    return rc;
+  } else if (errno == EAGAIN) {
+    errno = e;
+  } else {
+    return rc;
   }
 
-  BEGIN_CANCELLATION_POINT;
-  _unassert(atomic_fetch_add_explicit(&sem->sem_waiters, +1,
-                                      memory_order_acq_rel) >= 0);
+  BEGIN_CANCELATION_POINT;
+  unassert(atomic_fetch_add_explicit(&sem->sem_waiters, +1,
+                                     memory_order_acq_rel) >= 0);
   pthread_cleanup_push(sem_timedwait_cleanup, sem);
 
   do {
     if (!(v = atomic_load_explicit(&sem->sem_value, memory_order_relaxed))) {
-      rc = nsync_futex_wait_(&sem->sem_value, v, true, abstime);
+      rc = cosmo_futex_wait(&sem->sem_value, v, sem->sem_pshared,
+                            CLOCK_REALTIME, abstime);
       if (rc == -EINTR || rc == -ECANCELED) {
         errno = -rc;
         rc = -1;
       } else if (rc == -EAGAIN || rc == -EWOULDBLOCK) {
         rc = 0;
       } else if (rc == -ETIMEDOUT) {
-        _npassert(abstime);
+        npassert(abstime);
         if (timespec_cmp(*abstime, timespec_real()) <= 0) {
           rc = etimedout();
         } else {
           rc = 0;
         }
       } else {
-        _npassert(!rc);
+        npassert(!rc);
         rc = 0;
       }
     } else if (v > 0) {
       rc = 0;
     } else {
-      _unassert(v > INT_MIN);
+      unassert(v > INT_MIN);
       rc = einval();
     }
   } while (!rc && (!v || !atomic_compare_exchange_weak_explicit(
@@ -103,7 +148,7 @@ int sem_timedwait(sem_t *sem, const struct timespec *abstime) {
                              memory_order_relaxed)));
 
   pthread_cleanup_pop(1);
-  END_CANCELLATION_POINT;
+  END_CANCELATION_POINT;
 
   return rc;
 }

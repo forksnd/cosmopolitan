@@ -1,12 +1,13 @@
 #include "libc/nt/codegen.h"
-.imp	kernel32,__imp_GetFileInformationByHandleEx,GetFileInformationByHandleEx,0
+.imp	kernel32,__imp_GetFileInformationByHandleEx,GetFileInformationByHandleEx
 
 	.text.windows
+	.ftrace1
 GetFileInformationByHandleEx:
+	.ftrace2
 #ifdef __x86_64__
 	push	%rbp
 	mov	%rsp,%rbp
-	.profilable
 	mov	__imp_GetFileInformationByHandleEx(%rip),%rax
 	jmp	__sysv2nt
 #elif defined(__aarch64__)

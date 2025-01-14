@@ -1,4 +1,3 @@
-/* clang-format off */
 /*
  *  Copyright The Mbed TLS Contributors
  *  SPDX-License-Identifier: Apache-2.0
@@ -501,6 +500,8 @@ void test_aes_check_params( )
     size_t size;
     const int valid_mode = MBEDTLS_AES_ENCRYPT;
     const int invalid_mode = 42;
+    
+    (void)size;
 
     TEST_INVALID_PARAM( mbedtls_aes_init( NULL ) );
 #if defined(MBEDTLS_CIPHER_MODE_XTS)

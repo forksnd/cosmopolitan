@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:4;tab-width:4;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright The Mbed TLS Contributors                                          │
 │                                                                              │
@@ -15,9 +15,9 @@
 │ See the License for the specific language governing permissions and          │
 │ limitations under the License.                                               │
 ╚─────────────────────────────────────────────────────────────────────────────*/
-#include "libc/intrin/asan.internal.h"
+#include "third_party/mbedtls/sha512.h"
 #include "libc/literal.h"
-#include "libc/macros.internal.h"
+#include "libc/macros.h"
 #include "libc/nexgen32e/nexgen32e.h"
 #include "libc/nexgen32e/x86feature.h"
 #include "libc/str/str.h"
@@ -27,14 +27,7 @@
 #include "third_party/mbedtls/error.h"
 #include "third_party/mbedtls/md.h"
 #include "third_party/mbedtls/platform.h"
-#include "third_party/mbedtls/sha512.h"
-
-asm(".ident\t\"\\n\\n\
-Mbed TLS (Apache 2.0)\\n\
-Copyright ARM Limited\\n\
-Copyright Mbed TLS Contributors\"");
-asm(".include \"libc/disclaimer.inc\"");
-/* clang-format off */
+__static_yoink("mbedtls_notice");
 
 /**
  * @fileoverview FIPS-180-2 compliant SHA-384/512 implementation
@@ -173,8 +166,6 @@ int mbedtls_internal_sha512_process( mbedtls_sha512_context *ctx,
 
     if( !IsTiny() && X86_HAVE(AVX2) )
     {
-        if (IsAsan())
-            __asan_verify(data, 128);
         sha512_transform_rorx(ctx, data, 1);
         return 0;
     }
@@ -285,7 +276,6 @@ int mbedtls_sha512_update_ret( mbedtls_sha512_context *ctx,
         left = 0;
     }
     if (!IsTiny() && ilen >= 128 && X86_HAVE(AVX2)) {
-        if (IsAsan()) __asan_verify(input, ilen / 128 * 128);
         sha512_transform_rorx(ctx, input, ilen / 128);
         input += ROUNDDOWN(ilen, 128);
         ilen  -= ROUNDDOWN(ilen, 128);
@@ -419,12 +409,12 @@ cleanup:
     return( ret );
 }
 
-noinstrument int mbedtls_sha512_ret_384( const void *input, size_t ilen, unsigned char *output )
+dontinstrument int mbedtls_sha512_ret_384( const void *input, size_t ilen, unsigned char *output )
 {
     return mbedtls_sha512_ret( input, ilen, output, true );
 }
 
-noinstrument int mbedtls_sha512_ret_512( const void *input, size_t ilen, unsigned char *output )
+dontinstrument int mbedtls_sha512_ret_512( const void *input, size_t ilen, unsigned char *output )
 {
     return mbedtls_sha512_ret( input, ilen, output, false );
 }

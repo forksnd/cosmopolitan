@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2022 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -18,49 +18,25 @@
 ╚─────────────────────────────────────────────────────────────────────────────*/
 #include "libc/assert.h"
 #include "libc/atomic.h"
+#include "libc/calls/calls.h"
+#include "libc/cosmo.h"
+#include "libc/cxxabi.h"
 #include "libc/dce.h"
 #include "libc/intrin/atomic.h"
-#include "libc/intrin/kprintf.h"
-#include "libc/intrin/strace.internal.h"
+#include "libc/intrin/cxaatexit.h"
+#include "libc/intrin/describebacktrace.h"
+#include "libc/intrin/strace.h"
 #include "libc/intrin/weaken.h"
 #include "libc/limits.h"
 #include "libc/mem/gc.h"
+#include "libc/mem/mem.h"
+#include "libc/runtime/internal.h"
 #include "libc/runtime/runtime.h"
+#include "libc/str/str.h"
 #include "libc/thread/posixthread.internal.h"
 #include "libc/thread/thread.h"
 #include "libc/thread/tls.h"
-#include "third_party/nsync/dll.h"
-#include "third_party/nsync/futex.internal.h"
-
-static void CleanupThread(struct PosixThread *pt) {
-  struct _pthread_cleanup_buffer *cb;
-  while ((cb = pt->cleanup)) {
-    pt->cleanup = cb->__prev;
-    cb->__routine(cb->__arg);
-  }
-}
-
-static void DestroyTlsKeys(struct CosmoTib *tib) {
-  int i, j, gotsome;
-  void *val, **keys;
-  pthread_key_dtor dtor;
-  keys = tib->tib_keys;
-  for (j = 0; j < PTHREAD_DESTRUCTOR_ITERATIONS; ++j) {
-    for (gotsome = i = 0; i < PTHREAD_KEYS_MAX; ++i) {
-      if ((val = keys[i]) &&
-          (dtor = atomic_load_explicit(_pthread_key_dtor + i,
-                                       memory_order_relaxed)) &&
-          dtor != (pthread_key_dtor)-1) {
-        gotsome = 1;
-        keys[i] = 0;
-        dtor(val);
-      }
-    }
-    if (!gotsome) {
-      break;
-    }
-  }
-}
+#include "third_party/nsync/wait_s.internal.h"
 
 /**
  * Terminates current POSIX thread.
@@ -79,8 +55,8 @@ static void DestroyTlsKeys(struct CosmoTib *tib) {
  * the callback function that was supplied to pthread_create(). This may
  * be used if the thread wishes to exit at any other point in the thread
  * lifecycle, in which case this function is responsible for ensuring we
- * invoke _gc(), _defer(), and pthread_cleanup_push() callbacks, as well
- * as pthread_key_create() destructors.
+ * invoke gc(), _defer(), and pthread_cleanup_push() callbacks, and also
+ * pthread_key_create() destructors.
  *
  * If the current thread is an orphaned thread, or is the main thread
  * when no other threads were created, then this will terminated your
@@ -92,63 +68,97 @@ static void DestroyTlsKeys(struct CosmoTib *tib) {
  * destructors is also undefined.
  *
  * @param rc is reported later to pthread_join()
- * @threadsafe
  * @noreturn
  */
 wontreturn void pthread_exit(void *rc) {
+  unsigned population;
   struct CosmoTib *tib;
   struct PosixThread *pt;
   enum PosixThreadStatus status, transition;
 
   STRACE("pthread_exit(%p)", rc);
 
+  // get posix thread object
   tib = __get_tls();
   pt = (struct PosixThread *)tib->tib_pthread;
-  _unassert(~pt->flags & PT_EXITING);
-  pt->flags |= PT_EXITING;
-  pt->rc = rc;
+
+  // "The behavior of pthread_exit() is undefined if called from a
+  //  cancellation cleanup handler or destructor function that was
+  //  invoked as a result of either an implicit or explicit call to
+  //  pthread_exit()." ──Quoth POSIX.1-2017
+  unassert(!(pt->pt_flags & PT_EXITING));
+
+  // set state
+  pt->pt_flags |= PT_NOCANCEL | PT_EXITING;
+  pt->pt_val = rc;
 
   // free resources
-  CleanupThread(pt);
-  DestroyTlsKeys(tib);
-  _pthread_ungarbage();
-  pthread_decimate_np();
+  __cxa_thread_finalize();
+
+  // run atexit handlers if orphaned thread
+  // notice how we avoid acquiring the pthread gil
+  if (!(population = atomic_fetch_sub(&_pthread_count, 1) - 1)) {
+    // we know for certain we're an orphan. any other threads that
+    // exist, will terminate and clear their tid very soon. but some
+    // goofball could spawn more threads from atexit() handlers. we'd
+    // also like to avoid looping forever here, by auto-joining threads
+    // that leaked, because the user forgot to join them or detach them
+    for (;;) {
+      if (_weaken(__cxa_finalize))
+        _weaken(__cxa_finalize)(NULL);
+      _pthread_decimate(kPosixThreadTerminated);
+      if (pthread_orphan_np()) {
+        population = atomic_load(&_pthread_count);
+        break;
+      }
+    }
+  }
 
   // transition the thread to a terminated state
-  status = atomic_load_explicit(&pt->status, memory_order_acquire);
+  status = atomic_load_explicit(&pt->pt_status, memory_order_acquire);
   do {
-    switch (status) {
-      case kPosixThreadJoinable:
-        transition = kPosixThreadTerminated;
-        break;
-      case kPosixThreadDetached:
-        transition = kPosixThreadZombie;
-        break;
-      default:
-        unreachable;
+    if (status == kPosixThreadZombie) {
+      transition = kPosixThreadZombie;
+      break;
+    } else if (status == kPosixThreadTerminated) {
+      transition = kPosixThreadTerminated;
+      break;
+    } else if (status == kPosixThreadJoinable) {
+      transition = kPosixThreadTerminated;
+    } else if (status == kPosixThreadDetached) {
+      transition = kPosixThreadZombie;
+    } else {
+      __builtin_trap();
     }
   } while (!atomic_compare_exchange_weak_explicit(
-      &pt->status, &status, transition, memory_order_release,
+      &pt->pt_status, &status, transition, memory_order_release,
       memory_order_relaxed));
 
   // make this thread a zombie if it was detached
-  if (transition == kPosixThreadZombie) {
+  if (transition == kPosixThreadZombie)
     _pthread_zombify(pt);
-  }
 
-  // check if this is the main thread or an orphaned thread
-  if (pthread_orphan_np()) {
-    exit(0);
+  // "The process shall exit with an exit status of 0 after the last
+  //  thread has been terminated. The behavior shall be as if the
+  //  implementation called exit() with a zero argument at thread
+  //  termination time." ──Quoth POSIX.1-2017
+  if (!population) {
+    for (int i = __fini_array_end - __fini_array_start; i--;)
+      ((void (*)(void))__fini_array_start[i])();
+    _Exit(0);
   }
 
   // check if the main thread has died whilst children live
   // note that the main thread is joinable by child threads
-  if (pt->flags & PT_STATIC) {
-    atomic_store_explicit(&tib->tib_tid, 0, memory_order_release);
-    nsync_futex_wake_(&tib->tib_tid, INT_MAX, !IsWindows());
+  if (pt->pt_flags & PT_STATIC) {
+    atomic_store_explicit(&tib->tib_ctid, 0, memory_order_release);
+    cosmo_futex_wake((atomic_int *)&tib->tib_ctid, INT_MAX,
+                     !IsWindows() && !IsXnu());
     _Exit1(0);
   }
 
   // this is a child thread
-  longjmp(pt->exiter, 1);
+  __builtin_longjmp(pt->pt_exiter, 1);
 }
+
+__weak_reference(pthread_exit, thr_exit);

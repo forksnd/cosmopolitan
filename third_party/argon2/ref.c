@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:4;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=4 sts=4 sw=4 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=4 sts=4 sw=4 fenc=utf-8                               :vi │
 ╚──────────────────────────────────────────────────────────────────────────────╝
 │                                                                              │
 │ Argon2 reference source code package - reference C implementations           │
@@ -21,12 +21,6 @@
 #include "third_party/argon2/blake2.h"
 #include "third_party/argon2/blamka-round-ref.h"
 #include "third_party/argon2/core.h"
-
-asm(".ident\t\"\\n\\n\
-argon2 (CC0 or Apache2)\\n\
-Copyright 2016 Daniel Dinu, Dmitry Khovratovich\\n\
-Copyright 2016 Jean-Philippe Aumasson, Samuel Neves\"");
-/* clang-format off */
 
 /*
  * Argon2 reference source code package - reference C implementations

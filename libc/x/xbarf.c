@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2020 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -21,6 +21,7 @@
 #include "libc/str/str.h"
 #include "libc/sysv/consts/madv.h"
 #include "libc/sysv/consts/o.h"
+#include "libc/x/x.h"
 
 /**
  * Writes data to file.
@@ -30,13 +31,14 @@
  * @note this is uninterruptible
  */
 int xbarf(const char *path, const void *data, size_t size) {
-  char *p;
   ssize_t rc;
   int fd, res;
+  const char *p;
   size_t i, wrote;
   res = 0;
   p = data;
-  if (size == -1) size = data ? strlen(data) : 0;
+  if (size == -1)
+    size = data ? strlen(data) : 0;
   if ((fd = open(path, O_WRONLY | O_CREAT | O_TRUNC, 0644)) != -1) {
     if (ftruncate(fd, size) != -1) {
       if (size > 2 * 1024 * 1024) {

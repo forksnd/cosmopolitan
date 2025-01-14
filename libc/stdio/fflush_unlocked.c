@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=8 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=8 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2020 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -18,126 +18,44 @@
 ╚─────────────────────────────────────────────────────────────────────────────*/
 #include "libc/calls/calls.h"
 #include "libc/errno.h"
-#include "libc/intrin/bits.h"
-#include "libc/intrin/pushpop.h"
-#include "libc/macros.internal.h"
-#include "libc/mem/arraylist.internal.h"
+#include "libc/intrin/weaken.h"
 #include "libc/mem/mem.h"
-#include "libc/runtime/runtime.h"
-#include "libc/stdio/fflush.internal.h"
 #include "libc/stdio/internal.h"
-#include "libc/stdio/stdio.h"
 #include "libc/sysv/consts/o.h"
-#include "libc/thread/thread.h"
-
-void(__fflush_lock)(void) {
-  pthread_mutex_lock(&__fflush_lock_obj);
-}
-
-void(__fflush_unlock)(void) {
-  pthread_mutex_unlock(&__fflush_lock_obj);
-}
-
-static void __stdio_fork_prepare(void) {
-  FILE *f;
-  __fflush_lock();
-  for (int i = 0; i < __fflush.handles.i; ++i) {
-    if ((f = __fflush.handles.p[i])) {
-      pthread_mutex_lock((pthread_mutex_t *)f->lock);
-    }
-  }
-}
-
-static void __stdio_fork_parent(void) {
-  FILE *f;
-  for (int i = __fflush.handles.i; i--;) {
-    if ((f = __fflush.handles.p[i])) {
-      pthread_mutex_unlock((pthread_mutex_t *)f->lock);
-    }
-  }
-  __fflush_unlock();
-}
-
-static void __stdio_fork_child(void) {
-  FILE *f;
-  pthread_mutex_t *m;
-  for (int i = __fflush.handles.i; i--;) {
-    if ((f = __fflush.handles.p[i])) {
-      m = (pthread_mutex_t *)f->lock;
-      bzero(m, sizeof(*m));
-      m->_type = PTHREAD_MUTEX_RECURSIVE;
-    }
-  }
-  pthread_mutex_init(&__fflush_lock_obj, 0);
-}
-
-__attribute__((__constructor__)) static void __stdio_init(void) {
-  pthread_atfork(__stdio_fork_prepare, __stdio_fork_parent, __stdio_fork_child);
-}
 
 /**
  * Blocks until data from stream buffer is written out.
  *
- * @param f is the stream handle, or 0 for all streams
- * @return is 0 on success or -1 on error
+ * @param f is the stream handle, which must not be null
+ * @return is 0 on success or EOF on error
  */
 int fflush_unlocked(FILE *f) {
-  int rc = 0;
   size_t i;
-  if (!f) {
-    __fflush_lock();
-    for (i = __fflush.handles.i; i; --i) {
-      if ((f = __fflush.handles.p[i - 1])) {
-        if (fflush(f) == -1) {
-          rc = -1;
+  if (f->getln) {
+    if (_weaken(free))
+      _weaken(free)(f->getln);
+    f->getln = 0;
+  }
+  if (f->fd != -1) {
+    if (f->beg && !f->end && (f->oflags & O_ACCMODE) != O_RDONLY) {
+      ssize_t rc;
+      for (i = 0; i < f->beg; i += rc) {
+        if ((rc = write(f->fd, f->buf + i, f->beg - i)) == -1) {
+          f->state = errno;
+          return EOF;
         }
       }
+      f->beg = 0;
     }
-    __fflush_unlock();
-  } else if (f->fd != -1) {
-    if (__fflush_impl(f) == -1) {
-      rc = -1;
+    if (f->beg < f->end && (f->oflags & O_ACCMODE) != O_WRONLY) {
+      if (lseek(f->fd, -(int)(f->end - f->beg), SEEK_CUR) == -1) {
+        f->state = errno;
+        return EOF;
+      }
+      f->end = f->beg;
     }
-  } else if (f->beg && f->beg < f->size) {
+  }
+  if (f->buf && f->beg && f->beg < f->size)
     f->buf[f->beg] = 0;
-  }
-  return rc;
-}
-
-textstartup int __fflush_register(FILE *f) {
-  int rc;
-  size_t i;
-  struct StdioFlush *sf;
-  __fflush_lock();
-  sf = &__fflush;
-  if (!sf->handles.p) {
-    sf->handles.p = sf->handles_initmem;
-    pushmov(&sf->handles.n, ARRAYLEN(sf->handles_initmem));
-    __cxa_atexit(fflush_unlocked, 0, 0);
-  }
-  for (i = sf->handles.i; i; --i) {
-    if (!sf->handles.p[i - 1]) {
-      sf->handles.p[i - 1] = f;
-      __fflush_unlock();
-      return 0;
-    }
-  }
-  rc = append(&sf->handles, &f);
-  __fflush_unlock();
-  return rc;
-}
-
-void __fflush_unregister(FILE *f) {
-  size_t i;
-  struct StdioFlush *sf;
-  __fflush_lock();
-  sf = &__fflush;
-  sf = pushpop(sf);
-  for (i = sf->handles.i; i; --i) {
-    if (sf->handles.p[i - 1] == f) {
-      pushmov(&sf->handles.p[i - 1], 0);
-      break;
-    }
-  }
-  __fflush_unlock();
+  return 0;
 }

@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2022 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -20,8 +20,10 @@
 #include "tool/plinko/lib/plinko.h"
 
 int Evlis(int x, int a, dword p1, dword p2) {
-  if (!x) return x;
-  if (x > 0) return FasterRecurse(x, a, p1, p2);
+  if (!x)
+    return x;
+  if (x > 0)
+    return FasterRecurse(x, a, p1, p2);
   int y = FasterRecurse(Car(x), a, p1, p2);
   return Cons(y, Evlis(Cdr(x), a, p1, p2));
 }

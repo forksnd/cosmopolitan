@@ -1,3 +1,4 @@
+#ifdef _COSMO_SOURCE
 #ifndef COSMOPOLITAN_LIBC_DCE_H_
 #define COSMOPOLITAN_LIBC_DCE_H_
 /*─────────────────────────────────────────────────────────────────────────────╗
@@ -12,7 +13,7 @@
  */
 #define SUPPORT_VECTOR 255
 #else
-#define SUPPORT_VECTOR _HOSTLINUX
+#define SUPPORT_VECTOR (_HOSTLINUX | _HOSTXNU | _HOSTFREEBSD)
 #endif
 #endif
 
@@ -36,12 +37,6 @@
 #define IsModeDbg() 0
 #endif
 
-#ifdef __MFENTRY__
-#define HaveFentry() 1
-#else
-#define HaveFentry() 0
-#endif
-
 #ifdef TRUSTWORTHY
 #define IsTrustworthy() 1
 #else
@@ -60,16 +55,24 @@
 #define IsOptimized() 0
 #endif
 
-#ifdef __SANITIZE_ADDRESS__
-#define IsAsan() 1
+#ifdef __aarch64__
+#define IsAarch64()    1
+#define IsXnuSilicon() IsXnu()
 #else
-#define IsAsan() 0
+#define IsAarch64()    0
+#define IsXnuSilicon() 0
 #endif
 
-#if defined(__PIE__) || defined(__PIC__)
-#define IsPositionIndependent() 1
-#else
-#define IsPositionIndependent() 0
+#if defined(__x86_64__)
+#define _ARCH_NAME "amd64"
+#elif defined(__aarch64__)
+#define _ARCH_NAME "arm64"
+#elif defined(__powerpc64__)
+#define _ARCH_NAME "ppc64"
+#elif defined(__s390x__)
+#define _ARCH_NAME "s390x"
+#elif defined(__riscv)
+#define _ARCH_NAME "riscv"
 #endif
 
 #define SupportsLinux()   ((SUPPORT_VECTOR & _HOSTLINUX) == _HOSTLINUX)
@@ -110,14 +113,11 @@
 #if !(__ASSEMBLER__ + __LINKER__ + 0)
 COSMOPOLITAN_C_START_
 
-#ifdef __x86_64__
 extern const int __hostos;
-bool IsWsl1(void);
-#else
-#define __hostos _HOSTLINUX
-#define IsWsl1() false
-#endif
+
+int IsQemuUser(void);
 
 COSMOPOLITAN_C_END_
 #endif /* !(__ASSEMBLER__ + __LINKER__ + 0) */
 #endif /* COSMOPOLITAN_LIBC_DCE_H_ */
+#endif /* _COSMO_SOURCE */

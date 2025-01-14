@@ -1,12 +1,13 @@
 #include "libc/nt/codegen.h"
-.imp	user32,__imp_InvalidateRect,InvalidateRect,2048
+.imp	user32,__imp_InvalidateRect,InvalidateRect
 
 	.text.windows
+	.ftrace1
 InvalidateRect:
+	.ftrace2
 #ifdef __x86_64__
 	push	%rbp
 	mov	%rsp,%rbp
-	.profilable
 	mov	__imp_InvalidateRect(%rip),%rax
 	jmp	__sysv2nt
 #elif defined(__aarch64__)

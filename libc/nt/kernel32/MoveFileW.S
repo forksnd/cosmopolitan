@@ -1,12 +1,13 @@
 #include "libc/nt/codegen.h"
-.imp	kernel32,__imp_MoveFileW,MoveFileW,1000
+.imp	kernel32,__imp_MoveFileW,MoveFileW
 
 	.text.windows
+	.ftrace1
 MoveFile:
+	.ftrace2
 #ifdef __x86_64__
 	push	%rbp
 	mov	%rsp,%rbp
-	.profilable
 	mov	__imp_MoveFileW(%rip),%rax
 	jmp	__sysv2nt
 #elif defined(__aarch64__)

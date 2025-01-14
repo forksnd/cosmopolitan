@@ -1,12 +1,13 @@
 #include "libc/nt/codegen.h"
-.imp	kernel32,__imp_SetConsoleScreenBufferInfoEx,SetConsoleScreenBufferInfoEx,0
+.imp	kernel32,__imp_SetConsoleScreenBufferInfoEx,SetConsoleScreenBufferInfoEx
 
 	.text.windows
+	.ftrace1
 SetConsoleScreenBufferInfoEx:
+	.ftrace2
 #ifdef __x86_64__
 	push	%rbp
 	mov	%rsp,%rbp
-	.profilable
 	mov	__imp_SetConsoleScreenBufferInfoEx(%rip),%rax
 	jmp	__sysv2nt
 #elif defined(__aarch64__)

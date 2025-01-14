@@ -1,4 +1,3 @@
-// clang-format off
 /*
 *   $Id: general.h 508 2007-05-03 03:20:59Z dhiebert $
 *
@@ -12,6 +11,7 @@
 #ifndef _GENERAL_H
 #define _GENERAL_H
 #include "third_party/ctags/config.h"
+#include "libc/ctype.h"
 
 /* Define standard error destination
  */

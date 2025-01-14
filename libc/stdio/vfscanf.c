@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2020 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -16,13 +16,19 @@
 │ TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR             │
 │ PERFORMANCE OF THIS SOFTWARE.                                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
-#include "libc/fmt/fmt.h"
+#include "libc/fmt/internal.h"
 #include "libc/stdio/stdio.h"
 
 /**
  * Stream decoder.
  * @see libc/fmt/vcscanf.h
  */
-int(vfscanf)(FILE *stream, const char *fmt, va_list ap) {
-  return (vcscanf)((void *)fgetc, (void *)ungetc, stream, fmt, ap);
+int vfscanf(FILE *stream, const char *fmt, va_list ap) {
+  int rc;
+  flockfile(stream);
+  rc = __vcscanf((void *)fgetc_unlocked,   //
+                 (void *)ungetc_unlocked,  //
+                 stream, fmt, ap);
+  funlockfile(stream);
+  return rc;
 }

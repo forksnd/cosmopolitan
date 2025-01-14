@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2022 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -16,8 +16,8 @@
 │ TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR             │
 │ PERFORMANCE OF THIS SOFTWARE.                                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
-#include "libc/intrin/bits.h"
-#include "libc/macros.internal.h"
+#include "libc/serialize.h"
+#include "libc/macros.h"
 #include "libc/stdio/append.h"
 #include "third_party/mbedtls/iana.h"
 
@@ -25,7 +25,7 @@
  * Returns string of joined list of first 𝑘 client preferred ciphers.
  * @return string that must be free'd, or null if none set
  */
-dontdiscard char *FormatSslClientCiphers(const mbedtls_ssl_context *ssl) {
+__wur char *FormatSslClientCiphers(const mbedtls_ssl_context *ssl) {
   int i;
   char *b = 0;
   for (i = 0; i < ARRAYLEN(ssl->client_ciphers); ++i) {

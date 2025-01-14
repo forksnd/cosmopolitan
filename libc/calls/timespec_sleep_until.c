@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2022 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -28,11 +28,11 @@
  * @return 0 on success, or EINTR if interrupted
  * @raise ECANCELED if thread was cancelled in masked mode
  * @raise EINTR if signal was delivered
- * @cancellationpoint
+ * @cancelationpoint
  */
-errno_t timespec_sleep_until(struct timespec abs_deadline) {
+errno_t timespec_sleep_until(int clock, struct timespec abs_deadline) {
   errno_t rc;
-  rc = clock_nanosleep(CLOCK_REALTIME, TIMER_ABSTIME, &abs_deadline, 0);
-  _npassert(!rc || rc == EINTR || rc == ECANCELED);
+  rc = clock_nanosleep(clock, TIMER_ABSTIME, &abs_deadline, 0);
+  unassert(!rc || rc == EINTR || rc == ECANCELED);
   return rc;
 }

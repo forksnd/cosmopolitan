@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:4;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=4 sts=4 sw=4 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=4 sts=4 sw=4 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Python 3                                                                     │
 │ https://docs.python.org/3/license.html                                       │
@@ -7,12 +7,10 @@
 #include "third_party/python/Include/pyhash.h"
 #include "third_party/python/Include/pymem.h"
 #include "third_party/python/Modules/hashtable.h"
-/* clang-format off */
 
-asm(".ident\t\"\\n\\n\
-cfuhash (bsd-3)\\n\
-Copyright (c) 2005 Don Owens\"");
-asm(".include \"libc/disclaimer.inc\"");
+__notice(cfuhash_notice, "\
+cfuhash (bsd-3)\n\
+Copyright (c) 2005 Don Owens");
 
 /* The implementation of the hash table (_Py_hashtable_t) is based on the
    cfuhash project:

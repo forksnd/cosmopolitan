@@ -1,4 +1,3 @@
-// clang-format off
 /*
 *   $Id: vhdl.c 652 2008-04-18 03:51:47Z elliotth $
 * 
@@ -13,6 +12,7 @@
 /*
  *   INCLUDE FILES
  */
+#include "libc/ctype.h"
 #include "third_party/ctags/general.h"	/* must always come first */
 
 #include "libc/str/str.h"	/* to define isalpha () */

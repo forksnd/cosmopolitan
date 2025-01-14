@@ -1,12 +1,13 @@
 #include "libc/nt/codegen.h"
-.imp	kernel32,__imp_SetProcessWorkingSetSize,SetProcessWorkingSetSize,1356
+.imp	kernel32,__imp_SetProcessWorkingSetSize,SetProcessWorkingSetSize
 
 	.text.windows
+	.ftrace1
 SetProcessWorkingSetSize:
+	.ftrace2
 #ifdef __x86_64__
 	push	%rbp
 	mov	%rsp,%rbp
-	.profilable
 	mov	__imp_SetProcessWorkingSetSize(%rip),%rax
 	jmp	__sysv2nt
 #elif defined(__aarch64__)

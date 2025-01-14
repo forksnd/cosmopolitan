@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2022 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -18,7 +18,7 @@
 ╚─────────────────────────────────────────────────────────────────────────────*/
 #include "libc/calls/calls.h"
 #include "libc/errno.h"
-#include "libc/intrin/strace.internal.h"
+#include "libc/intrin/strace.h"
 #include "libc/log/check.h"
 #include "libc/runtime/runtime.h"
 #include "libc/str/str.h"
@@ -32,7 +32,7 @@
 static int Read1(int);
 static int Read2(int);
 
-noinstrument int ReadSpaces(int fd) {
+dontinstrument int ReadSpaces(int fd) {
   size_t n;
   ssize_t rc;
   for (;;) {
@@ -64,20 +64,22 @@ noinstrument int ReadSpaces(int fd) {
   }
 }
 
-noinstrument int ReadByte(int fd) {
+dontinstrument int ReadByte(int fd) {
   int c;
-  if ((c = g_buffer[fd][bp[fd]++] & 255)) return c;
+  if ((c = g_buffer[fd][bp[fd]++] & 255))
+    return c;
   return ReadSpaces(fd);
 }
 
-noinstrument int ReadChar(int fd) {
+dontinstrument int ReadChar(int fd) {
   int b, a = dx;
   for (;;) {
     dx = ReadByte(fd);
     if (dx != ';') {
       break;
     } else {
-      do b = ReadByte(fd);
+      do
+        b = ReadByte(fd);
       while ((b != '\n'));
     }
   }
@@ -98,10 +100,10 @@ noinstrument int ReadChar(int fd) {
 }
 
 static int ReadListItem(int fd, int closer, int f(int)) {
-  int i, n, x, y;
-  dword t;
+  int x, y;
   if ((x = f(fd)) > 0) {
-    if (Get(x) == MAKE(closer, TERM)) return -0;
+    if (Get(x) == MAKE(closer, TERM))
+      return -0;
     if (Get(x) == MAKE(L'.', TERM)) {
       x = f(fd);
       if ((y = ReadListItem(fd, closer, Read1))) {
@@ -123,7 +125,7 @@ static int ReadList(int fd, int closer) {
 
 static int TokenizeInteger(int fd, int b) {
   dword a;
-  int c, i, x, y;
+  int c, i;
   for (i = a = 0;; ++i) {
     if ((c = GetDiglet(ToUpper(dx))) != -1 && c < b) {
       a = (a * b) + c;
@@ -139,16 +141,20 @@ static void ConsumeComment(int fd) {
   int c, t = 1;
   for (;;) {
     c = ReadChar(fd);
-    if (c == '#' && dx == '|') ++t;
-    if (!t) return;
-    if (c == '|' && dx == '#') --t;
+    if (c == '#' && dx == '|')
+      ++t;
+    if (!t)
+      return;
+    if (c == '|' && dx == '#')
+      --t;
   }
 }
 
 static int ReadAtomRest(int fd, int x) {
-  int y, t, u;
+  int y;
   ax = y = TERM;
-  if (x == L'\\') x = ReadChar(fd);
+  if (x == L'\\')
+    x = ReadChar(fd);
   if (!IsSpace(dx) && !IsParen(dx) && !IsMathAlnum(x) && !IsMathAlnum(dx)) {
     y = ReadAtomRest(fd, ReadChar(fd));
   }
@@ -158,7 +164,8 @@ static int ReadAtomRest(int fd, int x) {
 static int ReadAtom(int fd) {
   int a, s, x;
   x = ReadChar(fd);
-  if ((s = Desymbolize(x)) != -1) return s;
+  if ((s = Desymbolize(x)) != -1)
+    return s;
   a = ReadAtomRest(fd, x);
   if (LO(Get(a)) == L'T' && HI(Get(a)) == TERM) {
     a = 1;
@@ -194,8 +201,9 @@ static int TokenizeComplicated(int fd) {
 }
 
 static int Read2(int fd) {
-  int r, f, t, l;
-  while (IsSpace((l = dx))) ReadChar(fd);
+  int r, l;
+  while (IsSpace((l = dx)))
+    ReadChar(fd);
   switch (dx) {
     case L'#':
       r = TokenizeComplicated(fd);
@@ -264,13 +272,15 @@ static int ReadLambda(int fd, int n) {
     } else {
       q = List(q, r);
     }
-    if (!n && dx == L')') break;
+    if (!n && dx == L')')
+      break;
   } while (!IsSpace(dx));
   return q;
 }
 
 static int Read1(int fd) {
-  while (IsSpace(dx)) ReadChar(fd);
+  while (IsSpace(dx))
+    ReadChar(fd);
   // todo: fix horrible i/o
   if (dx == 0xCE && (g_buffer[fd][bp[fd]] & 255) == 0xbb) {
     return ReadLambda(fd, 0);

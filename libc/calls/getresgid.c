@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2020 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -19,7 +19,7 @@
 #include "libc/calls/calls.h"
 #include "libc/calls/syscall-sysv.internal.h"
 #include "libc/dce.h"
-#include "libc/intrin/strace.internal.h"
+#include "libc/intrin/strace.h"
 
 /**
  * Gets real, effective, and "saved" group ids.
@@ -34,15 +34,20 @@ int getresgid(uint32_t *real, uint32_t *effective, uint32_t *saved) {
   int rc, gid;
   if (IsWindows()) {
     gid = getgid();
-    if (real) *real = gid;
-    if (effective) *effective = gid;
-    if (saved) *saved = gid;
+    if (real)
+      *real = gid;
+    if (effective)
+      *effective = gid;
+    if (saved)
+      *saved = gid;
     rc = 0;
   } else if (saved) {
     rc = sys_getresgid(real, effective, saved);
   } else {
-    if (real) *real = sys_getgid();
-    if (effective) *effective = sys_getegid();
+    if (real)
+      *real = sys_getgid();
+    if (effective)
+      *effective = sys_getegid();
     rc = 0;
   }
   STRACE("getresgid([%d], [%d], [%d]) → %d% m", real ? *real : 0,

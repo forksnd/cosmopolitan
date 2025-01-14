@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2021 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -16,41 +16,34 @@
 │ TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR             │
 │ PERFORMANCE OF THIS SOFTWARE.                                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
-#include "libc/sysv/consts/clone.h"
-#include "libc/assert.h"
-#include "libc/calls/calls.h"
+#include "libc/atomic.h"
+#include "libc/calls/state.internal.h"
 #include "libc/calls/struct/ucontext-netbsd.internal.h"
-#include "libc/calls/syscall-sysv.internal.h"
 #include "libc/dce.h"
-#include "libc/errno.h"
-#include "libc/intrin/asan.internal.h"
-#include "libc/intrin/describeflags.internal.h"
-#include "libc/intrin/kprintf.h"
-#include "libc/intrin/strace.internal.h"
+#include "libc/intrin/asmflag.h"
+#include "libc/intrin/atomic.h"
+#include "libc/intrin/ulock.h"
 #include "libc/limits.h"
-#include "libc/macros.internal.h"
+#include "libc/mem/alloca.h"
+#include "libc/nt/enum/processcreationflags.h"
 #include "libc/nt/runtime.h"
 #include "libc/nt/synchronization.h"
 #include "libc/nt/thread.h"
 #include "libc/nt/thunk/msabi.h"
-#include "libc/runtime/clone.internal.h"
-#include "libc/runtime/internal.h"
 #include "libc/runtime/runtime.h"
+#include "libc/runtime/syslib.internal.h"
 #include "libc/sock/internal.h"
-#include "libc/stdalign.internal.h"
-#include "libc/str/str.h"
-#include "libc/sysv/consts/futex.h"
-#include "libc/sysv/consts/nr.h"
-#include "libc/sysv/consts/nrlinux.h"
-#include "libc/sysv/errfuns.h"
+#include "libc/sysv/consts/arch.h"
 #include "libc/thread/freebsd.internal.h"
 #include "libc/thread/openbsd.internal.h"
-#include "libc/thread/thread.h"
-#include "libc/thread/tls.h"
-#include "libc/thread/tls2.h"
+#include "libc/thread/posixthread.internal.h"
 #include "libc/thread/xnu.internal.h"
 
-#ifdef __x86_64__
+#define kMaxThreadIds 32768
+#define kMinThreadId  262144
+
+#define AMD64_SET_FSBASE 129
+#define AMD64_SET_GSBASE 131
 
 #define __NR_thr_new                      455
 #define __NR_clone_linux                  56
@@ -62,78 +55,74 @@
 #define LWP_DETACHED                      0x00000040
 #define LWP_SUSPENDED                     0x00000080
 
-__msabi extern typeof(TlsSetValue) *const __imp_TlsSetValue;
-__msabi extern typeof(ExitThread) *const __imp_ExitThread;
-__msabi extern typeof(WakeByAddressAll) *const __imp_WakeByAddressAll;
-
 struct CloneArgs {
   union {
-    int tid;
-    uint32_t utid;
+    long sp;
     int64_t tid64;
   };
-  int *ptid;
-  int *ctid;
-  int *ztid;
+  atomic_int *ptid;
+  atomic_int *ctid;
   char *tls;
-  int (*func)(void *, int);
+  int (*func)(void *);
   void *arg;
 };
+
+int sys_set_tls(uintptr_t, void *);
+int __stack_call(void *, int, long, long, int (*)(void *), long);
+
+#ifdef __x86_64__
 
 ////////////////////////////////////////////////////////////////////////////////
 // THE NEW TECHNOLOGY
 
-int WinThreadLaunch(void *arg,                 // rdi
-                    int tid,                   // rsi
-                    int (*func)(void *, int),  // rdx
-                    intptr_t rsp);             // rcx
+__msabi extern typeof(ExitThread) *const __imp_ExitThread;
+__msabi extern typeof(GetCurrentThreadId) *const __imp_GetCurrentThreadId;
+__msabi extern typeof(WakeByAddressAll) *const __imp_WakeByAddressAll;
 
-// we can't log this function because:
-//   1. windows owns the backtrace pointer right now
-//   2. ftrace unwinds rbp to determine depth
-//   3. tid in tls for ftrace isn't set yet
-// we can't use address sanitizer because:
-//   1. __asan_handle_no_return wipes stack
-//   2. windows owns the stack memory right now
-// we need win32 raw imports because:
-//   1. generated thunks are function logged
-noasan noinstrument static textwindows wontreturn void  //
-WinThreadEntry(int rdi,                                 // rcx
-               int rsi,                                 // rdx
-               int rdx,                                 // r8
-               struct CloneArgs *wt) {                  // r9
-  int rc;
-  if (wt->tls) __set_tls_win32(wt->tls);
-  *wt->ctid = wt->tid;
-  rc = WinThreadLaunch(wt->arg, wt->tid, wt->func, (intptr_t)wt & -16);
+textwindows dontinstrument wontreturn static void  //
+WinThreadEntry(int rdi,                            // rcx
+               int rsi,                            // rdx
+               int rdx,                            // r8
+               struct CloneArgs *wt) {             // r9
+  __set_tls_win32(wt->tls);
+  int tid = __imp_GetCurrentThreadId();
+  atomic_int *ctid = wt->ctid;
+  atomic_init(ctid, tid);
+  atomic_init(wt->ptid, tid);
+  int rc = __stack_call(wt->arg, tid, 0, 0, wt->func, wt->sp);
   // we can now clear ctid directly since we're no longer using our own
   // stack memory, which can now be safely free'd by the parent thread.
-  *wt->ztid = 0;
-  __imp_WakeByAddressAll(wt->ztid);
+  atomic_store_explicit(ctid, 0, memory_order_release);
+  __imp_WakeByAddressAll(ctid);
   // since we didn't indirect this function through NT2SYSV() it's not
   // safe to simply return, and as such, we need ExitThread().
   __imp_ExitThread(rc);
-  notpossible;
+  __builtin_unreachable();
 }
 
-static textwindows errno_t CloneWindows(int (*func)(void *, int), char *stk,
-                                        size_t stksz, int flags, void *arg,
-                                        void *tls, int *ptid, int *ctid) {
+textwindows static errno_t CloneWindows(int (*func)(void *), char *stk,
+                                        size_t stksz, void *arg, void *tls,
+                                        atomic_int *ptid, atomic_int *ctid) {
+  long sp;
   int64_t h;
+  intptr_t tip;
+  uint32_t utid;
   struct CloneArgs *wt;
-  wt = (struct CloneArgs *)(((intptr_t)(stk + stksz) -
-                             sizeof(struct CloneArgs)) &
-                            -alignof(struct CloneArgs));
-  wt->ctid = flags & CLONE_CHILD_SETTID ? ctid : &wt->tid;
-  wt->ztid = flags & CLONE_CHILD_CLEARTID ? ctid : &wt->tid;
+  sp = tip = (intptr_t)stk + stksz;
+  sp -= sizeof(struct CloneArgs);
+  sp &= -alignof(struct CloneArgs);
+  wt = (struct CloneArgs *)sp;
+  wt->ctid = ctid;
+  wt->ptid = ptid;
   wt->func = func;
   wt->arg = arg;
-  wt->tls = flags & CLONE_SETTLS ? tls : 0;
-  if ((h = CreateThread(0, 4096, (void *)WinThreadEntry, wt, 0, &wt->utid))) {
-    CloseHandle(h);
-    if (flags & CLONE_PARENT_SETTID) {
-      *ptid = wt->tid;
-    }
+  wt->tls = tls;
+  wt->sp = tip & -16;
+  if ((h = CreateThread(0, 65536, (void *)WinThreadEntry, wt,
+                        kNtStackSizeParamIsAReservation, &utid))) {
+    atomic_init(ptid, utid);
+    struct CosmoTib *tib = tls;
+    atomic_store_explicit(&tib->tib_syshand, h, memory_order_release);
     return 0;
   } else {
     return __dos2errno(GetLastError());
@@ -143,134 +132,87 @@ static textwindows errno_t CloneWindows(int (*func)(void *, int), char *stk,
 ////////////////////////////////////////////////////////////////////////////////
 // XNU'S NOT UNIX
 
-void XnuThreadThunk(void *pthread,          // rdi
-                    int machport,           // rsi
-                    void *(*func)(void *),  // rdx
-                    void *arg,              // rcx
-                    intptr_t *stack,        // r8
-                    unsigned xnuflags);     // r9
+void XnuThreadThunk(void *pthread,          // rdi x0
+                    int machport,           // rsi x1
+                    void *(*func)(void *),  // rdx x2
+                    void *arg,              // rcx x3
+                    intptr_t *stack,        // r8  x4
+                    unsigned xnuflags);     // r9  x5
 asm("XnuThreadThunk:\n\t"
     "xor\t%ebp,%ebp\n\t"
     "mov\t%r8,%rsp\n\t"
-    "and\t$-16,%rsp\n\t"
     "push\t%rax\n\t"
     "jmp\tXnuThreadMain\n\t"
     ".size\tXnuThreadThunk,.-XnuThreadThunk");
-__attribute__((__used__, __no_reorder__))
+__attribute__((__used__))
 
-static wontreturn void
-XnuThreadMain(void *pthread,                    // rdi
-              int tid,                          // rsi
-              int (*func)(void *arg, int tid),  // rdx
-              void *arg,                        // rcx
-              struct CloneArgs *wt,             // r8
-              unsigned xnuflags) {              // r9
+dontinstrument wontreturn static void
+XnuThreadMain(void *pthread,           // rdi
+              int tid,                 // rsi
+              int (*func)(void *arg),  // rdx
+              void *arg,               // rcx
+              struct CloneArgs *wt,    // r8
+              unsigned xnuflags) {     // r9
+  atomic_init(wt->ctid, tid);
+  atomic_init(wt->ptid, tid);
+
+  // XNU uses the same 0x30 offset as the WIN32 TIB x64. They told the
+  // Go team at Google that they Apply stands by our ability to use it
+  // https://github.com/golang/go/issues/23617#issuecomment-376662373
   int ax;
-  wt->tid = tid;
-  *wt->ctid = tid;
-  *wt->ptid = tid;
+  asm volatile("syscall"
+               : "=a"(ax)
+               : "0"(__NR_thread_fast_set_cthread_self), "D"(wt->tls - 0x30)
+               : "rcx", "rdx", "r8", "r9", "r10", "r11", "memory", "cc");
 
-  if (wt->tls) {
-    // XNU uses the same 0x30 offset as the WIN32 TIB x64. They told the
-    // Go team at Google that they Apply stands by our ability to use it
-    // https://github.com/golang/go/issues/23617#issuecomment-376662373
-    asm volatile("syscall"
-                 : "=a"(ax)
-                 : "0"(__NR_thread_fast_set_cthread_self), "D"(wt->tls - 0x30)
-                 : "rcx", "rdx", "r8", "r9", "r10", "r11", "memory", "cc");
-  }
-
-  func(arg, tid);
+  func(arg);
 
   // we no longer use the stack after this point
   // %rax = int bsdthread_terminate(%rdi = void *stackaddr,
   //                                %rsi = size_t freesize,
   //                                %rdx = uint32_t port,
   //                                %r10 = uint32_t sem);
-  asm volatile("movl\t$0,%0\n\t"         // *wt->ztid = 0
-               "xor\t%%r10d,%%r10d\n\t"  // sem = 0
-               "syscall\n\t"             // __bsdthread_terminate()
-               "ud2"
-               : "=m"(*wt->ztid)
-               : "a"(0x2000000 | 361), "D"(0), "S"(0), "d"(0)
-               : "rcx", "r10", "r11", "memory");
-  notpossible;
+  asm volatile("movl\t$0,(%%rsi)\n\t"        // *wt->ctid = 0
+               "mov\t$0x101,%%edi\n\t"       // wake all
+               "xor\t%%edx,%%edx\n\t"        // wake_value
+               "mov\t$0x02000204,%%eax\n\t"  // ulock_wake()
+               "syscall\n\t"                 //
+               "xor\t%%edi,%%edi\n\t"        // freeaddr
+               "xor\t%%esi,%%esi\n\t"        // freesize
+               "xor\t%%edx,%%edx\n\t"        // kport
+               "xor\t%%r10d,%%r10d\n\t"      // joinsem
+               "mov\t$0x02000169,%%eax\n\t"  // bsdthread_terminate()
+               "syscall"
+               : /* no outputs */
+               : "S"(wt->ctid)
+               : "rax", "rcx", "r10", "r11", "memory");
+  __builtin_unreachable();
 }
 
-static errno_t CloneXnu(int (*fn)(void *), char *stk, size_t stksz, int flags,
-                        void *arg, void *tls, int *ptid, int *ctid) {
-  int rc;
-  bool failed;
+static errno_t CloneXnu(int (*fn)(void *), char *stk, size_t stksz, void *arg,
+                        void *tls, atomic_int *ptid, atomic_int *ctid) {
+
+  // perform this weird mandatory system call once
   static bool once;
-  struct CloneArgs *wt;
   if (!once) {
-    _npassert(sys_bsdthread_register(XnuThreadThunk, 0, 0, 0, 0, 0, 0) != -1);
+    sys_bsdthread_register(XnuThreadThunk, 0, 0, 0, 0, 0, 0);
     once = true;
   }
-  wt = (struct CloneArgs *)(((intptr_t)(stk + stksz) -
-                             sizeof(struct CloneArgs)) &
-                            -alignof(struct CloneArgs));
-  wt->ptid = flags & CLONE_PARENT_SETTID ? ptid : &wt->tid;
-  wt->ctid = flags & CLONE_CHILD_SETTID ? ctid : &wt->tid;
-  wt->ztid = flags & CLONE_CHILD_CLEARTID ? ctid : &wt->tid;
-  wt->tls = flags & CLONE_SETTLS ? tls : 0;
-  return sys_clone_xnu(fn, arg, wt, 0, PTHREAD_START_CUSTOM_XNU);
-}
 
-////////////////////////////////////////////////////////////////////////////////
-// FREE BESIYATA DISHMAYA
-
-static wontreturn void FreebsdThreadMain(void *p) {
-  struct CloneArgs *wt = p;
-  *wt->ctid = wt->tid;
-  wt->func(wt->arg, wt->tid);
-  // we no longer use the stack after this point
-  // void thr_exit(%rdi = long *state);
-  asm volatile("movl\t$0,%0\n\t"       // *wt->ztid = 0
-               "syscall\n\t"           // _umtx_op(wt->ztid, WAKE, INT_MAX)
-               "movl\t$431,%%eax\n\t"  // thr_exit(long *nonzeroes_and_wake)
-               "xor\t%%edi,%%edi\n\t"  // sad we can't use this free futex op
-               "syscall\n\t"           // exit1() fails if thread is orphaned
-               "movl\t$1,%%eax\n\t"    // exit()
-               "syscall"               //
-               : "=m"(*wt->ztid)
-               : "a"(454), "D"(wt->ztid), "S"(UMTX_OP_WAKE), "d"(INT_MAX)
-               : "rcx", "r8", "r9", "r10", "r11", "memory");
-  notpossible;
-}
-
-static errno_t CloneFreebsd(int (*func)(void *, int), char *stk, size_t stksz,
-                            int flags, void *arg, void *tls, int *ptid,
-                            int *ctid) {
-  int ax;
-  bool failed;
-  int64_t tid;
+  // setup stack for thread
+  long sp;
   struct CloneArgs *wt;
-  wt = (struct CloneArgs *)(((intptr_t)(stk + stksz) -
-                             sizeof(struct CloneArgs)) &
-                            -alignof(struct CloneArgs));
-  wt->ctid = flags & CLONE_CHILD_SETTID ? ctid : &wt->tid;
-  wt->ztid = flags & CLONE_CHILD_CLEARTID ? ctid : &wt->tid;
+  sp = (intptr_t)stk + stksz;
+  sp -= sizeof(struct CloneArgs);
+  sp &= -alignof(struct CloneArgs);
+  wt = (struct CloneArgs *)sp;
+  sp &= -16;
+
+  // pass parameters to new thread via xnu
+  wt->ctid = ctid;
+  wt->ptid = ptid;
   wt->tls = tls;
-  wt->func = func;
-  wt->arg = arg;
-  struct thr_param params = {
-      .start_func = FreebsdThreadMain,
-      .arg = wt,
-      .stack_base = stk,
-      .stack_size = (((intptr_t)wt - (intptr_t)stk) & -16) - 8,
-      .tls_base = flags & CLONE_SETTLS ? tls : 0,
-      .tls_size = 64,
-      .child_tid = &wt->tid64,
-      .parent_tid = &tid,
-  };
-  asm volatile(CFLAG_ASM("syscall")
-               : CFLAG_CONSTRAINT(failed), "=a"(ax)
-               : "1"(__NR_thr_new), "D"(&params), "S"(sizeof(params))
-               : "rcx", "rdx", "r8", "r9", "r10", "r11", "memory");
-  if (failed) return ax;
-  if (flags & CLONE_PARENT_SETTID) *ptid = tid;
-  return 0;
+  return sys_clone_xnu(fn, arg, wt, 0, PTHREAD_START_CUSTOM_XNU);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -278,26 +220,27 @@ static errno_t CloneFreebsd(int (*func)(void *, int), char *stk, size_t stksz,
 
 // we can't use address sanitizer because:
 //   1. __asan_handle_no_return wipes stack [todo?]
-noasan static wontreturn void OpenbsdThreadMain(void *p) {
+relegated dontinstrument wontreturn static void OpenbsdThreadMain(void *p) {
   struct CloneArgs *wt = p;
-  *wt->ctid = wt->tid;
-  wt->func(wt->arg, wt->tid);
-  asm volatile("mov\t%2,%%rsp\n\t"     // so syscall can validate stack exists
-               "movl\t$0,(%%rdi)\n\t"  // *wt->ztid = 0 (old stack now free'd)
+  int tid = atomic_load_explicit(wt->ctid, memory_order_relaxed);
+  atomic_init(wt->ptid, tid);
+  wt->func(wt->arg);
+  asm volatile("mov\t%1,%%rsp\n\t"     // so syscall can validate stack exists
+               "movl\t$0,(%2)\n\t"     // *wt->ctid = 0 (old stack now free'd)
                "syscall\n\t"           // futex(int*, op, val) will wake wait0
                "xor\t%%edi,%%edi\n\t"  // so kernel doesn't write to old stack
                "mov\t$302,%%eax\n\t"   // __threxit(int *notdead) doesn't wake
                "syscall"
-               : "=m"(*wt->ztid)
-               : "a"(83), "m"(__oldstack), "D"(wt->ztid),
+               : /* no outputs */
+               : "a"(83), "m"(__oldstack), "D"(wt->ctid),
                  "S"(2 /* FUTEX_WAKE */), "d"(INT_MAX)
                : "rcx", "r11", "memory");
-  notpossible;
+  __builtin_unreachable();
 }
 
-static errno_t CloneOpenbsd(int (*func)(void *, int), char *stk, size_t stksz,
-                            int flags, void *arg, void *tls, int *ptid,
-                            int *ctid) {
+relegated static errno_t CloneOpenbsd(int (*func)(void *), char *stk,
+                                      size_t stksz, void *arg, void *tls,
+                                      atomic_int *ptid, atomic_int *ctid) {
   int rc;
   intptr_t sp;
   struct __tfork *tf;
@@ -307,20 +250,20 @@ static errno_t CloneOpenbsd(int (*func)(void *, int), char *stk, size_t stksz,
   sp &= -alignof(struct __tfork);
   tf = (struct __tfork *)sp;
   sp -= sizeof(struct CloneArgs);
-  sp &= -MAX(16, alignof(struct CloneArgs));
+  sp &= -alignof(struct CloneArgs);
   wt = (struct CloneArgs *)sp;
-  wt->ctid = flags & CLONE_CHILD_SETTID ? ctid : &wt->tid;
-  wt->ztid = flags & CLONE_CHILD_CLEARTID ? ctid : &wt->tid;
+  sp &= -16;
+  sp -= 8;
+  *(intptr_t *)sp = (intptr_t)CloneOpenbsd + 1;
+  wt->ctid = ctid;
+  wt->ptid = ptid;
   wt->arg = arg;
   wt->func = func;
-  tf->tf_stack = (char *)wt - 8;
-  tf->tf_tcb = flags & CLONE_SETTLS ? tls : 0;
-  tf->tf_tid = &wt->tid;
+  tf->tf_stack = (char *)sp;
+  tf->tf_tcb = tls;
+  tf->tf_tid = ctid;
   if ((rc = __tfork_thread(tf, sizeof(*tf), OpenbsdThreadMain, wt)) >= 0) {
-    _npassert(rc);
-    if (flags & CLONE_PARENT_SETTID) {
-      *ptid = rc;
-    }
+    atomic_init(ptid, rc);
     return 0;
   } else {
     return -rc;
@@ -330,34 +273,35 @@ static errno_t CloneOpenbsd(int (*func)(void *, int), char *stk, size_t stksz,
 ////////////////////////////////////////////////////////////////////////////////
 // NET BESIYATA DISHMAYA
 
-static wontreturn void NetbsdThreadMain(void *arg,                 // rdi
-                                        int (*func)(void *, int),  // rsi
-                                        int *tid,                  // rdx
-                                        int *ctid,                 // rcx
-                                        int *ztid) {               // r9
-  int ax, dx;
-  // TODO(jart): Why are we seeing flakes where *tid is zero?
-  // ax = *tid;
-  ax = sys_gettid();
-  *ctid = ax;
-  func(arg, ax);
+wontreturn dontinstrument static void NetbsdThreadMain(
+    void *arg,            // rdi
+    int (*func)(void *),  // rsi
+    atomic_int *ctid,     // rdx
+    atomic_int *ptid) {   // rcx
+  int ax;
+  asm("syscall"
+      : "=a"(ax)  // man says always succeeds
+      : "0"(311)  // _lwp_self()
+      : "rcx", "rdx", "r8", "r9", "r10", "r11", "memory", "cc");
+  atomic_init(ctid, ax);
+  atomic_init(ptid, ax);
+  func(arg);
   // we no longer use the stack after this point
   // %eax = int __lwp_exit(void);
-  asm volatile("movl\t$0,%2\n\t"  // *wt->ztid = 0
-               "syscall\n\t"      // __lwp_exit()
-               "ud2"
-               : "=a"(ax), "=d"(dx), "=m"(*ztid)
-               : "0"(310)
+  asm volatile("movl\t$0,(%2)\n\t"  // *ztid = 0
+               "syscall"            // __lwp_exit()
+               : "=a"(ax)
+               : "0"(310), "r"(ctid)
                : "rcx", "r11", "memory");
-  notpossible;
+  __builtin_unreachable();
 }
 
-static int CloneNetbsd(int (*func)(void *, int), char *stk, size_t stksz,
-                       int flags, void *arg, void *tls, int *ptid, int *ctid) {
+static int CloneNetbsd(int (*func)(void *), char *stk, size_t stksz, void *arg,
+                       void *tls, atomic_int *ptid, atomic_int *ctid) {
   // NetBSD has its own clone() and it works, but it's technically a
   // second-class API, intended to help Linux folks migrate to this.
+  int ax;
   bool failed;
-  int ax, *tid;
   intptr_t dx, sp;
   static bool once;
   struct ucontext_netbsd *ctx;
@@ -369,19 +313,12 @@ static int CloneNetbsd(int (*func)(void *, int), char *stk, size_t stksz,
                  : CFLAG_CONSTRAINT(failed), "=a"(ax)
                  : "1"(__NR_getcontext_netbsd), "D"(&netbsd_clone_template)
                  : "rcx", "rdx", "r8", "r9", "r10", "r11", "memory");
-    _npassert(!failed);
     once = true;
   }
-  sp = (intptr_t)(stk + stksz);
-
-  // allocate memory for tid
-  sp -= sizeof(int);
-  sp = sp & -alignof(int);
-  tid = (int *)sp;
-  *tid = 0;
+  sp = (intptr_t)stk + stksz;
 
   // align the stack
-  sp = sp & -16;
+  sp &= -16;
 
   // simulate call to misalign stack and ensure backtrace looks good
   sp -= 8;
@@ -389,8 +326,7 @@ static int CloneNetbsd(int (*func)(void *, int), char *stk, size_t stksz,
 
   // place the giant 784 byte ucontext structure in the red zone!
   // it only has to live long enough for the thread to come alive
-  ctx = (struct ucontext_netbsd *)((sp - sizeof(struct ucontext_netbsd)) &
-                                   -alignof(struct ucontext_netbsd));
+  ctx = (struct ucontext_netbsd *)((sp - sizeof(struct ucontext_netbsd)) & -64);
 
   // pass parameters in process state
   memcpy(ctx, &netbsd_clone_template, sizeof(*ctx));
@@ -400,28 +336,23 @@ static int CloneNetbsd(int (*func)(void *, int), char *stk, size_t stksz,
   ctx->uc_mcontext.rip = (intptr_t)NetbsdThreadMain;
   ctx->uc_mcontext.rdi = (intptr_t)arg;
   ctx->uc_mcontext.rsi = (intptr_t)func;
-  ctx->uc_mcontext.rdx = (intptr_t)tid;
-  ctx->uc_mcontext.rcx = (intptr_t)(flags & CLONE_CHILD_SETTID ? ctid : tid);
-  ctx->uc_mcontext.r8 = (intptr_t)(flags & CLONE_CHILD_CLEARTID ? ctid : tid);
+  ctx->uc_mcontext.rdx = (intptr_t)ctid;
+  ctx->uc_mcontext.rcx = (intptr_t)ptid;
   ctx->uc_flags |= _UC_STACK;
   ctx->uc_stack.ss_sp = stk;
   ctx->uc_stack.ss_size = stksz;
   ctx->uc_stack.ss_flags = 0;
-  if (flags & CLONE_SETTLS) {
-    ctx->uc_flags |= _UC_TLSBASE;
-    ctx->uc_mcontext._mc_tlsbase = (intptr_t)tls;
-  }
+  ctx->uc_flags |= _UC_TLSBASE;
+  ctx->uc_mcontext._mc_tlsbase = (intptr_t)tls;
 
   // perform the system call
+  int tid = 0;
   asm volatile(CFLAG_ASM("syscall")
                : CFLAG_CONSTRAINT(failed), "=a"(ax), "=d"(dx)
-               : "1"(__NR__lwp_create), "D"(ctx), "S"(LWP_DETACHED), "2"(tid)
+               : "1"(__NR__lwp_create), "D"(ctx), "S"(LWP_DETACHED), "2"(&tid)
                : "rcx", "r8", "r9", "r10", "r11", "memory");
   if (!failed) {
-    _npassert(*tid);
-    if (flags & CLONE_PARENT_SETTID) {
-      *ptid = *tid;
-    }
+    atomic_init(ptid, tid);
     return 0;
   } else {
     return ax;
@@ -431,34 +362,208 @@ static int CloneNetbsd(int (*func)(void *, int), char *stk, size_t stksz,
 #endif /* __x86_64__ */
 
 ////////////////////////////////////////////////////////////////////////////////
+// FREE BESIYATA DISHMAYA
+
+wontreturn dontinstrument static void FreebsdThreadMain(void *p) {
+  struct CloneArgs *wt = p;
+#ifdef __aarch64__
+  asm volatile("mov\tx28,%0" : /* no outputs */ : "r"(wt->tls));
+#elif defined(__x86_64__)
+  sys_set_tls(AMD64_SET_GSBASE, wt->tls);
+#endif
+  atomic_init(wt->ctid, wt->tid64);
+  atomic_init(wt->ptid, wt->tid64);
+  wt->func(wt->arg);
+  // we no longer use the stack after this point
+  // void thr_exit(%rdi = long *state);
+#ifdef __x86_64__
+  asm volatile("movl\t$0,%0\n\t"       // *wt->ctid = 0
+               "syscall\n\t"           // _umtx_op(wt->ctid, WAKE, INT_MAX)
+               "movl\t$431,%%eax\n\t"  // thr_exit(long *nonzeroes_and_wake)
+               "xor\t%%edi,%%edi\n\t"  // sad we can't use this free futex op
+               "syscall\n\t"           // thr_exit() fails if thread is orphaned
+               "movl\t$1,%%eax\n\t"    // _exit()
+               "syscall"               //
+               : "=m"(*wt->ctid)
+               : "a"(454), "D"(wt->ctid), "S"(UMTX_OP_WAKE), "d"(INT_MAX)
+               : "rcx", "r8", "r9", "r10", "r11", "memory");
+#elif defined(__aarch64__)
+  register long x0 asm("x0") = (long)wt->ctid;
+  register long x1 asm("x1") = UMTX_OP_WAKE;
+  register long x2 asm("x2") = INT_MAX;
+  register long x8 asm("x8") = 454;  // _umtx_op
+  asm volatile("str\twzr,%0\n\t"     // *wt->ctid = 0
+               "svc\t0\n\t"          // _umtx_op(wt->ctid, WAKE, INT_MAX)
+               "mov\tx0,#0\n\t"      // arg0 = 0
+               "mov\tx8,#431\n\t"    // thr_exit
+               "svc\t0\n\t"          // thr_exit(long *nonzeroes_and_wake = 0)
+               "mov\tx8,#1\n\t"      // _exit
+               "svc\t0"              // _exit(long *nonzeroes_and_wake = 0)
+               : "=m"(*wt->ctid)
+               : "r"(x0), "r"(x1), "r"(x2), "r"(x8));
+#else
+#error "unsupported architecture"
+#endif
+  __builtin_unreachable();
+}
+
+static errno_t CloneFreebsd(int (*func)(void *), char *stk, size_t stksz,
+                            void *arg, void *tls, atomic_int *ptid,
+                            atomic_int *ctid) {
+  long sp;
+  int64_t tid64;
+  struct CloneArgs *wt;
+  sp = (intptr_t)stk + stksz;
+  sp -= sizeof(struct CloneArgs);
+  sp &= -alignof(struct CloneArgs);
+  wt = (struct CloneArgs *)sp;
+  sp &= -16;
+  wt->ctid = ctid;
+  wt->ptid = ptid;
+  wt->tls = tls;
+  wt->func = func;
+  wt->arg = arg;
+  struct thr_param params = {
+      .start_func = FreebsdThreadMain,
+      .arg = wt,
+      .stack_base = stk,
+      .stack_size = sp - (long)stk,
+      .tls_base = tls,
+      .tls_size = 64,
+      .child_tid = &wt->tid64,
+      .parent_tid = &tid64,
+  };
+#ifdef __x86_64__
+  int ax;
+  bool failed;
+  asm volatile(CFLAG_ASM("syscall")
+               : CFLAG_CONSTRAINT(failed), "=a"(ax)
+               : "1"(__NR_thr_new), "D"(&params), "S"(sizeof(params))
+               : "rcx", "rdx", "r8", "r9", "r10", "r11", "memory");
+  if (failed)
+    return ax;
+#elif defined(__aarch64__)
+  register long x0 asm("x0") = (long)&params;
+  register long x1 asm("x1") = sizeof(params);
+  register int x8 asm("x8") = 0x1c7;  // thr_new
+  asm volatile("svc\t0" : "+r"(x0) : "r"(x1), "r"(x8) : "memory");
+  if (x0)
+    return x0;
+#else
+#error "unsupported architecture"
+#endif
+  atomic_init(ptid, tid64);
+  return 0;
+}
+
+#ifdef __aarch64__
+
+////////////////////////////////////////////////////////////////////////////////
+// APPLE SILICON
+
+dontinstrument static void *SiliconThreadMain(void *arg) {
+  struct CloneArgs *wt = arg;
+  atomic_int *ctid = wt->ctid;
+  int tid = atomic_load_explicit(ctid, memory_order_relaxed);
+  asm volatile("mov\tx28,%0" : /* no outputs */ : "r"(wt->tls));
+  __stack_call(wt->arg, tid, 0, 0, wt->func, wt->sp);
+  atomic_store_explicit(ctid, 0, memory_order_release);
+  ulock_wake(UL_COMPARE_AND_WAIT | ULF_WAKE_ALL, ctid, 0);
+  return 0;
+}
+
+static errno_t CloneSilicon(int (*fn)(void *), char *stk, size_t stksz,
+                            void *arg, void *tls, atomic_int *ptid,
+                            atomic_int *ctid) {
+
+  // assign tid to new thread
+  static atomic_uint tids;
+  unsigned tid = atomic_fetch_add_explicit(&tids, 1, memory_order_relaxed);
+  tid %= kMaxThreadIds;
+  tid += kMinThreadId;
+  atomic_init(ctid, tid);
+  atomic_init(ptid, tid);
+
+  // pass temp data on stack
+  intptr_t sp, tip;
+  struct CloneArgs *wt;
+  sp = tip = (intptr_t)stk + stksz;
+  sp -= sizeof(struct CloneArgs);
+  sp &= -alignof(struct CloneArgs);
+  wt = (struct CloneArgs *)sp;
+  wt->func = fn;
+  wt->arg = arg;
+  wt->tls = tls;
+  wt->ctid = ctid;
+  wt->sp = tip & -16;
+
+  // ask apple libc to spawn thread
+  errno_t res;
+  pthread_t th;
+  size_t babystack = __syslib->__pthread_stack_min;
+#pragma GCC push_options
+#pragma GCC diagnostic ignored "-Walloca-larger-than="
+  void *attr = alloca(__syslib->__sizeof_pthread_attr_t);
+#pragma GCC pop_options
+  __syslib->__pthread_attr_init(attr);
+  __syslib->__pthread_attr_setguardsize(attr, 0);
+  __syslib->__pthread_attr_setstacksize(attr, babystack);
+  if (!(res = __syslib->__pthread_create(&th, attr, SiliconThreadMain, wt))) {
+    atomic_init(ptid, tid);
+    struct CosmoTib *tib = tls;
+    atomic_store_explicit(&tib[-1].tib_syshand, th, memory_order_release);
+  }
+  __syslib->__pthread_attr_destroy(attr);
+  return res;
+}
+
+#endif /* __aarch64__ */
+
+////////////////////////////////////////////////////////////////////////////////
 // GNU/SYSTEMD
 
-int sys_clone_linux(int flags,   // rdi
-                    long sp,     // rsi
-                    int *ptid,   // rdx
-                    int *ctid,   // rcx
-                    void *tls,   // r8
-                    void *func,  // r9
-                    void *arg);  // 8(rsp)
+struct LinuxCloneArgs {
+  int (*func)(void *);
+  void *arg;
+  char *tls;
+};
 
-static int CloneLinux(int (*func)(void *arg, int rc), char *stk, size_t stksz,
-                      int flags, void *arg, void *tls, int *ptid, int *ctid) {
-  int rc;
-  long sp;
-  sp = (intptr_t)(stk + stksz);
-  if (~flags & CLONE_CHILD_SETTID) {
-    flags |= CLONE_CHILD_SETTID;
-    sp -= sizeof(int);
-    sp = sp & -alignof(int);
-    ctid = (int *)sp;
-    sp -= 8;  // experiment
-  }
-  // align the stack
-#ifdef __aarch64__
-  sp = sp & -128;  // for kernel 4.6 and earlier
-#else
-  sp = sp & -16;
+int sys_clone_linux(int flags,         // rdi
+                    long sp,           // rsi
+                    atomic_int *ptid,  // rdx
+                    atomic_int *ctid,  // rcx
+                    void *tls,         // r8
+                    void *func,        // r9
+                    void *arg);        // 8(rsp)
+
+dontinstrument static int AmdLinuxThreadEntry(void *arg) {
+  struct LinuxCloneArgs *wt = arg;
+#if defined(__x86_64__)
+  sys_set_tls(ARCH_SET_GS, wt->tls);
 #endif
+  return wt->func(wt->arg);
+}
+
+static int CloneLinux(int (*func)(void *), char *stk, size_t stksz, int flags,
+                      void *arg, void *tls, atomic_int *ptid,
+                      atomic_int *ctid) {
+  long sp = (intptr_t)stk + stksz;
+
+#if defined(__x86_64__)
+  sp -= sizeof(struct LinuxCloneArgs);
+  sp &= -alignof(struct LinuxCloneArgs);
+  struct LinuxCloneArgs *wt = (struct LinuxCloneArgs *)sp;
+  sp &= -16;  // align the stack
+  wt->arg = arg;
+  wt->tls = tls;
+  wt->func = func;
+  func = AmdLinuxThreadEntry;
+  arg = wt;
+#elif defined(__aarch64__)
+  sp &= -128;  // for kernels <=4.6
+#endif
+
+  int rc;
   if ((rc = sys_clone_linux(flags, sp, ptid, ctid, tls, func, arg)) >= 0) {
     // clone() is documented as setting ptid before return
     return 0;
@@ -471,158 +576,45 @@ static int CloneLinux(int (*func)(void *arg, int rc), char *stk, size_t stksz,
 // COSMOPOLITAN
 
 /**
- * Creates thread without malloc being linked.
+ * Creates thread without malloc() being linked.
  *
- * If you use clone() you're on you're own, e.g.
- *
- *     int worker(void *arg) { return 0; }
- *     struct CosmoTib tib = {.tib_self = &tib, .tib_tid = -1};
- *     atomic_int tid;
- *     char *stk = _mapstack();
- *     clone(worker, stk, GetStackSize() - 16,
- *           CLONE_VM | CLONE_THREAD | CLONE_FS | CLONE_FILES |
- *           CLONE_SYSVSEM | CLONE_SIGHAND | CLONE_PARENT_SETTID |
- *           CLONE_CHILD_SETTID | CLONE_CHILD_CLEARTID | CLONE_SETTLS,
- *           arg, &tid, &tib, &tib.tib_tid);
- *     while (atomic_load(&tid) == 0) sched_yield();
- *     // thread is known
- *     while (atomic_load(&tib.tib_tid) < 0) sched_yield();
- *     // thread is running
- *     while (atomic_load(&tib.tib_tid) > 0) sched_yield();
- *     // thread has terminated
- *     _freestack(stk);
- *
- * Threads are created in a detached manner. They currently can't be
- * synchronized using wait() or posix signals. Threads created by this
- * function should be synchronized using shared memory operations.
- *
- * Any memory that's required by this system call wrapper is allocated
- * to the top of your stack. This shouldn't be more than 128 bytes.
- *
- * Your function is called from within the stack you specify. A return
- * address is pushed onto your stack, that causes returning to jump to
- * _Exit1() which terminates the thread. Even though the callback says
- * it supports a return code, that'll only work on Linux and Windows.
- *
- * This function follows the same ABI convention as the Linux userspace
- * libraries, with a few small changes. The varargs has been removed to
- * help prevent broken code, and the stack size and tls size parameters
- * are introduced for compatibility with FreeBSD.
- *
- * To keep this system call lightweight, only the thread creation use
- * case is polyfilled across platforms. For example, if you want fork
- * that works on OpenBSD for example, don't do it with clone(SIGCHLD)
- * and please just call fork(). Even if you do that on Linux, it will
- * effectively work around libc features like atfork(), so that means
- * other calls like getpid() may return incorrect values.
- *
- * @param func is your callback function, which this wrapper requires
- *     not be null, otherwise EINVAL is raised. It is passed two args
- *     within the child thread: (1) the caller-supplied `arg` and (2)
- *     the new tid is always passed in the second arg for convenience
- *
- * @param stk points to the bottom of a caller allocated stack, which
- *     must be allocated via mmap() using the MAP_STACK flag, or else
- *     you won't get optimal performance and it won't work on OpenBSD
- *
- * @param stksz is the size of that stack in bytes, we recommend that
- *     that this be set to GetStackSize() or else memory safety tools
- *     like kprintf() can't do as good and quick of a job; this value
- *     must be 16-aligned plus it must be at least 4192 bytes in size
- *     and it's advised to have the bottom-most page, be a guard page
- *
- * @param flags which SHOULD always have all of these flags:
- *
- *     - `CLONE_THREAD`
- *     - `CLONE_VM`
- *     - `CLONE_FS`
- *     - `CLONE_FILES`
- *     - `CLONE_SIGHAND`
- *     - `CLONE_SYSVSEM`
- *
- *     This system call wrapper is intended for threads, and as such, we
- *     won't polyfill Linux's ability to simulate unrelated calls (e.g.
- *     fork, vfork) via clone() on other platforms. Please just call
- *     fork() and vfork() when that's what you want.
- *
- *     Your `flags` may also optionally also additionally bitwise-OR any
- *     combination of the following additional flags:
- *
- *     - `CLONE_CHILD_SETTID` must be specified if you intend to set the
- *       `ctid` argument, which will updated with the child tid once the
- *       child has started.
- *
- *     - `CLONE_PARENT_SETTID` must be specified if you intend to set
- *       the `ptid` argument, which is updated at the most opportune
- *       moment. On all platforms except XNU, this happens before
- *       clone() returns. On XNU, it happens once the thread starts.
- *
- *     - `CLONE_CHILD_CLEARTID` causes `*ctid = 0` upon child thread
- *       termination. This is used to implement join so that the parent
- *       may know when it's safe to free the child's stack memory, and
- *       as such, is guaranteed to happen AFTER the child thread has
- *       either terminated or has finished using its stack memory
- *
- *     - `CLONE_SETTLS` is needed if you intend to specify the `tls`
- *       argument, which after thread creation may be accessed using
- *       __get_tls(). Doing this means that `errno`, gettid(), etc.
- *       correctly work. Caveat emptor if you choose not to do this.
- *
- * @param arg is passed as an argument to `func` in the child thread
- * @param tls may be used to set the thread local storage segment;
- *     this parameter is ignored if `CLONE_SETTLS` is not set
- * @param ctid lets the child receive its thread id without having to
- *     call gettid() and is ignored if `CLONE_CHILD_SETTID` isn't set
- * @return 0 on success, or errno on errno
- * @threadsafe
+ * If you use clone() you're on your own.
  */
 errno_t clone(void *func, void *stk, size_t stksz, int flags, void *arg,
               void *ptid, void *tls, void *ctid) {
-  int rc;
+  errno_t err;
 
-  if (flags & CLONE_THREAD) {
-    __enable_threads();
-  }
+  atomic_fetch_add(&_pthread_count, 1);
 
-  if (!func) {
-    rc = EINVAL;
-  } else if (!IsTiny() &&
-             ((flags & CLONE_VM) && (stksz < PAGESIZE || (stksz & 15)))) {
-    rc = EINVAL;
-  } else if (IsAsan() &&
-             (((flags & CLONE_SETTLS) && !__asan_is_valid(tls, 64)) ||
-              ((flags & CLONE_PARENT_SETTID) &&
-               !__asan_is_valid(ptid, sizeof(int))) ||
-              ((flags & CLONE_CHILD_SETTID) &&
-               !__asan_is_valid(ctid, sizeof(int))))) {
-    rc = EFAULT;
-  } else if (IsLinux()) {
-    rc = CloneLinux(func, stk, stksz, flags, arg, tls, ptid, ctid);
-  } else if (!IsTiny() &&
-             (flags & ~(CLONE_SETTLS | CLONE_PARENT_SETTID |
-                        CLONE_CHILD_SETTID | CLONE_CHILD_CLEARTID)) !=
-                 (CLONE_THREAD | CLONE_VM | CLONE_FS | CLONE_FILES |
-                  CLONE_SIGHAND | CLONE_SYSVSEM)) {
-    STRACE("cosmo clone() is picky about flags, see clone.c");
-    rc = EINVAL;
-#ifdef __x86_64__
+  if (IsLinux()) {
+    err = CloneLinux(func, stk, stksz, flags, arg, tls, ptid, ctid);
   } else if (IsXnu()) {
-    rc = CloneXnu(func, stk, stksz, flags, arg, tls, ptid, ctid);
+#if defined(__x86_64__)
+    err = CloneXnu(func, stk, stksz, arg, tls, ptid, ctid);
+#elif defined(__aarch64__)
+    err = CloneSilicon(func, stk, stksz, arg, tls, ptid, ctid);
+#else
+#error "unsupported architecture"
+#endif
   } else if (IsFreebsd()) {
-    rc = CloneFreebsd(func, stk, stksz, flags, arg, tls, ptid, ctid);
-  } else if (IsNetbsd()) {
-    rc = CloneNetbsd(func, stk, stksz, flags, arg, tls, ptid, ctid);
-  } else if (IsOpenbsd()) {
-    rc = CloneOpenbsd(func, stk, stksz, flags, arg, tls, ptid, ctid);
+    err = CloneFreebsd(func, stk, stksz, arg, tls, ptid, ctid);
+#if defined(__x86_64__)
   } else if (IsWindows()) {
-    rc = CloneWindows(func, stk, stksz, flags, arg, tls, ptid, ctid);
+    err = CloneWindows(func, stk, stksz, arg, tls, ptid, ctid);
+  } else if (IsNetbsd()) {
+    err = CloneNetbsd(func, stk, stksz, arg, tls, ptid, ctid);
+  } else if (IsOpenbsd()) {
+    err = CloneOpenbsd(func, stk, stksz, arg, tls, ptid, ctid);
 #endif /* __x86_64__ */
   } else {
-    rc = ENOSYS;
+    err = ENOSYS;
   }
 
-  STRACE("clone(%t, %p, %'zu, %#x, %p, %p, %p, %p) → %s", func, stk, stksz,
-         flags, arg, ptid, tls, ctid, DescribeErrno(rc));
+  if (SupportsBsd() && err == EPROCLIM)
+    err = EAGAIN;
 
-  return rc;
+  if (err)
+    atomic_fetch_sub(&_pthread_count, 1);
+
+  return err;
 }

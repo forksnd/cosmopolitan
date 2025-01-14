@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2020 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -29,10 +29,9 @@
  * @param file specifies filesystem path to open
  * @return file descriptor, or -1 w/ errno
  * @see openat() for further documentation
- * @cancellationpoint
+ * @cancelationpoint
  * @asyncsignalsafe
  * @restartable
- * @threadsafe
  * @vforksafe
  */
 int open(const char *file, int flags, ...) {
@@ -43,3 +42,5 @@ int open(const char *file, int flags, ...) {
   va_end(va);
   return openat(AT_FDCWD, file, flags, mode);
 }
+
+__weak_reference(open, open64);

@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2020 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -16,25 +16,26 @@
 │ TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR             │
 │ PERFORMANCE OF THIS SOFTWARE.                                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
-#include "libc/intrin/safemacros.internal.h"
 #include "libc/fmt/itoa.h"
+#include "libc/intrin/safemacros.h"
 #include "tool/viz/lib/formatstringtable.h"
 
 void *FormatStringTableAsCode(long yn, long xn, const char *const T[yn][xn],
                               int emit(), void *arg, const char *type,
                               const char *name, const char *ignored) {
+  void (*Emit)(const char *, void *) = (void (*)(const char *, void *))emit;
   char ynstr[21], xnstr[21];
   FormatUint64(ynstr, yn);
   FormatUint64(xnstr, xn);
-  emit(type, arg);
-  emit(" ", arg);
-  emit(firstnonnull(name, "M"), arg);
-  emit("[", arg);
-  emit(ynstr, arg);
-  emit("][", arg);
-  emit(xnstr, arg);
-  emit("] = {", arg);
+  Emit(type, arg);
+  Emit(" ", arg);
+  Emit(firstnonnull(name, "M"), arg);
+  Emit("[", arg);
+  Emit(ynstr, arg);
+  Emit("][", arg);
+  Emit(xnstr, arg);
+  Emit("] = {", arg);
   FormatStringTable(yn, xn, T, emit, arg, "\n    {", ", ", "},");
-  emit("\n};\n", arg);
+  Emit("\n};\n", arg);
   return (/* unconst */ void *)T;
 }

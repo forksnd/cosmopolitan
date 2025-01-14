@@ -1,12 +1,13 @@
 #ifndef COSMOPOLITAN_LIBC_NT_SYNCHRONIZATION_H_
 #define COSMOPOLITAN_LIBC_NT_SYNCHRONIZATION_H_
+#include "libc/intrin/atomic.h"
 #include "libc/nt/struct/criticalsection.h"
 #include "libc/nt/struct/filetime.h"
 #include "libc/nt/struct/linkedlist.h"
+#include "libc/nt/struct/processornumber.h"
 #include "libc/nt/struct/securityattributes.h"
 #include "libc/nt/struct/systemtime.h"
 #include "libc/nt/thunk/msabi.h"
-#if !(__ASSEMBLER__ + __LINKER__ + 0)
 COSMOPOLITAN_C_START_
 /*                            ░░░░
                        ▒▒▒░░░▒▒▒▒▒▒▒▓▓▓░
@@ -33,20 +34,13 @@ COSMOPOLITAN_C_START_
 │ cosmopolitan § new technology » synchronization                          ─╬─│┼
 ╚────────────────────────────────────────────────────────────────────────────│*/
 
-#define InterlockedAdd(PTR, VAL)                                           \
-  ({                                                                       \
-    typeof(*(PTR)) Res;                                                    \
-    typeof(Res) Val = (VAL);                                               \
-    asm volatile("lock xadd\t%0,%1" : "=r"(Res), "+m"(*(PTR)) : "0"(Val)); \
-    Res + Val;                                                             \
-  })
+static inline int32_t InterlockedAdd(int32_t volatile *p, int32_t x) {
+  return atomic_fetch_add((_Atomic(int32_t) *)p, x) + x;
+}
 
-#define InterlockedExchange(PTR, VAL)                      \
-  ({                                                       \
-    typeof(*(PTR)) Res = (VAL);                            \
-    asm volatile("xchg\t%0,%1" : "+r"(Res), "+m"(*(PTR))); \
-    Res;                                                   \
-  })
+static inline int32_t InterlockedExchange(int32_t volatile *p, int32_t x) {
+  return atomic_exchange((_Atomic(int32_t) *)p, x);
+}
 
 typedef void (*NtTimerapcroutine)(void *lpArgToCompletionRoutine,
                                   uint32_t dwTimerLowValue,
@@ -56,7 +50,7 @@ typedef void (*NtWaitOrTimerCallback)(void *lpParameter,
 
 void WakeByAddressAll(void *Address);
 void WakeByAddressSingle(void *Address);
-bool32 WaitOnAddress(volatile void *Address, void *CompareAddress,
+bool32 WaitOnAddress(const volatile void *Address, void *CompareAddress,
                      size_t AddressSize, uint32_t opt_dwMilliseconds);
 
 void Sleep(uint32_t dwMilliseconds);
@@ -65,7 +59,7 @@ uint32_t SleepEx(uint32_t dwMilliseconds, bool32 bAlertable);
 void GetSystemTime(struct NtSystemTime *lpSystemTime);
 bool32 SystemTimeToFileTime(const struct NtSystemTime *lpSystemTime,
                             struct NtFileTime *lpFileTime);
-void GetSystemTimeAsFileTime(struct NtFileTime *);        /* win8+ */
+void GetSystemTimeAsFileTime(struct NtFileTime *);
 void GetSystemTimePreciseAsFileTime(struct NtFileTime *); /* win8+ */
 
 uint32_t WaitForSingleObject(int64_t hHandle, uint32_t dwMilliseconds);
@@ -81,19 +75,16 @@ bool32 RegisterWaitForSingleObject(int64_t *phNewWaitObject, int64_t hObject,
                                    void *Context, uint32_t dwMilliseconds,
                                    uint32_t dwFlags);
 
-int64_t CreateWaitableTimer(struct NtSecurityAttributes *lpTimerAttributes,
-                            bool32 bManualReset, const char16_t *lpTimerName);
+int64_t CreateWaitableTimer(
+    const struct NtSecurityAttributes *lpTimerAttributes, bool32 bManualReset,
+    const char16_t *lpTimerName);
 bool32 SetWaitableTimer(int64_t hTimer, const int64_t *lpDueTimeAsFtOrNegRela,
                         int32_t opt_lPeriodMs, NtTimerapcroutine opt_callback,
                         void *lpArgToCallback, bool32 fUnsleepSystem);
 
-int64_t CreateSemaphore(struct NtSecurityAttributes *opt_lpSemaphoreAttributes,
-                        uint32_t lInitialCount, uint32_t lMaximumCount,
-                        const char16_t *opt_lpName);
-
-int32_t SetEvent(int64_t hEvent);
-int32_t ResetEvent(int64_t hEvent);
-int32_t PulseEvent(int64_t hEvent);
+int64_t CreateSemaphore(
+    const struct NtSecurityAttributes *opt_lpSemaphoreAttributes,
+    uint32_t lInitialCount, uint32_t lMaximumCount, const char16_t *opt_lpName);
 
 int32_t ReleaseMutex(int64_t hMutex);
 int32_t ReleaseSemaphore(int64_t hSemaphore, int32_t lReleaseCount,
@@ -119,15 +110,19 @@ void TryAcquireSRWLockShared(intptr_t *);
 
 uint64_t GetTickCount64(void);
 
-bool32 QueryPerformanceFrequency(int64_t *lpFrequency);
-bool32 QueryPerformanceCounter(int64_t *lpPerformanceCount);
+bool32 QueryPerformanceFrequency(uint64_t *lpFrequency);
+bool32 QueryPerformanceCounter(uint64_t *lpPerformanceCount);
 bool32 GetSystemTimeAdjustment(uint32_t *lpTimeAdjustment,
                                uint32_t *lpTimeIncrement,
                                bool32 *lpTimeAdjustmentDisabled);
+
+void GetCurrentProcessorNumberEx(struct NtProcessorNumber *out_ProcNumber);
+
+bool32 GetNumaProcessorNodeEx(const struct NtProcessorNumber *Processor,
+                              unsigned short *out_NodeNumber);
 
 #if ShouldUseMsabiAttribute()
 #include "libc/nt/thunk/synchronization.inc"
 #endif /* ShouldUseMsabiAttribute() */
 COSMOPOLITAN_C_END_
-#endif /* !(__ASSEMBLER__ + __LINKER__ + 0) */
 #endif /* COSMOPOLITAN_LIBC_NT_SYNCHRONIZATION_H_ */

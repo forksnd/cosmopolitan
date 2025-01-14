@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2022 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -16,8 +16,7 @@
 │ TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR             │
 │ PERFORMANCE OF THIS SOFTWARE.                                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
-#include "libc/calls/syscall_support-nt.internal.h"
-#include "libc/intrin/strace.internal.h"
+#include "libc/intrin/strace.h"
 #include "libc/nt/files.h"
 #include "libc/nt/thunk/msabi.h"
 
@@ -25,12 +24,10 @@ __msabi extern typeof(RemoveDirectory) *const __imp_RemoveDirectoryW;
 
 /**
  * Deletes existing empty directory on the New Technology.
- * @note this wrapper takes care of ABI, STRACE(), and __winerr()
  */
 textwindows bool32 RemoveDirectory(const char16_t *lpPathName) {
   bool32 ok;
   ok = __imp_RemoveDirectoryW(lpPathName);
-  if (!ok) __winerr();
-  NTTRACE("RemoveDirectory(%#hs) → %hhhd% m", lpPathName, ok);
+  NTTRACE("RemoveDirectory(%#hs) → %hhhd", lpPathName, ok);
   return ok;
 }

@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2020 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -19,9 +19,8 @@
 #include "libc/calls/calls.h"
 #include "libc/calls/syscall_support-sysv.internal.h"
 #include "libc/dce.h"
-#include "libc/intrin/kprintf.h"
-#include "libc/intrin/strace.internal.h"
-#include "libc/macros.internal.h"
+#include "libc/intrin/strace.h"
+#include "libc/macros.h"
 #include "libc/nt/enum/computernameformat.h"
 #include "libc/str/str.h"
 #include "libc/sysv/errfuns.h"
@@ -76,6 +75,6 @@ int getdomainname(char *name, size_t len) {
   if (!rc && len && !strcmp(name, "(none)")) {
     name[0] = 0;
   }
-  STRACE("getdomainname([%#.*s], %'zu) → %d% m", len, name, len, rc);
+  STRACE("getdomainname([%#.*s], %'zu) → %d% m", (int)len, name, len, rc);
   return rc;
 }

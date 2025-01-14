@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2021 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -16,9 +16,6 @@
 │ TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR             │
 │ PERFORMANCE OF THIS SOFTWARE.                                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
-#include "libc/intrin/pcmpgtb.h"
-#include "libc/intrin/pmovmskb.h"
-#include "libc/intrin/tpenc.h"
 #include "libc/mem/mem.h"
 #include "libc/str/str.h"
 #include "libc/str/thompike.h"
@@ -41,20 +38,12 @@ char *Underlong(const char *p, size_t n, size_t *z) {
   char *r, *q;
   size_t i, j, m;
   wint_t x, a, b;
-  int8_t v1[16], v2[16], vz[16];
-  if (z) *z = 0;
-  if (n == -1) n = p ? strlen(p) : 0;
+  if (z)
+    *z = 0;
+  if (n == -1)
+    n = p ? strlen(p) : 0;
   if ((q = r = malloc(n * 2 + 1))) {
     for (i = 0; i < n;) {
-      bzero(vz, 16); /* 50x speedup for ASCII */
-      while (i + 16 < n) {
-        memcpy(v1, p + i, 16);
-        pcmpgtb(v2, v1, vz);
-        if (pmovmskb((void *)v2) != 0xFFFF) break;
-        memcpy(q, v1, 16);
-        q += 16;
-        i += 16;
-      }
       x = p[i++] & 0xff;
       if (x >= 0300) {
         a = ThomPikeByte(x);
@@ -62,7 +51,8 @@ char *Underlong(const char *p, size_t n, size_t *z) {
         if (i + m <= n) {
           for (j = 0;;) {
             b = p[i + j] & 0xff;
-            if (!ThomPikeCont(b)) break;
+            if (!ThomPikeCont(b))
+              break;
             a = ThomPikeMerge(a, b);
             if (++j == m) {
               x = a;
@@ -72,14 +62,16 @@ char *Underlong(const char *p, size_t n, size_t *z) {
           }
         }
       }
-      w = _tpenc(x);
+      w = tpenc(x);
       do {
         *q++ = w;
       } while ((w >>= 8));
     }
-    if (z) *z = q - r;
+    if (z)
+      *z = q - r;
     *q++ = '\0';
-    if ((q = realloc(r, q - r))) r = q;
+    if ((q = realloc(r, q - r)))
+      r = q;
   }
   return r;
 }

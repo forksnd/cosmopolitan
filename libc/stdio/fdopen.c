@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=8 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=8 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2020 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -16,12 +16,12 @@
 │ TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR             │
 │ PERFORMANCE OF THIS SOFTWARE.                                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
-#include "libc/calls/calls.h"
+#include "libc/calls/struct/stat.h"
+#include "libc/mem/mem.h"
 #include "libc/stdio/internal.h"
-#include "libc/stdio/stdio.h"
-#include "libc/sysv/consts/o.h"
-#include "libc/sysv/errfuns.h"
-#include "libc/thread/thread.h"
+#include "libc/sysv/consts/s.h"
+
+__static_yoink("fflush");
 
 /**
  * Allocates stream object for already-opened file descriptor.
@@ -33,16 +33,19 @@
  */
 FILE *fdopen(int fd, const char *mode) {
   FILE *f;
-  if ((f = __stdio_alloc())) {
-    f->fd = fd;
-    f->bufmode = ischardev(fd) ? _IOLBF : _IOFBF;
-    f->iomode = fopenflags(mode);
-    f->buf = f->mem;
-    f->size = BUFSIZ;
-    if ((f->iomode & O_ACCMODE) != O_RDONLY) {
-      __fflush_register(f);
-    }
-    return f;
+  struct stat st;
+  if (fstat(fd, &st))
+    return 0;
+  if (!(f = __stdio_alloc()))
+    return 0;
+  f->bufmode = S_ISCHR(st.st_mode) ? _IONBF : _IOFBF;
+  f->oflags = fopenflags(mode);
+  f->size = BUFSIZ;
+  if (!(f->buf = malloc(f->size))) {
+    __stdio_unref(f);
+    return 0;
   }
-  return NULL;
+  f->freebuf = 1;
+  f->fd = fd;
+  return f;
 }

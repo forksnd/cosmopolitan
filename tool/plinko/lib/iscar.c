@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2022 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -28,16 +28,20 @@
  */
 int IsCar(int x_) {
   dword w_;
-  if (x_ >= 0) return 0;
+  if (x_ >= 0)
+    return 0;
   w_ = Get(x_);  // (⍅ X)
   int ax_ = LO(w_);
   int dx_ = HI(w_);
-  if (ax_ != kCar) return 0;
-  if (dx_ >= 0) return 0;
+  if (ax_ != kCar)
+    return 0;
+  if (dx_ >= 0)
+    return 0;
   w_ = Get(dx_);  // (X)
   int adx_ = LO(w_);
   int ddx_ = HI(w_);
   int X = adx_;
-  if (ddx_) return 0;
+  if (ddx_)
+    return 0;
   return X;
 }

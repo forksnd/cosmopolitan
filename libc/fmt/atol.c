@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2020 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -16,35 +16,34 @@
 │ TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR             │
 │ PERFORMANCE OF THIS SOFTWARE.                                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
-#include "libc/errno.h"
+#include "libc/ctype.h"
 #include "libc/fmt/conv.h"
-#include "libc/limits.h"
 #include "libc/str/str.h"
 
 /**
- * Decodes decimal integer from ASCII string.
+ * Turns string into long.
  *
- * @param s is a non-null nul-terminated string
+ * Decimal is the only radix supported. Leading whitespace (as specified
+ * by the isspace() function) is skipped over. Unlike strtol(), the atoi
+ * function has undefined behavior on error and it never changes `errno`
+ *
+ * @param nptr is a non-null nul-terminated string
  * @return the decoded signed saturated integer
  */
-long atol(const char *s) {
+long atol(const char *nptr) {
   long x;
   int c, d;
-  do {
-    c = *s++;
-  } while (c == ' ' || c == '\t');
+  do
+    c = *nptr++;
+  while (isspace(c));
   d = c == '-' ? -1 : 1;
-  if (c == '-' || c == '+') c = *s++;
-  for (x = 0; isdigit(c); c = *s++) {
-    if (__builtin_mul_overflow(x, 10, &x) ||
-        __builtin_add_overflow(x, (c - '0') * d, &x)) {
-      errno = ERANGE;
-      if (d > 0) {
-        return LONG_MAX;
-      } else {
-        return LONG_MIN;
-      }
-    }
+  if (c == '-' || c == '+')
+    c = *nptr++;
+  for (x = 0; isdigit(c); c = *nptr++) {
+    x *= 10;
+    x += (c - '0') * d;
   }
   return x;
 }
+
+__weak_reference(atol, atoll);

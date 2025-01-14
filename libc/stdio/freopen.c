@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2020 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -16,8 +16,9 @@
 │ TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR             │
 │ PERFORMANCE OF THIS SOFTWARE.                                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
+#include "libc/assert.h"
 #include "libc/calls/calls.h"
-#include "libc/stdio/lock.internal.h"
+#include "libc/stdio/internal.h"
 #include "libc/stdio/stdio.h"
 #include "libc/sysv/consts/f.h"
 #include "libc/sysv/consts/fd.h"
@@ -37,8 +38,8 @@
  * @return stream object if successful, or NULL w/ errno
  */
 FILE *freopen(const char *pathname, const char *mode, FILE *stream) {
-  int fd;
   FILE *res;
+  int fd, fd2;
   unsigned flags;
   flags = fopenflags(mode);
   flockfile(stream);
@@ -46,19 +47,30 @@ FILE *freopen(const char *pathname, const char *mode, FILE *stream) {
   if (pathname) {
     /* open new stream, overwriting existing alloc */
     if ((fd = open(pathname, flags, 0666)) != -1) {
-      dup3(fd, stream->fd, flags & O_CLOEXEC);
+      fd2 = dup3(fd, stream->fd, flags & O_CLOEXEC);
       close(fd);
-      stream->iomode = flags;
-      stream->beg = 0;
-      stream->end = 0;
-      res = stream;
+      if (fd2 != -1) {
+        stream->fd = fd2;
+        stream->oflags = flags;
+        stream->beg = 0;
+        stream->end = 0;
+        res = stream;
+      } else {
+        res = NULL;
+      }
     } else {
       res = NULL;
     }
   } else {
-    fcntl(stream->fd, F_SETFD, !!(flags & O_CLOEXEC));
-    fcntl(stream->fd, F_SETFL, flags & ~O_CLOEXEC);
-    res = stream;
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wanalyzer-fd-use-without-check"
+    if (fcntl(stream->fd, F_SETFD, !!(flags & O_CLOEXEC)) != -1 &&
+        fcntl(stream->fd, F_SETFL, flags & ~O_CLOEXEC) != -1) {
+#pragma GCC diagnostic pop
+      res = stream;
+    } else {
+      res = NULL;
+    }
   }
   funlockfile(stream);
   return res;

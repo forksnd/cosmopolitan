@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2022 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -16,8 +16,8 @@
 │ TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR             │
 │ PERFORMANCE OF THIS SOFTWARE.                                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
-#include "libc/intrin/describeflags.internal.h"
-#include "libc/macros.internal.h"
+#include "libc/intrin/describeflags.h"
+#include "libc/macros.h"
 #include "libc/nt/enum/filemapflags.h"
 #include "libc/nt/ipc.h"
 
@@ -32,7 +32,7 @@ static const struct DescribeFlags kPipeModeFlags[] = {
     //{kNtPipeTypeByte, "TypeByte"},                        // 0x00000000
 };
 
-const char *(DescribeNtPipeModeFlags)(char buf[64], uint32_t x) {
-  return DescribeFlags(buf, 64, kPipeModeFlags, ARRAYLEN(kPipeModeFlags),
-                       "kNtPipe", x);
+const char *_DescribeNtPipeModeFlags(char buf[64], uint32_t x) {
+  return _DescribeFlags(buf, 64, kPipeModeFlags, ARRAYLEN(kPipeModeFlags),
+                        "kNtPipe", x);
 }

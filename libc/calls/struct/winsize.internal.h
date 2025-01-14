@@ -1,12 +1,13 @@
 #ifndef COSMOPOLITAN_LIBC_CALLS_STRUCT_WINSIZE_INTERNAL_H_
 #define COSMOPOLITAN_LIBC_CALLS_STRUCT_WINSIZE_INTERNAL_H_
-#include "libc/calls/struct/fd.internal.h"
 #include "libc/calls/struct/winsize.h"
-#if !(__ASSEMBLER__ + __LINKER__ + 0)
+#include "libc/intrin/fds.h"
+#include "libc/mem/alloca.h"
 COSMOPOLITAN_C_START_
 
-int ioctl_tiocgwinsz_nt(struct Fd *, struct winsize *) _Hide;
+int tcgetwinsize_nt(int, struct winsize *);
+const char *_DescribeWinsize(char[64], int, const struct winsize *);
+#define DescribeWinsize(rc, ws) _DescribeWinsize(alloca(64), rc, ws)
 
 COSMOPOLITAN_C_END_
-#endif /* !(__ASSEMBLER__ + __LINKER__ + 0) */
 #endif /* COSMOPOLITAN_LIBC_CALLS_STRUCT_WINSIZE_INTERNAL_H_ */

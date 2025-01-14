@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:t;c-basic-offset:8;tab-width:8;coding:utf-8   -*-│
-│vi: set et ft=c ts=8 tw=8 fenc=utf-8                                       :vi│
+│ vi: set noet ft=c ts=8 sw=8 fenc=utf-8                                   :vi │
 ╚──────────────────────────────────────────────────────────────────────────────╝
 │                                                                              │
 │  Musl Libc                                                                   │
@@ -25,24 +25,19 @@
 │  SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.                      │
 │                                                                              │
 ╚─────────────────────────────────────────────────────────────────────────────*/
+#include "third_party/musl/lockf.h"
 #include "libc/calls/calls.h"
 #include "libc/calls/struct/flock.h"
 #include "libc/calls/weirdtypes.h"
 #include "libc/errno.h"
 #include "libc/sysv/consts/f.h"
 #include "libc/sysv/errfuns.h"
-#include "third_party/musl/lockf.h"
-
-asm(".ident\t\"\\n\\n\
-Musl libc (MIT License)\\n\
-Copyright 2005-2014 Rich Felker, et. al.\"");
-asm(".include \"libc/disclaimer.inc\"");
-// clang-format off
+__static_yoink("musl_libc_notice");
 
 /**
  * Locks file.
  *
- * @cancellationpoint when `op` is `F_LOCK`
+ * @cancelationpoint when `op` is `F_LOCK`
  */
 int lockf(int fd, int op, off_t size)
 {
@@ -68,3 +63,5 @@ int lockf(int fd, int op, off_t size)
 	}
 	return einval();
 }
+
+__weak_reference(lockf, lockf64);

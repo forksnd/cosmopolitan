@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:t;c-basic-offset:8;tab-width:8;coding:utf-8   -*-│
-│vi: set et ft=c ts=8 tw=8 fenc=utf-8                                       :vi│
+│ vi: set noet ft=c ts=8 sw=8 fenc=utf-8                                   :vi │
 ╚──────────────────────────────────────────────────────────────────────────────╝
 │                                                                              │
 │  Musl Libc                                                                   │
@@ -26,15 +26,9 @@
 │                                                                              │
 ╚─────────────────────────────────────────────────────────────────────────────*/
 #include "libc/math.h"
+__static_yoink("musl_libc_notice");
+__static_yoink("fdlibm_notice");
 
-asm(".ident\t\"\\n\\n\
-fdlibm (fdlibm license)\\n\
-Copyright (C) 1993 by Sun Microsystems, Inc. All rights reserved.\"");
-asm(".ident\t\"\\n\\n\
-Musl libc (MIT License)\\n\
-Copyright 2005-2014 Rich Felker, et. al.\"");
-asm(".include \"libc/disclaimer.inc\"");
-// clang-format off
 
 /* origin: FreeBSD /usr/src/lib/msun/src/e_scalb.c */
 /*
@@ -56,18 +50,18 @@ asm(".include \"libc/disclaimer.inc\"");
 /**
  * Returns 𝑥 × 2ʸ.
  */
-double scalb(double x, double fn)
+double scalb(double x, double y)
 {
-	if (isnan(x) || isnan(fn))
-		return x*fn;
-	if (!isfinite(fn)) {
-		if (fn > 0.0)
-			return x*fn;
+	if (isunordered(x, y))
+		return x*y;
+	if (!isfinite(y)) {
+		if (y > 0.0)
+			return x*y;
 		else
-			return x/(-fn);
+			return x/(-y);
 	}
-	if (rint(fn) != fn) return (fn-fn)/(fn-fn);
-	if ( fn > 65000.0) return scalbn(x, 65000);
-	if (-fn > 65000.0) return scalbn(x,-65000);
-	return scalbn(x,(int)fn);
+	if (rint(y) != y) return (y-y)/(y-y);
+	if ( y > 65000.0) return scalbn(x, 65000);
+	if (-y > 65000.0) return scalbn(x,-65000);
+	return scalbn(x,(int)y);
 }

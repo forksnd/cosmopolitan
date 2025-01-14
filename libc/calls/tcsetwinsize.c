@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2023 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -16,13 +16,34 @@
 │ TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR             │
 │ PERFORMANCE OF THIS SOFTWARE.                                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
-#include "libc/calls/calls.h"
-#include "libc/calls/ioctl.h"
+#include "libc/calls/internal.h"
 #include "libc/calls/struct/winsize.h"
+#include "libc/calls/struct/winsize.internal.h"
+#include "libc/calls/syscall-sysv.internal.h"
+#include "libc/calls/termios.h"
+#include "libc/dce.h"
+#include "libc/intrin/strace.h"
+#include "libc/sysv/consts/termios.h"
+#include "libc/sysv/errfuns.h"
+
+int tcsetwinsize_nt(int, const struct winsize *);
 
 /**
  * Sets terminal window size attributes.
  */
 int tcsetwinsize(int fd, const struct winsize *ws) {
-  return ioctl_tiocswinsz(fd, ws);
+  int rc;
+  if (fd >= 0) {
+    if (fd < g_fds.n && g_fds.p[fd].kind == kFdZip) {
+      rc = enotty();
+    } else if (!IsWindows()) {
+      rc = sys_ioctl(fd, TIOCSWINSZ, ws);
+    } else {
+      rc = tcsetwinsize_nt(fd, ws);
+    }
+  } else {
+    rc = einval();
+  }
+  STRACE("tcsetwinsize(%d, %s) → %d% m", fd, DescribeWinsize(rc, ws), rc);
+  return rc;
 }

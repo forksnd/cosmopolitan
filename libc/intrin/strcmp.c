@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2020 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -17,8 +17,8 @@
 │ PERFORMANCE OF THIS SOFTWARE.                                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
 #include "libc/dce.h"
-#include "libc/intrin/asan.internal.h"
 #include "libc/str/str.h"
+#ifndef __aarch64__
 
 /**
  * Compares NUL-terminated strings.
@@ -28,12 +28,14 @@
  * @return is <0, 0, or >0 based on uint8_t comparison
  * @asyncsignalsafe
  */
-noasan int strcmp(const char *a, const char *b) {
+int strcmp(const char *a, const char *b) {
   int c;
   size_t i = 0;
-  uint64_t v, w, d;
-  if (a == b) return 0;
-  if ((c = (*a & 255) - (*b & 255))) return c;
+  uint64_t v, w;
+  if (a == b)
+    return 0;
+  if ((c = (*a & 255) - (*b & 255)))
+    return c;
   if (!IsTiny() && ((uintptr_t)a & 7) == ((uintptr_t)b & 7)) {
     for (; (uintptr_t)(a + i) & 7; ++i) {
       if (a[i] != b[i] || !b[i]) {
@@ -50,11 +52,10 @@ noasan int strcmp(const char *a, const char *b) {
       }
     }
   } else {
-    while (a[i] == b[i] && b[i]) ++i;
-  }
-  if (IsAsan()) {
-    __asan_verify(a, i + 1);
-    __asan_verify(b, i + 1);
+    while (a[i] == b[i] && b[i])
+      ++i;
   }
   return (a[i] & 255) - (b[i] & 255);
 }
+
+#endif /* __aarch64__ */

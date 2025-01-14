@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2021 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -16,132 +16,240 @@
 │ TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR             │
 │ PERFORMANCE OF THIS SOFTWARE.                                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
+#include "libc/atomic.h"
 #include "libc/calls/calls.h"
 #include "libc/calls/metalfile.internal.h"
 #include "libc/calls/syscall-sysv.internal.h"
+#include "libc/cosmo.h"
 #include "libc/dce.h"
 #include "libc/errno.h"
-#include "libc/macros.internal.h"
+#include "libc/fmt/libgen.h"
+#include "libc/intrin/getenv.h"
+#include "libc/intrin/strace.h"
+#include "libc/limits.h"
+#include "libc/macros.h"
 #include "libc/nt/runtime.h"
 #include "libc/runtime/runtime.h"
+#include "libc/serialize.h"
 #include "libc/str/str.h"
 #include "libc/sysv/consts/at.h"
 #include "libc/sysv/consts/ok.h"
 
-#define SIZE                       1024
+#ifdef __x86_64__
+__static_yoink("_init_program_executable_name");
+#endif
+
 #define CTL_KERN                   1
 #define KERN_PROC                  14
 #define KERN_PROC_PATHNAME_FREEBSD 12
 #define KERN_PROC_PATHNAME_NETBSD  5
 
-char program_executable_name[PATH_MAX];
+#define DevFd() (IsBsd() ? "/dev/fd/" : IsLinux() ? "/proc/self/fd/" : 0)
+#define StrlenDevFd()                      \
+  ((IsBsd()     ? sizeof("/dev/fd/")       \
+    : IsLinux() ? sizeof("/proc/self/fd/") \
+                : 0) -                     \
+   1)
+
+static struct {
+  atomic_uint once;
+  union {
+    char buf[PATH_MAX];
+    char16_t buf16[PATH_MAX / 2];
+  } u;
+} g_prog;
 
 static inline int IsAlpha(int c) {
   return ('A' <= c && c <= 'Z') || ('a' <= c && c <= 'z');
 }
 
-static inline char *StrCat(char buf[PATH_MAX], const char *a, const char *b) {
-  char *p, *e;
-  p = buf;
-  e = buf + PATH_MAX;
-  while (*a && p < e) *p++ = *a++;
-  while (*b && p < e) *p++ = *b++;
-  return buf;
+static inline int AllNumDot(const char *s) {
+  while (true) {
+    switch (*s++) {
+      default:
+        return 0;
+      case 0:
+        return 1;
+      case '0':
+      case '1':
+      case '2':
+      case '3':
+      case '4':
+      case '5':
+      case '6':
+      case '7':
+      case '8':
+      case '9':
+      case '.':; /* continue */
+    }
+  }
 }
 
-static inline void GetProgramExecutableNameImpl(char *p, char *e) {
-  char *q;
-  ssize_t rc;
-  size_t i, n;
-  union {
-    int cmd[4];
-    char path[PATH_MAX];
-    char16_t path16[PATH_MAX];
-  } u;
+// old loaders do not pass __program_executable_name, so we need to
+// check for them when we use KERN_PROC_PATHNAME et al.
+static int OldApeLoader(char *s) {
+  char *b;
+  return !strcmp(s, "/usr/bin/ape") ||
+         (!strncmp((b = basename(s)), ".ape-", 5) && AllNumDot(b + 5));
+}
+
+static int CopyWithCwd(const char *q, char *p, char *e) {
+  char c;
+  if (*q != '/') {
+    if (q[0] == '.' && q[1] == '/')
+      q += 2;
+    int got = __getcwd(p, e - p - 1 /* '/' */);
+    if (got != -1) {
+      p += got - 1;
+      *p++ = '/';
+    }
+  }
+  while ((c = *q++)) {
+    if (p + 1 /* nul */ < e) {
+      *p++ = c;
+    } else {
+      return 0;
+    }
+  }
+  *p = 0;
+  return 1;
+}
+
+// if q exists then turn it into an absolute path.
+static int TryPath(const char *q) {
+  if (!q)
+    return 0;
+  if (!CopyWithCwd(q, g_prog.u.buf, g_prog.u.buf + sizeof(g_prog.u.buf)))
+    return 0;
+  return !sys_faccessat(AT_FDCWD, g_prog.u.buf, F_OK, 0);
+}
+
+// if the loader passed a relative path, prepend cwd to it.
+// called early in init.
+void __init_program_executable_name(void) {
+  if (__program_executable_name && *__program_executable_name != '/' &&
+      CopyWithCwd(__program_executable_name, g_prog.u.buf,
+                  g_prog.u.buf + sizeof(g_prog.u.buf)))
+    __program_executable_name = g_prog.u.buf;
+}
+
+static inline void InitProgramExecutableNameImpl(void) {
+  size_t n;
+  ssize_t got;
+  char c, *q, *b;
 
   if (IsWindows()) {
-    n = GetModuleFileName(0, u.path16, ARRAYLEN(u.path16));
-    for (i = 0; i < n; ++i) {
+    int n = GetModuleFileName(0, g_prog.u.buf16, ARRAYLEN(g_prog.u.buf16));
+    for (int i = 0; i < n; ++i) {
       // turn c:\foo\bar into c:/foo/bar
-      if (u.path16[i] == '\\') {
-        u.path16[i] = '/';
+      if (g_prog.u.buf16[i] == '\\') {
+        g_prog.u.buf16[i] = '/';
       }
     }
-    if (IsAlpha(u.path16[0]) && u.path16[1] == ':' && u.path16[2] == '/') {
+    if (IsAlpha(g_prog.u.buf16[0]) &&  //
+        g_prog.u.buf16[1] == ':' &&    //
+        g_prog.u.buf16[2] == '/') {
       // turn c:/... into /c/...
-      u.path16[1] = u.path16[0];
-      u.path16[0] = '/';
-      u.path16[2] = '/';
+      g_prog.u.buf16[1] = g_prog.u.buf16[0];
+      g_prog.u.buf16[0] = '/';
+      g_prog.u.buf16[2] = '/';
     }
-    tprecode16to8(p, e - p, u.path16);
-    return;
+    tprecode16to8(g_prog.u.buf, sizeof(g_prog.u.buf), g_prog.u.buf16);
+    goto UseBuf;
   }
-
   if (IsMetal()) {
-    if (!memccpy(p, APE_COM_NAME, 0, e - p - 1)) e[-1] = 0;
+    __program_executable_name = APE_COM_NAME;
     return;
   }
 
-  // if argv[0] exists then turn it into an absolute path. we also try
-  // adding a .com suffix since the ape auto-appends it when resolving
-  if (__argc && (((q = __argv[0]) && !sys_faccessat(AT_FDCWD, q, F_OK, 0)) ||
-                 ((q = StrCat(u.path, __argv[0], ".com")) &&
-                  !sys_faccessat(AT_FDCWD, q, F_OK, 0)))) {
-    if (*q != '/') {
-      if (q[0] == '.' && q[1] == '/') {
-        q += 2;
-      }
-      if (getcwd(p, e - p)) {
-        while (*p) ++p;
-        *p++ = '/';
+  // see if the loader passed us a path.
+  if (__program_executable_name) {
+    if (issetugid()) {
+      /* we are running as a set-id interpreter script. this is highly unusual.
+         it means either someone installed their ape loader set-id, or they are
+         running a system that supports secure set-id interpreter scripts via a
+         /dev/fd/ path. check for the latter and allow that. otherwise, use the
+         empty string to obviate the TOCTOU problem between loader and binary.
+       */
+      if (!(b = DevFd()) ||
+          0 != strncmp(b, __program_executable_name, (n = StrlenDevFd())) ||
+          !__program_executable_name[n] ||
+          __program_executable_name[n] == '.' ||
+          strchr(__program_executable_name + n, '/')) {
+        goto UseEmpty;
       }
     }
-    for (i = 0; *q && p + 1 < e; ++p, ++q) {
-      *p = *q;
+    return;
+  }
+
+  b = g_prog.u.buf;
+  n = sizeof(g_prog.u.buf) - 1;
+  if (IsFreebsd() || IsNetbsd()) {
+    int cmd[4];
+    cmd[0] = CTL_KERN;
+    cmd[1] = KERN_PROC;
+    if (IsFreebsd()) {
+      cmd[2] = KERN_PROC_PATHNAME_FREEBSD;
+    } else {
+      cmd[2] = KERN_PROC_PATHNAME_NETBSD;
+    }
+    cmd[3] = -1;  // current process
+    if (sysctl(cmd, ARRAYLEN(cmd), b, &n, 0, 0) != -1) {
+      if (!OldApeLoader(b)) {
+        goto UseBuf;
+      }
+    }
+  }
+  if (IsLinux()) {
+    if ((got = sys_readlinkat(AT_FDCWD, "/proc/self/exe", b, n)) > 0 ||
+        (got = sys_readlinkat(AT_FDCWD, "/proc/curproc/file", b, n)) > 0) {
+      b[got] = 0;
+      if (!OldApeLoader(b)) {
+        goto UseBuf;
+      }
+    }
+  }
+
+  // don't trust argv or envp if set-id.
+  if (issetugid())
+    goto UseEmpty;
+
+  // try argv[0], then then $_.
+  if (TryPath(__argv[0]) || TryPath(__getenv(__envp, "_").s))
+    goto UseBuf;
+
+  // give up and just copy argv[0] into it
+  if ((q = __argv[0])) {
+    char *p = g_prog.u.buf;
+    char *e = p + sizeof(g_prog.u.buf);
+    while ((c = *q++)) {
+      if (p + 1 < e) {
+        *p++ = c;
+      }
     }
     *p = 0;
-    return;
+    goto UseBuf;
   }
 
-  // if argv[0] doesn't exist, then fallback to interpreter name
-  if ((rc = sys_readlinkat(AT_FDCWD, "/proc/self/exe", p, e - p - 1)) > 0 ||
-      (rc = sys_readlinkat(AT_FDCWD, "/proc/curproc/file", p, e - p - 1)) > 0) {
-    p[rc] = 0;
-    return;
-  }
-  if (IsFreebsd() || IsNetbsd()) {
-    u.cmd[0] = CTL_KERN;
-    u.cmd[1] = KERN_PROC;
-    if (IsFreebsd()) {
-      u.cmd[2] = KERN_PROC_PATHNAME_FREEBSD;
-    } else {
-      u.cmd[2] = KERN_PROC_PATHNAME_NETBSD;
-    }
-    u.cmd[3] = -1;  // current process
-    n = e - p;
-    if (sys_sysctl(u.cmd, ARRAYLEN(u.cmd), p, &n, 0, 0) != -1) {
-      return;
-    }
-  }
+UseEmpty:
+  // if we don't even have that then empty the string
+  g_prog.u.buf[0] = 0;
+
+UseBuf:
+  __program_executable_name = g_prog.u.buf;
+}
+
+static void InitProgramExecutableName(void) {
+  int e = errno;
+  InitProgramExecutableNameImpl();
+  errno = e;
 }
 
 /**
  * Returns absolute path of program.
  */
 char *GetProgramExecutableName(void) {
-  int e;
-  static bool once;
-  if (!once) {
-    e = errno;
-    GetProgramExecutableNameImpl(
-        program_executable_name,
-        program_executable_name + sizeof(program_executable_name));
-    errno = e;
-    once = true;
-  }
-  return program_executable_name;
+  cosmo_once(&g_prog.once, InitProgramExecutableName);
+  STRACE("GetProgramExecutableName() → %#s", __program_executable_name);
+  return __program_executable_name;
 }
-
-/* const void *const GetProgramExecutableNameCtor[] initarray = { */
-/*     GetProgramExecutableName, */
-/* }; */

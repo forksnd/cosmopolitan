@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2020 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -18,7 +18,7 @@
 ╚─────────────────────────────────────────────────────────────────────────────*/
 #include "libc/limits.h"
 #include "libc/log/log.h"
-#include "libc/macros.internal.h"
+#include "libc/macros.h"
 #include "libc/mem/alg.h"
 #include "libc/mem/gc.h"
 #include "libc/mem/mem.h"
@@ -50,18 +50,20 @@ void insertionsort(int32_t *a, size_t n) {
   }
 }
 
+#ifdef __x86_64__
 TEST(djbsort, test4) {
   static const int kA[] = {4, 3, 2, 1};
   n = ARRAYLEN(kA);
-  a = memcpy(_gc(malloc(n * 4)), kA, n * 4);
-  b = memcpy(_gc(malloc(n * 4)), kA, n * 4);
-  c = memcpy(_gc(malloc(n * 4)), kA, n * 4);
+  a = memcpy(gc(malloc(n * 4)), kA, n * 4);
+  b = memcpy(gc(malloc(n * 4)), kA, n * 4);
+  c = memcpy(gc(malloc(n * 4)), kA, n * 4);
   insertionsort(a, n);
   djbsort_avx2(b, n);
   djbsort(c, n);
   ASSERT_EQ(0, memcmp(a, b, n * 4));
   ASSERT_EQ(0, memcmp(a, c, n * 4));
 }
+#endif /* __x86_64__ */
 
 TEST(djbsort, test64) {
   static const int kA[64] = {
@@ -80,27 +82,31 @@ TEST(djbsort, test64) {
       -1323943608, -1219421355, -582289873,  1062699814,
   };
   n = ARRAYLEN(kA);
-  a = memcpy(_gc(malloc(n * 4)), kA, n * 4);
-  b = memcpy(_gc(malloc(n * 4)), kA, n * 4);
-  c = memcpy(_gc(malloc(n * 4)), kA, n * 4);
+  a = memcpy(gc(malloc(n * 4)), kA, n * 4);
+  b = memcpy(gc(malloc(n * 4)), kA, n * 4);
+  c = memcpy(gc(malloc(n * 4)), kA, n * 4);
   insertionsort(a, n);
   djbsort(c, n);
   ASSERT_EQ(0, memcmp(a, c, n * 4));
+#ifdef __x86_64__
   if (X86_HAVE(AVX2)) {
     djbsort_avx2(b, n);
     ASSERT_EQ(0, memcmp(a, b, n * 4));
   }
+#endif /* __x86_64__ */
 }
 
 static int CompareInt(const void *a, const void *b) {
-  if (*(const int *)a < *(const int *)b) return -1;
-  if (*(const int *)a > *(const int *)b) return +1;
+  if (*(const int *)a < *(const int *)b)
+    return -1;
+  if (*(const int *)a > *(const int *)b)
+    return +1;
   return 0;
 }
 
 BENCH(djbsort, bench) {
   n = 256;
-  a = _gc(memalign(32, n * 4));
+  a = gc(memalign(32, n * 4));
   EZBENCH2("insertionsort[255]", rngset(a, n * 4, _rand64, -1),
            insertionsort(a, n));
   EZBENCH2("djbsort[255]", rngset(a, n * 4, _rand64, -1), djbsort(a, n));

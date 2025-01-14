@@ -1,4 +1,3 @@
-/* clang-format off */
 /* ===-- int_lib.h - configuration header for compiler-rt  -----------------===
  *
  *                     The LLVM Compiler Infrastructure
@@ -47,16 +46,19 @@
 
 #ifdef _MSC_VER
 #define ALWAYS_INLINE __forceinline
+#define NOINLINE __declspec(noinline)
 #define NORETURN __declspec(noreturn)
 #define UNUSED
 #else
 #define ALWAYS_INLINE __attribute__((__always_inline__))
+#define NOINLINE __attribute__((__noinline__))
 #define NORETURN __attribute__((__noreturn__))
 #define UNUSED __attribute__((__unused__))
 #endif
 
 #include "libc/literal.h"
 #include "libc/math.h"
+#include "libc/limits.h"
 
 /* Include the commonly used internal type definitions. */
 #include "third_party/compiler_rt/int_types.h"

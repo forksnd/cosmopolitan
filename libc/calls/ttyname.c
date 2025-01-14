@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2020 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -17,15 +17,26 @@
 │ PERFORMANCE OF THIS SOFTWARE.                                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
 #include "libc/calls/calls.h"
+#include "libc/errno.h"
 #include "libc/log/log.h"
-
-static char ttyname_buf[PATH_MAX];
+#include "libc/paths.h"
+#include "libc/stdio/sysparam.h"
 
 /**
  * Returns name of terminal.
+ *
+ * This function isn't required to be thread safe, consider ttyname_r().
+ *
+ * @return terminal path on success, or null w/ errno
+ * @see ttyname_r()
  */
 char *ttyname(int fd) {
-  int rc = ttyname_r(fd, ttyname_buf, sizeof(ttyname_buf));
-  if (rc != 0) return NULL;
-  return &ttyname_buf[0];
+  errno_t err;
+  static char buf[sizeof(_PATH_DEV) + MAXNAMLEN];
+  if (!(err = ttyname_r(fd, buf, sizeof(buf)))) {
+    return buf;
+  } else {
+    errno = err;
+    return 0;
+  }
 }

@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2020 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -16,26 +16,12 @@
 │ TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR             │
 │ PERFORMANCE OF THIS SOFTWARE.                                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
+#include "libc/dce.h"
 #include "libc/str/str.h"
+#ifndef __aarch64__
 
 typedef char xmm_u __attribute__((__vector_size__(16), __aligned__(1)));
 typedef char xmm_t __attribute__((__vector_size__(16), __aligned__(16)));
-
-#ifdef __x86_64__
-static inline noasan size_t strcpy_sse2(char *d, const char *s, size_t i) {
-  xmm_t v, z = {0};
-  for (;;) {
-    v = *(xmm_t *)(s + i);
-    if (!__builtin_ia32_pmovmskb128(v == z)) {
-      *(xmm_u *)(d + i) = v;
-      i += 16;
-    } else {
-      break;
-    }
-  }
-  return i;
-}
-#endif
 
 /**
  * Copies bytes from 𝑠 to 𝑑 until a NUL is encountered.
@@ -46,15 +32,24 @@ static inline noasan size_t strcpy_sse2(char *d, const char *s, size_t i) {
  * @return original dest
  * @asyncsignalsafe
  */
-char *strcpy(char *d, const char *s) {
+__vex char *strcpy(char *d, const char *s) {
   size_t i = 0;
-#ifdef __x86_64__
+#if defined(__x86_64__) && !defined(__chibicc__)
   for (; (uintptr_t)(s + i) & 15; ++i) {
     if (!(d[i] = s[i])) {
       return d;
     }
   }
-  i = strcpy_sse2(d, s, i);
+  for (;;) {
+    xmm_t z = {0};
+    xmm_t v = *(xmm_t *)(s + i);
+    if (!__builtin_ia32_pmovmskb128(v == z)) {
+      *(xmm_u *)(d + i) = v;
+      i += 16;
+    } else {
+      break;
+    }
+  }
 #endif
   for (;;) {
     if (!(d[i] = s[i])) {
@@ -63,3 +58,5 @@ char *strcpy(char *d, const char *s) {
     ++i;
   }
 }
+
+#endif /* __aarch64__ */

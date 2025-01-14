@@ -1,4 +1,3 @@
-/* clang-format off */
 /* ===-- assembly.h - compiler-rt assembler support macros -----------------===
  *
  *                     The LLVM Compiler Infrastructure
@@ -46,7 +45,7 @@
 #define CONST_SECTION .section .rodata
 
 #if defined(__GNU__) || defined(__FreeBSD__) || defined(__Fuchsia__) || \
-    defined(__linux__)
+    defined(__linux__) || defined(__COSMOPOLITAN__)
 #define NO_EXEC_STACK_DIRECTIVE .section .note.GNU-stack,"",%progbits
 #else
 #define NO_EXEC_STACK_DIRECTIVE

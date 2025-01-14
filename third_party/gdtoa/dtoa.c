@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:t;c-basic-offset:8;tab-width:8;coding:utf-8   -*-│
-│vi: set et ft=c ts=8 tw=8 fenc=utf-8                                       :vi│
+│ vi: set noet ft=c ts=8 sw=8 fenc=utf-8                                   :vi │
 ╚──────────────────────────────────────────────────────────────────────────────╝
 │                                                                              │
 │  The author of this software is David M. Gay.                                │
@@ -31,7 +31,6 @@
 ╚─────────────────────────────────────────────────────────────────────────────*/
 #include "libc/runtime/fenv.h"
 #include "third_party/gdtoa/gdtoa.internal.h"
-/* clang-format off */
 
 /* dtoa for IEEE arithmetic (dmg): convert double to ASCII string.
  *
@@ -247,6 +246,9 @@ dtoa(double d0, int mode, int ndigits, int *decpt, int *sign, char **rve)
 			i = 1;
 	}
 	s = s0 = __gdtoa_rv_alloc(i, &TI);
+	if (s0 == NULL)
+		goto ret1;
+
 	if (mode > 1 && Rounding != 1)
 		leftright = 0;
 	if (ilim >= 0 && ilim <= Quick_max && try_quick) {
@@ -615,7 +617,8 @@ retc:
 		--s;
 ret1:
 	__gdtoa_Bfree(b, &TI);
-	*s = 0;
+	if (s != NULL)
+		*s = 0;
 	*decpt = k + 1;
 	if (rve)
 		*rve = s;

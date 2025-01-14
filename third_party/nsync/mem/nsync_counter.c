@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:t;c-basic-offset:8;tab-width:8;coding:utf-8   -*-│
-│vi: set et ft=c ts=8 tw=8 fenc=utf-8                                       :vi│
+│ vi: set noet ft=c ts=8 sw=8 fenc=utf-8                                   :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2016 Google Inc.                                                   │
 │                                                                              │
@@ -15,36 +15,32 @@
 │ See the License for the specific language governing permissions and          │
 │ limitations under the License.                                               │
 ╚─────────────────────────────────────────────────────────────────────────────*/
+#include "libc/intrin/dll.h"
 #include "libc/mem/mem.h"
 #include "libc/str/str.h"
 #include "third_party/nsync/atomic.h"
+#include "third_party/nsync/time.h"
 #include "third_party/nsync/atomic.internal.h"
 #include "third_party/nsync/common.internal.h"
 #include "third_party/nsync/counter.h"
-#include "third_party/nsync/dll.h"
 #include "third_party/nsync/mu_semaphore.h"
 #include "third_party/nsync/races.internal.h"
 #include "third_party/nsync/wait_s.internal.h"
 #include "third_party/nsync/waiter.h"
-
-asm(".ident\t\"\\n\\n\
-*NSYNC (Apache 2.0)\\n\
-Copyright 2016 Google, Inc.\\n\
-https://github.com/google/nsync\"");
-// clang-format off
+__static_yoink("nsync_notice");
 
 /* Internal details of nsync_counter. */
 struct nsync_counter_s_ {
         nsync_atomic_uint32_ waited;    /* wait has been called */
         nsync_mu counter_mu;         /* protects fields below except reads of "value" */
         nsync_atomic_uint32_ value;     /* value of counter */
-        struct nsync_dll_element_s_ *waiters;  /* list of waiters */
+        struct Dll *waiters;  /* list of waiters */
 };
 
 nsync_counter nsync_counter_new (uint32_t value) {
 	nsync_counter c = (nsync_counter) malloc (sizeof (*c));
 	if (c != NULL) {
-		memset ((void *) c, 0, sizeof (*c));
+		bzero ((void *) c, sizeof (*c));
 		ATM_STORE (&c->value, value);
 	}
 	return (c);
@@ -52,7 +48,7 @@ nsync_counter nsync_counter_new (uint32_t value) {
 
 void nsync_counter_free (nsync_counter c) {
 	nsync_mu_lock (&c->counter_mu);
-	ASSERT (nsync_dll_is_empty_ (c->waiters));
+	ASSERT (dll_is_empty (c->waiters));
 	nsync_mu_unlock (&c->counter_mu);
 	free (c);
 }
@@ -77,10 +73,10 @@ uint32_t nsync_counter_add (nsync_counter c, int32_t delta) {
 			ASSERT (value < value - delta); /* Crash on overflow. */
 		}
 		if (value == 0) {
-			nsync_dll_element_ *p;
-			while ((p = nsync_dll_first_ (c->waiters)) != NULL) {
+			struct Dll *p;
+			while ((p = dll_first (c->waiters)) != NULL) {
 				struct nsync_waiter_s *nw = DLL_NSYNC_WAITER (p);
-				c->waiters = nsync_dll_remove_ (c->waiters, p);
+				dll_remove (&c->waiters, p);
 				ATM_STORE_REL (&nw->waiting, 0);
 				nsync_mu_semaphore_v (nw->sem);
 			}
@@ -99,13 +95,13 @@ uint32_t nsync_counter_value (nsync_counter c) {
 	return (result);
 }
 
-uint32_t nsync_counter_wait (nsync_counter c, nsync_time abs_deadline) {
+uint32_t nsync_counter_wait (nsync_counter c, int clock, nsync_time abs_deadline) {
 	struct nsync_waitable_s waitable;
 	struct nsync_waitable_s *pwaitable = &waitable;
 	uint32_t result = 0;
 	waitable.v = c;
 	waitable.funcs = &nsync_counter_waitable_funcs;
-	if (nsync_wait_n (NULL, NULL, NULL, abs_deadline, 1, &pwaitable) != 0) {
+	if (nsync_wait_n (NULL, NULL, NULL, clock, abs_deadline, 1, &pwaitable) != 0) {
 		IGNORE_RACES_START ();
 		result = ATM_LOAD_ACQ (&c->value);
 		IGNORE_RACES_END ();
@@ -127,7 +123,7 @@ static int counter_enqueue (void *v, struct nsync_waiter_s *nw) {
 	nsync_mu_lock (&c->counter_mu);
 	value = ATM_LOAD_ACQ (&c->value);
 	if (value != 0) {
-		c->waiters = nsync_dll_make_last_in_list_ (c->waiters, &nw->q);
+		dll_make_last (&c->waiters, &nw->q);
 		ATM_STORE (&nw->waiting, 1);
 	} else {
 		ATM_STORE (&nw->waiting, 0);
@@ -142,7 +138,7 @@ static int counter_dequeue (void *v, struct nsync_waiter_s *nw) {
 	nsync_mu_lock (&c->counter_mu);
 	value = ATM_LOAD_ACQ (&c->value);
 	if (ATM_LOAD_ACQ (&nw->waiting) != 0) {
-		c->waiters = nsync_dll_remove_ (c->waiters, &nw->q);
+		dll_remove (&c->waiters, &nw->q);
 		ATM_STORE (&nw->waiting, 0);
 	}
 	nsync_mu_unlock (&c->counter_mu);

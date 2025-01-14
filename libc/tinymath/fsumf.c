@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2021 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -17,13 +17,12 @@
 │ PERFORMANCE OF THIS SOFTWARE.                                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
 #include "libc/math.h"
-#include "libc/str/str.h"
 
 /**
  * Adds floats in array.
  */
-float fsumf(const float *p, size_t n) {
-  float s;
+double fsumf(const float *p, size_t n) {
+  double s;
   size_t i;
   if (n > 8) return fsumf(p, n / 2) + fsumf(p + n / 2, n - n / 2);
   for (s = i = 0; i < n; ++i) s += p[i];

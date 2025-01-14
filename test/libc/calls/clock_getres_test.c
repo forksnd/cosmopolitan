@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2022 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -21,7 +21,7 @@
 #include "libc/runtime/runtime.h"
 #include "libc/sysv/consts/clock.h"
 #include "libc/testlib/testlib.h"
-#include "libc/time/time.h"
+#include "libc/time.h"
 
 struct timespec ts;
 
@@ -32,22 +32,9 @@ TEST(clock_getres, realtimeHasMillisecondPrecisionOrBetter) {
   EXPECT_GT(ts.tv_nsec, 0);
 }
 
-TEST(clock_getres, realtimeFastHasMillisecondPrecisionOrBetter) {
-  ASSERT_EQ(0, clock_getres(CLOCK_REALTIME_FAST, &ts));
-  EXPECT_EQ(0, ts.tv_sec);
-  EXPECT_LT(ts.tv_nsec, 1000000);
-  EXPECT_GT(ts.tv_nsec, 0);
-}
-
 TEST(clock_getres, realtimeCoarseHasMillisecondPrecisionOrBetter) {
-  if (clock_getres(CLOCK_REALTIME_COARSE, &ts)) return;
-  EXPECT_EQ(0, ts.tv_sec);
-  EXPECT_LT(ts.tv_nsec, 100000000);
-  EXPECT_GT(ts.tv_nsec, 0);
-}
-
-TEST(clock_getres, realtimePreciseHasMillisecondPrecisionOrBetter) {
-  if (clock_getres(CLOCK_REALTIME_PRECISE, &ts)) return;
+  if (clock_getres(CLOCK_REALTIME_COARSE, &ts))
+    return;
   EXPECT_EQ(0, ts.tv_sec);
   EXPECT_LT(ts.tv_nsec, 100000000);
   EXPECT_GT(ts.tv_nsec, 0);
@@ -60,22 +47,9 @@ TEST(clock_getres, monotonicHasMillisecondPrecisionOrBetter) {
   EXPECT_GT(ts.tv_nsec, 0);
 }
 
-TEST(clock_getres, monotonicFastHasMillisecondPrecisionOrBetter) {
-  ASSERT_EQ(0, clock_getres(CLOCK_MONOTONIC_FAST, &ts));
-  EXPECT_EQ(0, ts.tv_sec);
-  EXPECT_LT(ts.tv_nsec, 1000000);
-  EXPECT_GT(ts.tv_nsec, 0);
-}
-
 TEST(clock_getres, monotonicCoarseHasMillisecondPrecisionOrBetter) {
-  if (clock_getres(CLOCK_MONOTONIC_COARSE, &ts)) return;
-  EXPECT_EQ(0, ts.tv_sec);
-  EXPECT_LT(ts.tv_nsec, 100000000);
-  EXPECT_GT(ts.tv_nsec, 0);
-}
-
-TEST(clock_getres, monotonicPreciseHasMillisecondPrecisionOrBetter) {
-  if (clock_getres(CLOCK_MONOTONIC_PRECISE, &ts)) return;
+  if (clock_getres(CLOCK_MONOTONIC_COARSE, &ts))
+    return;
   EXPECT_EQ(0, ts.tv_sec);
   EXPECT_LT(ts.tv_nsec, 100000000);
   EXPECT_GT(ts.tv_nsec, 0);

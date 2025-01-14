@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2020 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -27,7 +27,8 @@ int sys_chdir_nt_impl(char16_t[hasatleast PATH_MAX], uint32_t);
 
 textwindows int sys_fchdir_nt(int dirfd) {
   char16_t dir[PATH_MAX];
-  if (!__isfdkind(dirfd, kFdFile)) return ebadf();
+  if (!__isfdkind(dirfd, kFdFile))
+    return ebadf();
   return sys_chdir_nt_impl(
       dir, GetFinalPathNameByHandle(g_fds.p[dirfd].handle, dir, ARRAYLEN(dir),
                                     kNtFileNameNormalized | kNtVolumeNameDos));

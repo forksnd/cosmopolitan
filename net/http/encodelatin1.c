@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2021 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -17,8 +17,6 @@
 │ PERFORMANCE OF THIS SOFTWARE.                                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
 #include "libc/errno.h"
-#include "libc/intrin/pcmpgtb.h"
-#include "libc/intrin/pmovmskb.h"
 #include "libc/mem/mem.h"
 #include "libc/stdio/stdio.h"
 #include "libc/str/str.h"
@@ -41,17 +39,21 @@ char *EncodeLatin1(const char *p, size_t n, size_t *z, int f) {
   char t[256];
   char *r, *q;
   bzero(t, sizeof(t));
-  if (f & kControlC0) memset(t + 0x00, 1, 0x20 - 0x00), t[0x7F] = 1;
-  if (f & kControlC1) memset(t + 0x80, 1, 0xA0 - 0x80);
+  if (f & kControlC0)
+    memset(t + 0x00, 1, 0x20 - 0x00), t[0x7F] = 1;
+  if (f & kControlC1)
+    memset(t + 0x80, 1, 0xA0 - 0x80);
   t['\t'] = t['\r'] = t['\n'] = t['\v'] = !!(f & kControlWs);
-  if (z) *z = 0;
-  if (n == -1) n = p ? strlen(p) : 0;
+  if (z)
+    *z = 0;
+  if (n == -1)
+    n = p ? strlen(p) : 0;
   if ((q = r = malloc(n + 1))) {
     for (i = 0; i < n;) {
       c = p[i++] & 0xff;
       if (c >= 0300) {
         if ((c <= 0303) && i < n && (p[i] & 0300) == 0200) {
-          c = (c & 037) << 6 | p[i++] & 077;
+          c = (c & 037) << 6 | (p[i++] & 077);
         } else {
           goto Invalid;
         }
@@ -61,9 +63,11 @@ char *EncodeLatin1(const char *p, size_t n, size_t *z, int f) {
       }
       *q++ = c;
     }
-    if (z) *z = q - r;
+    if (z)
+      *z = q - r;
     *q++ = '\0';
-    if ((q = realloc(r, q - r))) r = q;
+    if ((q = realloc(r, q - r)))
+      r = q;
   }
   return r;
 Invalid:

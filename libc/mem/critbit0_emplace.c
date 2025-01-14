@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2020 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -21,27 +21,40 @@
 #include "libc/mem/mem.h"
 #include "libc/str/str.h"
 
+static void *critbit0_dup(const void *u, size_t ulen) {
+  char *res;
+  if ((res = malloc(ulen + 1))) {
+    if (ulen) {
+      memcpy(res, u, ulen);
+    }
+    res[ulen] = 0;
+  }
+  return res;
+}
+
 /**
  * Inserts 𝑢 into 𝑡 without copying.
  *
- * @param t is critical bit tree
- * @param u is nul-terminated string which must be 8+ byte aligned
- *     and becomes owned by the tree afterwards
- * @return true if 𝑡 was mutated, or -1 w/ errno
+ * @return 1 if 𝑡 was mutated, 0 if present, or -1 w/ errno
  * @note h/t djb and agl
  */
-int critbit0_emplace(struct critbit0 *t, char *u, size_t ulen) {
+int critbit0_emplace(struct critbit0 *t, const void *u, size_t ulen) {
   unsigned char *p = t->root;
   if (!p) {
-    t->root = u;
-    t->count = 1;
-    return 1;
+    if ((u = critbit0_dup(u, ulen))) {
+      t->root = (void *)u;
+      t->count = 1;
+      return 1;
+    } else {
+      return -1;
+    }
   }
-  const unsigned char *const ubytes = (void *)u;
+  const unsigned char *ubytes = (void *)u;
   while (1 & (intptr_t)p) {
     struct CritbitNode *q = (void *)(p - 1);
     unsigned char c = 0;
-    if (q->byte < ulen) c = ubytes[q->byte];
+    if (q->byte < ulen)
+      c = ubytes[q->byte];
     const int direction = (1 + (q->otherbits | c)) >> 8;
     p = q->child[direction];
   }
@@ -66,19 +79,24 @@ DifferentByteFound:
   unsigned char c = p[newbyte];
   int newdirection = (1 + (newotherbits | c)) >> 8;
   struct CritbitNode *newnode;
-  if ((newnode = malloc(sizeof(struct CritbitNode)))) {
+  if ((newnode = malloc(sizeof(struct CritbitNode))) &&
+      (ubytes = critbit0_dup(ubytes, ulen))) {
     newnode->byte = newbyte;
     newnode->otherbits = newotherbits;
     newnode->child[1 - newdirection] = (void *)ubytes;
     void **wherep = &t->root;
     for (;;) {
       unsigned char *wp = *wherep;
-      if (!(1 & (intptr_t)wp)) break;
+      if (!(1 & (intptr_t)wp))
+        break;
       struct CritbitNode *q = (void *)(wp - 1);
-      if (q->byte > newbyte) break;
-      if (q->byte == newbyte && q->otherbits > newotherbits) break;
+      if (q->byte > newbyte)
+        break;
+      if (q->byte == newbyte && q->otherbits > newotherbits)
+        break;
       unsigned char c2 = 0;
-      if (q->byte < ulen) c2 = ubytes[q->byte];
+      if (q->byte < ulen)
+        c2 = ubytes[q->byte];
       const int direction = (1 + (q->otherbits | c2)) >> 8;
       wherep = q->child + direction;
     }
@@ -87,6 +105,7 @@ DifferentByteFound:
     t->count++;
     return 1;
   } else {
+    free(newnode);
     return -1;
   }
 }

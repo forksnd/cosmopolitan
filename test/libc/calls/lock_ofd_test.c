@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2022 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -23,7 +23,7 @@
 #include "libc/dce.h"
 #include "libc/errno.h"
 #include "libc/intrin/kprintf.h"
-#include "libc/macros.internal.h"
+#include "libc/macros.h"
 #include "libc/runtime/runtime.h"
 #include "libc/sysv/consts/f.h"
 #include "libc/sysv/consts/o.h"
@@ -39,21 +39,24 @@
 #define RATIO      3
 #define ITERATIONS 10
 
-char testlib_enable_tmp_setup_teardown;
+void SetUpOnce(void) {
+  testlib_enable_tmp_setup_teardown();
+}
 
 _Thread_local const char *kind;
 
 bool SupportsOfdLocks(void) {
   int e;
   bool r;
-  if (!IsLinux()) return false;
+  if (!IsLinux())
+    return false;
   // F_OFD_* was introduced in linux 3.15
   // getrandom() was introduced in linux 3.17
   // testing for getrandom() should be a sure thing w/o creating an fd
   e = errno;
-  BLOCK_CANCELLATIONS;
+  BLOCK_CANCELATION;
   r = !sys_getrandom(0, 0, 0);
-  ALLOW_CANCELLATIONS;
+  ALLOW_CANCELATION;
   errno = e;
   return r;
 }

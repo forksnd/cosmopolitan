@@ -1,4 +1,3 @@
-/* clang-format off */
 //===-- lib/divtf3.c - Quad-precision division --------------------*- C -*-===//
 //
 //                     The LLVM Compiler Infrastructure
@@ -17,7 +16,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-STATIC_YOINK("huge_compiler_rt_license");
+__static_yoink("huge_compiler_rt_license");
 
 #define QUAD_PRECISION
 #include "libc/literal.h"

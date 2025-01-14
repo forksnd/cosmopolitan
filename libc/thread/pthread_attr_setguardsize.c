@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2022 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -19,9 +19,10 @@
 #include "libc/thread/thread.h"
 
 /**
- * Sets size of unmapped pages at bottom of stack.
+ * Sets minimum size of protected region beneath thread stack.
  *
- * @param guardsize contains guard size in bytes
+ * @param guardsize contains guard size in bytes, which is implicitly
+ *     rounded up to `sysconf(_SC_PAGESIZE)`, or zero to disable
  * @return 0 on success, or errno on error
  */
 errno_t pthread_attr_setguardsize(pthread_attr_t *attr, size_t guardsize) {

@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2022 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -16,26 +16,34 @@
 │ TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR             │
 │ PERFORMANCE OF THIS SOFTWARE.                                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
-#include "libc/intrin/strace.internal.h"
+#include "tool/plinko/lib/printf.h"
+#include "libc/intrin/strace.h"
 #include "libc/nexgen32e/rdtsc.h"
 #include "libc/runtime/runtime.h"
 #include "libc/str/str.h"
-#include "libc/time/clockstonanos.internal.h"
 #include "tool/plinko/lib/char.h"
 #include "tool/plinko/lib/plinko.h"
 #include "tool/plinko/lib/print.h"
-#include "tool/plinko/lib/printf.h"
+
+static inline uint64_t ClocksToNanos(uint64_t x, uint64_t y) {
+  // approximation of round(x*.323018) which is usually
+  // the ratio between inva rdtsc ticks and nanoseconds
+  uint128_t difference = x - y;
+  return (difference * 338709) >> 20;
+}
 
 static inline long GetVarInt(va_list va, signed char t) {
-  if (t <= 0) return va_arg(va, int);
+  if (t <= 0)
+    return va_arg(va, int);
   return va_arg(va, long);
 }
 
 static int PrintStr(int fd, const char *s, int cols) {
-  int n, j, k = 0, i = 0;
+  int n, k = 0, i = 0;
   n = strlen(s);
   k += PrintIndent(fd, +cols - n);
-  while (i < n) k += PrintChar(fd, s[i++]);
+  while (i < n)
+    k += PrintChar(fd, s[i++]);
   k += PrintIndent(fd, -cols - n);
   return k;
 }
@@ -77,7 +85,7 @@ int Vfnprintf(const char *f, va_list va, int fd, int n) {
   const char *s;
   signed char type;
   char quot, ansi, gotr, pdot, zero;
-  int b, c, i, x, y, si, prec, cols, sign;
+  int b, c, x, y, si, prec, cols, sign;
   gotr = false;
   t = rdtsc();
   ftrace_enabled(-1);
@@ -85,7 +93,8 @@ int Vfnprintf(const char *f, va_list va, int fd, int n) {
   ++recursive;
   for (ansi = 0;;) {
     for (;;) {
-      if (!(c = *f++ & 0377) || c == L'%') break;
+      if (!(c = *f++ & 0377) || c == L'%')
+        break;
       if (c >= 0300) {
         for (b = 0200; c & b; b >>= 1) {
           c ^= b;
@@ -118,12 +127,13 @@ int Vfnprintf(const char *f, va_list va, int fd, int n) {
           }
           break;
         default:
-          unreachable;
+          __builtin_unreachable();
       }
     EmitFormatByte:
       PrintChar(fd, c);
     }
-    if (!c) break;
+    if (!c)
+      break;
     prec = 0;
     pdot = 0;
     cols = 0;
@@ -221,7 +231,8 @@ int Vfnprintf(const char *f, va_list va, int fd, int n) {
           }
           break;
         case L'p':
-          if (simpler) goto SimplePrint;
+          if (simpler)
+            goto SimplePrint;
           // fallthrough
         case L'P':
           n += PrettyPrint(fd, va_arg(va, int),
@@ -251,7 +262,8 @@ int Vfnprintf(const char *f, va_list va, int fd, int n) {
             PrintChar(fd, L'(');
             for (;;) {
               n += Print(fd, Car(Car(b)));
-              if ((b = Cdr(b)) >= 0) break;
+              if ((b = Cdr(b)) >= 0)
+                break;
               PrintChar(fd, L' ');
             }
             PrintChar(fd, L')');
@@ -279,7 +291,8 @@ int Vfnprintf(const char *f, va_list va, int fd, int n) {
           break;
         case L's':
           s = va_arg(va, const char *);
-          if (!s) s = "NULL";
+          if (!s)
+            s = "NULL";
           n += PrintStr(fd, s, cols * sign);
           break;
         case L'c':

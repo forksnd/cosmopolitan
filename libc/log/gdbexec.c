@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2020 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -17,8 +17,7 @@
 │ PERFORMANCE OF THIS SOFTWARE.                                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
 #include "libc/calls/calls.h"
-#include "libc/fmt/fmt.h"
-#include "libc/intrin/safemacros.internal.h"
+#include "libc/intrin/safemacros.h"
 #include "libc/log/gdb.h"
 #include "libc/log/log.h"
 #include "libc/nexgen32e/stackframe.h"
@@ -28,13 +27,13 @@
 /**
  * Attaches GDB temporarily, to do something like print a variable.
  */
-privileged int(gdbexec)(const char *cmd) {
+relegated int(gdbexec)(const char *cmd) {
+  int pid;
   struct StackFrame *bp;
-  int pid, ttyin, ttyout;
-  intptr_t continuetoaddr;
   const char *se, *elf, *gdb;
   char pidstr[11], breakcmd[40];
-  if (!(gdb = GetGdbPath())) return -1;
+  if (!(gdb = GetGdbPath()))
+    return -1;
   snprintf(pidstr, sizeof(pidstr), "%u", getpid());
   if ((elf = FindDebugBinary())) {
     se = "-se";
@@ -43,8 +42,7 @@ privileged int(gdbexec)(const char *cmd) {
     elf = "-q";
   }
   bp = __builtin_frame_address(0);
-  continuetoaddr = bp->addr;
-  sprintf(breakcmd, "%s *%#p", "break", bp->addr);
+  sprintf(breakcmd, "%s *%#lx", "break", (unsigned long)bp->addr);
   if (!(pid = vfork())) {
     execv(gdb, (char *const[]){
                    "gdb",
@@ -52,8 +50,8 @@ privileged int(gdbexec)(const char *cmd) {
                    "--nh",
                    "-p",
                    pidstr,
-                   se,
-                   elf,
+                   (char *)se,
+                   (char *)elf,
                    "-ex",
                    "set osabi GNU/Linux",
                    "-ex",
@@ -66,7 +64,7 @@ privileged int(gdbexec)(const char *cmd) {
                    "-ex",
                    breakcmd,
                    "-ex",
-                   cmd,
+                   (char *)cmd,
                    "-ex",
                    "quit",
                    NULL,

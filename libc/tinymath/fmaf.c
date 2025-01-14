@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:t;c-basic-offset:8;tab-width:8;coding:utf-8   -*-│
-│vi: set et ft=c ts=8 tw=8 fenc=utf-8                                       :vi│
+│ vi: set noet ft=c ts=8 sw=8 fenc=utf-8                                   :vi │
 ╚──────────────────────────────────────────────────────────────────────────────╝
 │                                                                              │
 │  Musl Libc                                                                   │
@@ -26,16 +26,10 @@
 │                                                                              │
 ╚─────────────────────────────────────────────────────────────────────────────*/
 #include "libc/math.h"
+#include "libc/nexgen32e/x86feature.h"
 #include "libc/runtime/fenv.h"
-
-asm(".ident\t\"\\n\\n\
-Fused Multiply Add (MIT License)\\n\
-Copyright (c) 2005-2011 David Schultz <das@FreeBSD.ORG>\"");
-asm(".ident\t\"\\n\\n\
-Musl libc (MIT License)\\n\
-Copyright 2005-2014 Rich Felker, et. al.\"");
-asm(".include \"libc/disclaimer.inc\"");
-// clang-format off
+__static_yoink("musl_libc_notice");
+__static_yoink("freebsd_libm_notice");
 
 /* origin: FreeBSD /usr/src/lib/msun/src/s_fmaf.c */
 /*-
@@ -106,11 +100,21 @@ float fmaf(float x, float y, float z)
 
 #else
 
+#ifdef __x86_64__
+	if (X86_HAVE(FMA)) {
+		asm("vfmadd132ss\t%1,%2,%0" : "+x"(x) : "x"(y), "x"(z));
+		return x;
+	} else if (X86_HAVE(FMA4)) {
+		asm("vfmaddss\t%3,%2,%1,%0" : "=x"(x) : "x"(x), "x"(y), "x"(z));
+		return x;
+	}
+#endif
+
 	/* A double has more than twice as much precision than a float,
 	   so direct double-precision arithmetic suffices, except where
 	   double rounding occurs. */
 
-	/* #pragma STDC FENV_ACCESS ON */
+/* #pragma STDC FENV_ACCESS ON */
 	double xy, result;
 	union {double f; uint64_t i;} u;
 	int e;

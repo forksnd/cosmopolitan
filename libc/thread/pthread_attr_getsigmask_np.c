@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2022 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -31,7 +31,9 @@
 errno_t pthread_attr_getsigmask_np(const pthread_attr_t *attr,
                                    sigset_t *sigmask) {
   _Static_assert(sizeof(attr->__sigmask) == sizeof(*sigmask), "");
-  if (!attr->__havesigmask) return PTHREAD_ATTR_NO_SIGMASK_NP;
-  if (sigmask) memcpy(sigmask, attr->__sigmask, sizeof(*sigmask));
+  if (!attr->__havesigmask)
+    return PTHREAD_ATTR_NO_SIGMASK_NP;
+  if (sigmask)
+    *sigmask = attr->__sigmask;
   return 0;
 }

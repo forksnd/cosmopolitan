@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2022 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -18,10 +18,9 @@
 ╚─────────────────────────────────────────────────────────────────────────────*/
 #include "libc/assert.h"
 #include "libc/dce.h"
-#include "libc/intrin/asan.internal.h"
 #include "libc/str/str.h"
 
-static noasan size_t strnlen_s_x64(const char *s, size_t n, size_t i) {
+static size_t strnlen_s_x64(const char *s, size_t n, size_t i) {
   uint64_t w;
   for (; i + 8 < n; i += 8) {
     w = *(uint64_t *)(s + i);
@@ -45,17 +44,19 @@ static noasan size_t strnlen_s_x64(const char *s, size_t n, size_t i) {
  * @return byte length
  * @asyncsignalsafe
  */
-noasan size_t strnlen_s(const char *s, size_t n) {
+size_t strnlen_s(const char *s, size_t n) {
   size_t i;
-  if (!s) return 0;
-  if (IsAsan()) __asan_verify(s, n);
+  if (!s)
+    return 0;
   for (i = 0; (uintptr_t)(s + i) & 7; ++i) {
-    if (i == n || !s[i]) return i;
+    if (i == n || !s[i])
+      return i;
   }
   i = strnlen_s_x64(s, n, i);
   for (;; ++i) {
-    if (i == n || !s[i]) break;
+    if (i == n || !s[i])
+      break;
   }
-  _unassert(i == n || (i < n && !s[i]));
+  unassert(i == n || (i < n && !s[i]));
   return i;
 }

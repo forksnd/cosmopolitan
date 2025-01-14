@@ -1,11 +1,10 @@
 #ifndef COSMOPOLITAN_LIBC_BITS_POPCNT_H_
 #define COSMOPOLITAN_LIBC_BITS_POPCNT_H_
 #include "libc/nexgen32e/x86feature.h"
-#if !(__ASSEMBLER__ + __LINKER__ + 0)
 COSMOPOLITAN_C_START_
 
-size_t _countbits(const void *, size_t);
-unsigned long popcnt(unsigned long) pureconst;
+libcesque size_t _countbits(const void *, size_t);
+libcesque unsigned long popcnt(unsigned long) pureconst;
 
 #if defined(__GNUC__) && !defined(__STRICT_ANSI__) && defined(__x86_64__)
 #define popcnt(X)                                                \
@@ -23,5 +22,4 @@ unsigned long popcnt(unsigned long) pureconst;
 #endif /* GNUC && !ANSI */
 
 COSMOPOLITAN_C_END_
-#endif /* !(__ASSEMBLER__ + __LINKER__ + 0) */
 #endif /* COSMOPOLITAN_LIBC_BITS_POPCNT_H_ */

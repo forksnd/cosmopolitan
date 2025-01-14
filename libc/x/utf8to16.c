@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2021 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -34,11 +34,14 @@ char16_t *utf8to16(const char *p, size_t n, size_t *z) {
   wint_t x, a, b;
   char16_t *r, *q;
   unsigned m, j, w;
-  if (z) *z = 0;
-  if (n == -1) n = p ? strlen(p) : 0;
+  if (z)
+    *z = 0;
+  if (n == -1)
+    n = p ? strlen(p) : 0;
   if ((q = r = malloc((n + 16) * sizeof(char16_t) * 2 + sizeof(char16_t)))) {
     for (i = 0; i < n;) {
-#if defined(__SSE2__) && defined(__GNUC__) && !defined(__STRICT_ANSI__)
+#if defined(__SSE2__) && defined(__GNUC__) && !defined(__STRICT_ANSI__) && \
+    !defined(__llvm__) && !defined(__chibicc__)
       if (i + 16 < n) {
         typedef char xmm_t __attribute__((__vector_size__(16), __aligned__(1)));
         xmm_t vi, vz = {0};
@@ -65,7 +68,8 @@ char16_t *utf8to16(const char *p, size_t n, size_t *z) {
         if (i + m <= n) {
           for (j = 0;;) {
             b = p[i + j] & 0xff;
-            if (!ThomPikeCont(b)) break;
+            if (!ThomPikeCont(b))
+              break;
             a = ThomPikeMerge(a, b);
             if (++j == m) {
               x = a;
@@ -77,11 +81,14 @@ char16_t *utf8to16(const char *p, size_t n, size_t *z) {
       }
       w = EncodeUtf16(x);
       *q++ = w;
-      if ((w >>= 16)) *q++ = w;
+      if ((w >>= 16))
+        *q++ = w;
     }
-    if (z) *z = q - r;
+    if (z)
+      *z = q - r;
     *q++ = '\0';
-    if ((q = realloc(r, (q - r) * sizeof(char16_t)))) r = q;
+    if ((q = realloc(r, (q - r) * sizeof(char16_t))))
+      r = q;
   }
   return r;
 }

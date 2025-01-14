@@ -16,8 +16,8 @@
 ** This file is #include-ed onto the end of "rtree.c" so that it has
 ** access to all of the R-Tree internals.
 */
-#include "third_party/gdtoa/gdtoa.h"
-/* clang-format off */
+#include "libc/ctype.h"
+#include "libc/fmt/conv.h"
 
 /* Enable -DGEOPOLY_ENABLE_DEBUG for debugging facilities */
 #ifdef GEOPOLY_ENABLE_DEBUG

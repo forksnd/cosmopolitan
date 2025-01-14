@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:t;c-basic-offset:8;tab-width:8;coding:utf-8   -*-│
-│vi: set et ft=c ts=8 tw=8 fenc=utf-8                                       :vi│
+│ vi: set noet ft=c ts=8 sw=8 fenc=utf-8                                   :vi │
 ╚──────────────────────────────────────────────────────────────────────────────╝
 │                                                                              │
 │  Musl Libc                                                                   │
@@ -25,25 +25,21 @@
 │  SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.                      │
 │                                                                              │
 ╚─────────────────────────────────────────────────────────────────────────────*/
+#include "third_party/musl/tempnam.h"
 #include "libc/calls/calls.h"
 #include "libc/calls/struct/stat.h"
 #include "libc/calls/struct/timespec.h"
 #include "libc/errno.h"
+#include "libc/limits.h"
 #include "libc/mem/mem.h"
 #include "libc/runtime/runtime.h"
 #include "libc/str/str.h"
 #include "libc/sysv/consts/at.h"
 #include "libc/sysv/consts/clock.h"
-#include "libc/time/time.h"
-#include "third_party/musl/tempnam.h"
+#include "libc/time.h"
+__static_yoink("musl_libc_notice");
 
 #define MAXTRIES 100
-
-asm(".ident\t\"\\n\\n\
-Musl libc (MIT License)\\n\
-Copyright 2005-2014 Rich Felker, et. al.\"");
-asm(".include \"libc/disclaimer.inc\"");
-/* clang-format off */
 
 static char *
 __randname(char *template)
@@ -52,7 +48,7 @@ __randname(char *template)
 	struct timespec ts;
 	unsigned long r;
 	clock_gettime(CLOCK_REALTIME, &ts);
-	r = ts.tv_nsec * 65537 ^ (uintptr_t)&ts / 16 + (uintptr_t) template;
+	r = ts.tv_nsec * 65537 ^ ((uintptr_t)&ts / 16 + (uintptr_t) template);
 	for (i = 0; i < 6; i++, r >>= 5) template[i] = 'A' + (r & 15) + (r & 16) * 2;
 	return template;
 }
@@ -66,7 +62,7 @@ tempnam(const char *dir, const char *pfx)
 	int i, r;
 	char s[PATH_MAX];
 	size_t l, dl, pl;
-	if (!dir) dir = kTmpPath;
+	if (!dir) dir = __get_tmpdir();
 	if (!pfx) pfx = "temp";
 	dl = strlen(dir);
 	pl = strlen(pfx);

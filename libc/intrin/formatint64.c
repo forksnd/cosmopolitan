@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2021 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -50,6 +50,7 @@ dontinline char *FormatUint64(char p[static 21], uint64_t x) {
  * @return pointer to nul byte
  */
 char *FormatInt64(char p[static 21], int64_t x) {
-  if (x < 0) *p++ = '-', x = -(uint64_t)x;
+  if (x < 0)
+    *p++ = '-', x = -(uint64_t)x;
   return FormatUint64(p, x);
 }

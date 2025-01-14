@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2020 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -16,7 +16,6 @@
 │ TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR             │
 │ PERFORMANCE OF THIS SOFTWARE.                                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
-#include "libc/mem/bisect.internal.h"
 #include "libc/nexgen32e/x86info.h"
 
 static int CmpX86ProcModelKey(const struct X86ProcessorModel *a,
@@ -32,7 +31,8 @@ static int CmpX86ProcModelKey(const struct X86ProcessorModel *a,
  * @see https://a4lg.com/tech/x86/database/x86-families-and-models.en.html
  */
 const struct X86ProcessorModel *getx86processormodel(short key) {
-  return bisect(&(struct X86ProcessorModel){key}, kX86ProcessorModels,
-                kX86ProcessorModelCount, sizeof(struct X86ProcessorModel),
-                (void *)CmpX86ProcModelKey, NULL);
+  for (int i = 0; kX86ProcessorModels[i].key; ++i)
+    if (kX86ProcessorModels[i].key == key)
+      return &kX86ProcessorModels[i];
+  return 0;
 }

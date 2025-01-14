@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2020 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -16,7 +16,12 @@
 │ TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR             │
 │ PERFORMANCE OF THIS SOFTWARE.                                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
+#include "libc/calls/calls.h"
+#include "libc/errno.h"
+#include "libc/mem/gc.h"
+#include "libc/mem/mem.h"
 #include "libc/stdio/stdio.h"
+#include "libc/temp.h"
 #include "libc/testlib/testlib.h"
 
 TEST(fmemopen, testWriteRewindRead) {
@@ -30,10 +35,43 @@ TEST(fmemopen, testWriteRewindRead) {
   fclose(f);
 }
 
-/* TEST(fmemopen, testWriteRead_readsNothingButNotEof) { */
-/*   char c; */
-/*   FILE *f; */
-/*   f = fmemopen(NULL, BUFSIZ, "w+"); */
-/*   EXPECT_EQ(1, fwrite("c", 1, 1, f)); */
-/*   EXPECT_EQ(0, fread(&c, 1, 1, f)); */
-/* } */
+TEST(fmemopen_fprintf, test) {
+  FILE *f = fmemopen(NULL, BUFSIZ, "w+");
+  EXPECT_EQ(1, fprintf(f, "%ld", 0L));
+  rewind(f);
+  char buf[8] = {0};
+  EXPECT_EQ(1, fread(&buf, 1, 8, f));
+  EXPECT_STREQ("0", buf);
+  fclose(f);
+}
+
+TEST(fmemopen, seekEofRead) {
+  FILE *f = fmemopen("x", 1, "r+");
+  ASSERT_SYS(EINVAL, -1, fseek(f, -1, SEEK_SET));
+  ASSERT_SYS(EINVAL, -1, fseek(f, +1, SEEK_END));
+  ASSERT_EQ(0, fseek(f, 0, SEEK_END));
+  ASSERT_FALSE(feof(f));
+  ASSERT_EQ(-1, fgetc(f));
+  ASSERT_TRUE(feof(f));
+  fclose(f);
+}
+
+TEST(tmpfile_fprintf, test) {
+  FILE *f = tmpfile();
+  EXPECT_EQ(1, fprintf(f, "%ld", 0L));
+  rewind(f);
+  char buf[8] = {0};
+  EXPECT_EQ(1, fread(&buf, 1, 8, f));
+  EXPECT_STREQ("0", buf);
+  fclose(f);
+}
+
+TEST(fmemopen, small) {
+  FILE *f = fmemopen(gc(malloc(1)), 1, "w+");
+  EXPECT_EQ(3, fprintf(f, "%ld", 123L));
+  rewind(f);
+  char buf[8] = {0};
+  EXPECT_EQ(1, fread(&buf, 1, 8, f));
+  EXPECT_STREQ("1", buf);
+  fclose(f);
+}

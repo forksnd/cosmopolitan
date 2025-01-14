@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2022 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -16,26 +16,29 @@
 │ TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR             │
 │ PERFORMANCE OF THIS SOFTWARE.                                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
-#include "libc/intrin/describeflags.internal.h"
-#include "libc/macros.internal.h"
+#include "libc/dce.h"
+#include "libc/intrin/describeflags.h"
+#include "libc/macros.h"
 #include "libc/nt/enum/consolemodeflags.h"
 #include "libc/sysv/consts/map.h"
 #include "libc/sysv/consts/prot.h"
 
-const char *(DescribeMapFlags)(char buf[64], int x) {
+#define MAP_GROWSDOWN_LINUX 0x00000100
+
+const char *_DescribeMapFlags(char buf[64], int x) {
   const struct DescribeFlags kMapFlags[] = {
-      {MAP_STACK, "STACK"},                      // order matters
-      {MAP_PRIVATE, "PRIVATE"},                  //
-      {MAP_ANONYMOUS, "ANONYMOUS"},              //
-      {MAP_SHARED, "SHARED"},                    //
-      {MAP_FIXED, "FIXED"},                      //
-      {MAP_FIXED_NOREPLACE, "FIXED_NOREPLACE"},  //
-      {MAP_CONCEAL, "CONCEAL"},                  //
-      {MAP_HUGETLB, "HUGETLB"},                  //
-      {MAP_LOCKED, "LOCKED"},                    //
-      {MAP_NORESERVE, "NORESERVE"},              //
-      {MAP_NONBLOCK, "NONBLOCK"},                //
-      {MAP_POPULATE, "POPULATE"},                //
+      {MAP_PRIVATE, "PRIVATE"},                            //
+      {MAP_ANONYMOUS, "ANONYMOUS"},                        //
+      {MAP_SHARED, "SHARED"},                              //
+      {MAP_FIXED, "FIXED"},                                //
+      {MAP_FIXED_NOREPLACE, "FIXED_NOREPLACE"},            //
+      {MAP_HUGETLB, "HUGETLB"},                            //
+      {MAP_CONCEAL, "CONCEAL"},                            //
+      {MAP_LOCKED, "LOCKED"},                              //
+      {MAP_NORESERVE, "NORESERVE"},                        //
+      {MAP_NONBLOCK, "NONBLOCK"},                          //
+      {MAP_POPULATE, "POPULATE"},                          //
+      {IsLinux() ? MAP_GROWSDOWN_LINUX : 0, "GROWSDOWN"},  //
   };
-  return DescribeFlags(buf, 64, kMapFlags, ARRAYLEN(kMapFlags), "MAP_", x);
+  return _DescribeFlags(buf, 64, kMapFlags, ARRAYLEN(kMapFlags), "MAP_", x);
 }

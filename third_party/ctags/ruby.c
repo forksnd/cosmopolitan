@@ -1,4 +1,3 @@
-// clang-format off
 /*
 *   $Id: ruby.c 571 2007-06-24 23:32:14Z elliotth $
 *
@@ -16,6 +15,7 @@
 /*
 *   INCLUDE FILES
 */
+#include "libc/ctype.h"
 #include "third_party/ctags/general.h"  /* must always come first */
 
 #include "libc/mem/alg.h"

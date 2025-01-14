@@ -36,14 +36,10 @@
  * OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
  * EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-#include "libc/calls/calls.h"
-#include "libc/calls/struct/stat.h"
-#include "libc/stdio/rand.h"
-#include "libc/runtime/runtime.h"
-#include "libc/stdio/stdio.h"
-#include "libc/str/str.h"
-#include "libc/time/time.h"
-#include "third_party/zlib/zlib.h"
+#include <stdio.h>
+#include <stdlib.h>
+#include <sys/stat.h>
+#include <time.h>
 // clang-format off
 
 #define DICT "usr/share/dict/hangman"
@@ -178,8 +174,7 @@ void youwon()
 	printf("you win, the word is %s\n",realword);
 }
 
-main(argc,argv)
-	char **argv;
+int main(int argc,char **argv)
 {
 	if(argc==1) dictfile=DICT;
 	else dictfile=argv[1];

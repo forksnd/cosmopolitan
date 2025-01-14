@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ Copyright 2020 Justine Alexandra Roberts Tunney                              │
 │                                                                              │
@@ -16,18 +16,11 @@
 │ TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR             │
 │ PERFORMANCE OF THIS SOFTWARE.                                                │
 ╚─────────────────────────────────────────────────────────────────────────────*/
-#include "libc/calls/asan.internal.h"
-#include "libc/calls/calls.h"
-#include "libc/calls/internal.h"
+#include "libc/calls/struct/timespec.h"
 #include "libc/calls/struct/timespec.internal.h"
-#include "libc/dce.h"
-#include "libc/intrin/asan.internal.h"
-#include "libc/intrin/describeflags.internal.h"
-#include "libc/intrin/strace.internal.h"
-#include "libc/intrin/weaken.h"
-#include "libc/sysv/consts/at.h"
+#include "libc/intrin/describeflags.h"
+#include "libc/intrin/strace.h"
 #include "libc/sysv/errfuns.h"
-#include "libc/zipos/zipos.internal.h"
 
 /**
  * Sets access/modified time on file, the modern way.
@@ -43,35 +36,32 @@
  * @param dirfd can be `AT_FDCWD` or an open directory
  * @param path is filename whose timestamps should be modified
  * @param ts is {access, modified} timestamps, or null for current time
- * @param flags can have `AT_SYMLINK_NOFOLLOW` when `path` is specified
+ * @param flags can have `AT_SYMLINK_NOFOLLOW`
  * @return 0 on success, or -1 w/ errno
  * @raise EINVAL if `flags` had an unrecognized value
+ * @raise EINVAL on XNU or RHEL5 when any `flags` are used
  * @raise EPERM if pledge() is in play without `fattr` promise
  * @raise EACCES if unveil() is in play and `path` isn't unveiled
- * @raise ENOTSUP if `path` is a zip filesystem path or `dirfd` is zip
  * @raise EINVAL if `ts` specifies a nanosecond value that's out of range
  * @raise ENAMETOOLONG if symlink-resolved `path` length exceeds `PATH_MAX`
  * @raise ENAMETOOLONG if component in `path` exists longer than `NAME_MAX`
  * @raise EBADF if `dirfd` isn't a valid fd or `AT_FDCWD`
  * @raise EFAULT if `path` or `ts` memory was invalid
- * @raise EROFS if `path` is on read-only filesystem
- * @raise ENOSYS on bare metal or on rhel5 when `dirfd` or `flags` is used
+ * @raise EROFS if `path` is on read-only filesystem (e.g. zipos)
+ * @raise ENOTSUP on XNU or RHEL5 when `dirfd` isn't `AT_FDCWD`
+ * @raise ENOSYS on bare metal
  * @asyncsignalsafe
- * @threadsafe
  */
 int utimensat(int dirfd, const char *path, const struct timespec ts[2],
               int flags) {
   int rc;
-
   if (!path) {
     rc = efault();  // linux kernel abi behavior isn't supported
   } else {
     rc = __utimens(dirfd, path, ts, flags);
   }
-
   STRACE("utimensat(%s, %#s, {%s, %s}, %#o) → %d% m", DescribeDirfd(dirfd),
          path, DescribeTimespec(0, ts), DescribeTimespec(0, ts ? ts + 1 : 0),
          flags, rc);
-
   return rc;
 }

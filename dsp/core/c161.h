@@ -1,7 +1,6 @@
 #ifndef COSMOPOLITAN_DSP_CORE_C161_H_
 #define COSMOPOLITAN_DSP_CORE_C161_H_
-#include "libc/macros.internal.h"
-#if !(__ASSEMBLER__ + __LINKER__ + 0)
+#include "libc/macros.h"
 
 #define EXTRA_SHARP 2
 
@@ -12,9 +11,8 @@
  * @limit [0..255] → [-510..1,532] → [-127..383] → [0..255]
  * @see C1331()
  */
-forceinline pureconst artificial unsigned char C161(unsigned char al,
-                                                    unsigned char bl,
-                                                    unsigned char cl) {
+__funline unsigned char C161(unsigned char al, unsigned char bl,
+                             unsigned char cl) {
   short ax, bx, cx;
   ax = al;
   bx = bl;
@@ -29,5 +27,4 @@ forceinline pureconst artificial unsigned char C161(unsigned char al,
   return MIN(255, MAX(0, ax));
 }
 
-#endif /* !(__ASSEMBLER__ + __LINKER__ + 0) */
 #endif /* COSMOPOLITAN_DSP_CORE_C161_H_ */

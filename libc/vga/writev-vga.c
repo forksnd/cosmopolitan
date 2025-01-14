@@ -1,5 +1,5 @@
 /*-*- mode:c;indent-tabs-mode:nil;c-basic-offset:2;tab-width:8;coding:utf-8 -*-│
-│vi: set net ft=c ts=2 sts=2 sw=2 fenc=utf-8                                :vi│
+│ vi: set et ft=c ts=2 sts=2 sw=2 fenc=utf-8                               :vi │
 ╞══════════════════════════════════════════════════════════════════════════════╡
 │ This is free and unencumbered software released into the public domain.      │
 │                                                                              │
@@ -24,7 +24,7 @@
 │ ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR        │
 │ OTHER DEALINGS IN THE SOFTWARE.                                              │
 ╚─────────────────────────────────────────────────────────────────────────────*/
-#include "libc/calls/struct/fd.internal.h"
+#include "libc/intrin/fds.h"
 #include "libc/calls/struct/iovec.h"
 #include "libc/calls/struct/iovec.internal.h"
 #include "libc/dce.h"
@@ -39,11 +39,14 @@ ssize_t sys_writev_vga(struct Fd *fd, const struct iovec *iov, int iovlen) {
     void *output = iov[i].iov_base;
     size_t len = iov[i].iov_len;
     res = _TtyWrite(&_vga_tty, output, len);
-    if (res < 0) break;
+    if (res < 0)
+      break;
     wrote += res;
-    if (res != len) return wrote;
+    if (res != len)
+      return wrote;
   }
-  if (!wrote) return res;
+  if (!wrote)
+    return res;
   return wrote;
 }
 
